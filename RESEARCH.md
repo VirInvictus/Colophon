@@ -184,43 +184,256 @@ feature, but shouldn't block v1.
   copied this pass. Needed only if Colophon wants highlight content, not
   just counts.
 
-## 4. Existing third-party tools (cloned for study, not yet deeply read)
+## 4. KOReader's own built-in stats UI (surveyed 2026-07-03)
 
-Shallow-cloned into `~/.gitrepos/.studyrepos/` (outside this repo, reference
-only, not Brandon's code):
+Read in full from the on-device plugin source in
+`research/koreader-plugin-src/statistics.koplugin/` (main.lua 3242 lines,
+calendarview.lua 1591, readerprogress.lua 503). This is what Colophon must
+*not* merely re-skin.
 
-- **`GeorgeSG/KoInsight`** — the main one Brandon asked about by name. Web
-  dashboard (upload a `statistics.sqlite3` or sync a plugin live), has grown
-  a "Reference Pages" feature to normalize progress across devices/layouts,
-  plus annotation (highlights/notes) sync. This is exactly the
-  web-dashboard pattern Colophon exists to avoid *using*, but its feature
-  set is the best map of "what's worth showing" — read its dashboard
-  components / API layer for chart and metric ideas before designing
-  Colophon's widget catalogue.
-- **`paviro/KoShelf`** — combines notes/highlights with statistics into one
-  dashboard. Relevant for the highlight-content angle (§1, §3) since it
-  presumably already solved reading `.sdr` sidecars.
-- **`Yuchen971/Kodashboard`** — a KOReader-side plugin serving a local web
-  dashboard (library, stats, calendar activity, highlights). Different
-  approach (runs on-device) but likely queries the same schema documented
-  above; useful as a second implementation to cross-check query shapes
-  against.
-- **`advokatb/readingstreak.koplugin`** — small, focused KOReader plugin
-  just for streak tracking. Good, minimal reference for one specific derived
-  metric (streaks) without wading through a full dashboard app.
+### 4.1 Recording semantics (interpretation-critical for any consumer)
 
-**Not yet done, still open for the next research pass:** actually reading
-these four repos' source for (a) what KOReader's own built-in statistics
-screen shows natively (so Colophon doesn't duplicate it) and (b) the full
-list of derived metrics/charts they've already built, to sanity-check or
-extend the widget brainstorm in `spec.md`. This pass only confirmed the
-underlying schema and got the tools cloned locally.
+- On each page turn, the time since the previous turn becomes that page's
+  duration, subject to two user settings (defaults `min_sec = 5`,
+  `max_sec = 120`; main.lua:30-31): under `min_sec` the event is
+  **discarded entirely**, over `max_sec` it is **clamped to `max_sec`** at
+  record time (main.lua:2667-2682). Confirmed in the live sample: every
+  row's duration is in [5, 120].
+- Suspend/resume: screensaver time is *excised* (the pause duration is
+  added to the current page's start timestamp on resume, main.lua:2775-2793),
+  not clamped. So a row's `start_time + duration` chain can have clean gaps.
+- Flush to DB every 50 page turns and on close/suspend/before every stats
+  screen (main.lua:29, 2689).
+- KOReader displays two different "total time" numbers for a book:
+  *uncapped* (`sum(duration)` over `page_stat`) and *capped* (per distinct
+  page, `min(sum(duration), max_sec)`; the `STATISTICS_SQL_BOOK_CAPPED_
+  TOTALS_QUERY` at main.lua:41-50). `avg_time` (sec/page, used for the
+  time-left estimate) comes from the **capped** totals. Colophon must
+  reproduce both or its numbers won't match the device.
+- "Today" = since local midnight computed in Lua; "session" = since the
+  reader resumed/opened, not a DB concept (main.lua:1042, 2762-2765).
+- `book.total_read_time`/`total_read_pages` are uncapped cached totals
+  refreshed on flush (main.lua:971-984).
+- A "daily timeline starts at" setting can shift the day boundary for the
+  day view and (optionally) calendar queries (main.lua:2846, 2884); the
+  rest of the UI uses plain local midnight.
 
-## 5. Immediate implications for `spec.md` / `roadmap.md`
+### 4.2 What its screens show
 
-- `spec.md` open question #1 (real schema) is now answered — see §1 above.
-  Update the spec to drop the "unconfirmed" framing and cite this document.
-- Open question #2 (data granularity / font-size handling) is answered:
-  `page_stat_data.total_pages` per-row plus the `page_stat` rescaling view.
-- Still genuinely open: KOReader's built-in stats UI survey, the deeper
-  read of the four cloned tools, and the `.sdr` highlight-content question.
+Everything is a `KeyValuePage` text list except three real visualizations:
+
+- **Current book / book statistics**: session time/pages, today time/pages,
+  total time (capped and uncapped), estimated time left and finish date
+  (`(pages_left) * avg_time`, `now + time_left / (read_time/days)`), days
+  reading, average per day, average per page, start date, pages read as %
+  of current page count, highlight/note counts.
+- **Time range statistics**: eight drill-in lists (all books ranked by
+  total time; books by week/month; last week / last month / last year by
+  day; last year by week; all months), all built on one
+  `GROUP BY id_book, page, strftime(bucket)` query family over the
+  `page_stat` view (main.lua:1855-1913): "pages" = distinct
+  (book, page, bucket).
+- **Reading progress** (also the screensaver widget): last-7-days summary
+  tiles, per-day horizontal bars normalized to the busiest day of the week
+  (readerprogress.lua:196-280), session/today tiles.
+- **Calendar view**: month grid; each day cell has a 24-bar hourly
+  mini-histogram (bar height = fraction of that hour spent reading,
+  main.lua:2837-2880) and up to 3 colored per-book spans that merge across
+  consecutive days (calendarview.lua:194-248); colors are book_id mod an
+  8-entry palette.
+- **Today's timeline / day view**: 24-hour vertical timeline with per-book
+  colored spans placed to the second; queries `page_stat_data` **directly**
+  (real timestamps matter there); spans of the same book separated by
+  ≤ `max(30, min_sec)` s are merged visually (main.lua:2922-3010).
+
+### 4.3 What KOReader does NOT show (gaps Colophon can own)
+
+No streaks; no reading-speed trends (pages/hour over time); no aggregate
+time-of-day or weekday profile across the history (only per-day-cell
+histograms); no cross-book pace comparison; no series/language rollups
+(despite storing both columns); no yearly summaries or books-finished-per-
+year (a "finished" state doesn't even exist in this DB; it lives in `.sdr`
+sidecars); no session-length analysis; and essentially no charts beyond
+the three above.
+
+## 5. Existing third-party tools (read in depth 2026-07-03)
+
+All four in `~/.gitrepos/.studyrepos/` (reference only, not Brandon's
+code). Summary of each tool's metric catalogue and the load-bearing
+implementation choices; line references are into those clones.
+
+### 5.1 KoInsight (`GeorgeSG/KoInsight`, TS web dashboard, MIT)
+
+Re-imports KOReader data into its own SQLite (books keyed by `md5`, page
+stats keyed `(book_md5, device_id, page, start_time)`), then computes
+everything in JS. Notable:
+
+- **Reference pages** is its flagship idea: the user sets a canonical page
+  count per book, and every `page_stat` row is mapped onto that axis. Each
+  row `page` (out of its own `total_pages`) becomes the fractional interval
+  `[(page-1)*ref/total, page*ref/total]`; interval union (merged, then
+  summed; `apps/server/src/utils/ranges.ts`) gives **unique pages read**
+  and a percent-complete immune to both re-reads and pagination drift.
+  This is the single best derived-metric idea in any of the four tools.
+- Multi-device: same-device re-syncs are idempotent (upsert on the 4-tuple)
+  but genuinely concurrent reads on two devices double-count; it doesn't
+  try to solve that.
+- Charts (Recharts): GitHub-style dot-trail day heatmap (intensity relative
+  to the single best day ever), weekly area chart, weekday bar chart
+  (raw sums, not normalized), monthly bar chart, per-book donut + calendar.
+- Conspicuously absent: sessions, streaks, reading speed, any time-of-day
+  analysis, finished-state, year-in-review.
+
+### 5.2 KoShelf (`paviro/KoShelf`, Rust + React static-ish site, EUPL)
+
+The most sophisticated of the four, and the closest in spirit to a "real"
+stats engine. Rust ingest → own SQLite → axum API → hand-rolled charts.
+
+- **Copies the DB to a temp snapshot before opening** (WAL-safe), then
+  opens `?mode=ro`, and reads the **`page_stat` view**, not the raw table
+  (`src/source/koreader/database.rs`).
+- **Dedupes `book` rows sharing an md5** (KOReader's unique index is
+  (title, authors, md5), so editing a book's metadata creates a second row
+  for the same file): canonical row = max(last_open, id), totals summed,
+  page stats remapped (`database.rs:146-206`).
+- **Session = per-book cluster of page stats where each row starts ≤ 300 s
+  after the previous row's end** (`compute/sessions.rs:6`). Sessions never
+  span books. Derived: count, average, longest, per-bucket series.
+- **Completion detection**, its flagship idea: a "read-through" is a
+  progression of page stats visiting ≥ 78 % of pages including a page in
+  the first 20 % and one in the last 2 %; backwards jumps to the first 5 %
+  split a new progression only if the remainder would itself form a valid
+  completion (`compute/completion_detection.rs`). Yields per-completion
+  start/end dates, reading time, session count, and pages/hour. This is
+  how it gets books-finished-per-year out of a DB with no finished flag.
+- **Streaks**: consecutive-calendar-day runs; current streak alive iff the
+  last read day is today or yesterday.
+- **Configurable logical day start** (`--day-start-time HH:MM`; reading at
+  02:00 can count as the previous day) and timezone (`time_config.rs`).
+- **Per-page activity grid** per book: per-page total duration + read
+  count, sqrt height scaling capped at the 90th percentile, with
+  highlight/note/bookmark markers at their pages, optionally filtered to
+  one completion. The most underexplored visualization in the space.
+- Also: yearly recap (share images), month calendar with multi-day event
+  spans, ISO-week stats, min-pages/min-time noise filters, "pagemap"
+  synthetic-page scaling when sidecars carry it.
+
+### 5.3 Kodashboard (`Yuchen971/Kodashboard`, on-device plugin + web SPA)
+
+Queries `page_stat_data` directly (not the view) with
+`date(start_time,'unixepoch','localtime')` day bucketing throughout.
+
+- Calls every raw row a "session" (no gap threshold anywhere) and counts
+  page-turn *events* as "pages"; a caution, not a model to copy.
+- Streaks: same today-or-yesterday grace rule, implemented three separate
+  times (server + client + per-window).
+- Charts: SVG area trend, monthly bars, weekday-average bars, 24-hour
+  activity pills, top-books meters, month heat calendar (continuous 0-1
+  intensity normalized to the 90-day max), per-book 13-week Monday-aligned
+  heatmap that also marks annotation-only days, milestones timeline, and an
+  "insights" prose card (pace up/down/steady = second half vs first half of
+  the window at ±15 %).
+- Reads highlight *content* from `.sdr` sidecars via raw Lua `dofile`,
+  matching sidecar `partial_md5_checksum` against `book.md5`, with a fuzzy
+  title/author/pages scorer as fallback.
+- Trusts `book.total_read_time`/`total_read_pages` for all-time totals.
+
+### 5.4 readingstreak.koplugin (`advokatb`, on-device streak plugin)
+
+Streaks from its own `reading_history` array of "YYYY-MM-DD" strings, not
+live DB queries; the DB is only used for one-time import and weekly-time
+display. The algorithm details are the reference for Colophon's streak
+widget:
+
+- A day counts once any page turn happens (optional page/time thresholds,
+  both default 0). Current streak alive iff last read day is today or
+  yesterday; a gap of ≥ 2 days zeroes it; longest = max consecutive run.
+  Date math via Julian day numbers (DST-safe).
+- Its import query is the correct "distinct pages per day" shape:
+  `GROUP BY date, id_book, page` inside, then `GROUP BY date` outside, over
+  the `page_stat` view in localtime (`statistics_importer.lua:32-46`).
+- Also tracks week streaks (Monday-start, hand-rolled week numbering) and
+  a binary month calendar (day read / not read).
+
+## 6. Conventions Colophon adopts (converged across tools)
+
+| Concern | Convention | Source |
+|---|---|---|
+| Day bucketing | `date(start_time,'unixepoch','localtime')`, i.e. local midnight | all tools + KOReader itself |
+| Session | per-book; new session when a row starts > 300 s after previous row's end | KoShelf (only real implementation) |
+| Streak | day counts if any reading; current streak alive if last day is today **or** yesterday; ≥ 2-day gap → 0 | readingstreak, Kodashboard, KoShelf (independent convergence) |
+| "Pages read" | distinct (book, page) per bucket, never raw event count | KOReader, readingstreak |
+| Book identity | `book.md5` (KOReader's partial MD5); merge `book` rows sharing an md5 | KoShelf, KoInsight, Kodashboard |
+| Page axis | `page_stat` view for anything page-positional; `page_stat_data` for real timestamps (timelines) | KOReader itself |
+| Device parity | reproduce both capped and uncapped totals; label which is shown | KOReader (§4.1) |
+| Progress % | interval-union of fractional page spans (unique pages read) | KoInsight |
+| Completion | 78 % / first-20 % / last-2 % progression detection | KoShelf |
+
+Junk filtering is Colophon's own addition: the live sample contains plugin
+READMEs and the quickstart guide as "books" (§1); a minimum-total-read-time
+display filter (KOReader's own purge uses < N minutes) handles it.
+
+Note the *Jingo* case in the sample: two `book` rows with the same
+title/authors but different md5s and page counts. That is two different
+*files* (e.g. a re-download), not the metadata-edit duplication KoShelf's
+md5-dedup solves. Grouping same-title/author books for display is a
+Colophon design decision (group in UI, never merge in data).
+
+## 7. The `.sdr` sidecar question (answered from source, sample pending)
+
+Structure fully documented from KoShelf's parser + Kodashboard's loader;
+no live sample copied yet (Kindle wasn't mounted this pass; grab
+`<book>.sdr/metadata.epub.lua` for one highlighted book next time it is).
+
+- Location: `<book dir>/<stem>.sdr/metadata.<ext>.lua` next to the book by
+  default (KOReader can be configured for central `docsettings/` or
+  hash-named `hashdocsettings/` dirs instead).
+- Format: a Lua chunk `return`ing a table. Keys of interest:
+  `annotations` (array of `{chapter, datetime, pageno, pos0, pos1, text,
+  note, color, drawer}`; no `drawer` ⇒ bookmark, `note` present ⇒ note),
+  `partial_md5_checksum` (**the join key to `book.md5`**),
+  `percent_finished` (0-1), `summary` (`status` reading/complete/abandoned,
+  `rating` stars, `note` review text, `modified` date), `doc_props`,
+  `doc_pages`, plus typesetting state (font, margins, pagemap fields).
+- Parsing in Rust: KoShelf evaluates the chunk in a sandboxed `mlua` VM
+  (`Lua::new_with(StdLib::NONE, ...)`), lossily fixing invalid UTF-8 first.
+  Clean, safe, directly reusable pattern, but it means an `mlua` dependency
+  when this comes in scope (ask first, per house rules).
+- `summary.status` is also the only source of a user-declared
+  "finished" state anywhere in KOReader; the stats DB has none.
+
+## 8. What's genuinely underexplored (Colophon's opening)
+
+Across KOReader's UI and all four tools, nobody ships:
+
+1. **Reading-speed analytics.** Pages/hour over time, per-book vs library
+   baseline, speed by time of day. (KoShelf computes a single pages/hour
+   per completion; that's the entire field.)
+2. **Session-length analysis.** KoShelf counts/averages sessions; nobody
+   shows a session-length distribution, session start-time patterns, or
+   long-session records.
+3. **Aggregate time-of-day × weekday profile.** "When do I read" as a
+   7×24 heatmap over the whole history. KOReader has per-day cell
+   histograms; Kodashboard has a flat 24-hour profile; nobody crosses them.
+4. **Per-book velocity narrative.** "Did it drag in the middle": time per
+   page position across a book (the `page_stat` view exists precisely to
+   make this valid), or pace-per-day through a single read.
+5. **Cross-book comparison.** Ranked pace, session habits, or calendar
+   span per book; series/language/author rollups.
+6. **A native desktop presentation.** Every one of these is a web page.
+
+Also worth stealing but not novel: KoShelf's completion detection and
+per-page activity grid, KoInsight's interval-union progress, the standard
+streak/calendar-heatmap set.
+
+## 9. Status for `spec.md` / `roadmap.md`
+
+- Schema (§1), granularity/font-size handling (§1), KOReader's own UI
+  (§4), the four tools' catalogues (§5), and the `.sdr` structure (§7) are
+  all answered. Phase 0's research goals are met.
+- `spec.md`'s widget list is now locked against §4.3/§6/§8 (done in the
+  same pass as this update).
+- Remaining loose ends, none blocking: copy one real `.sdr` sample when
+  the Kindle is next mounted; multi-device merge stays out of scope until
+  a second device exists (KoInsight's 4-tuple upsert is the reference if
+  it ever does).
