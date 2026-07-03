@@ -1,0 +1,4 @@
+/target
+/build
+*.sqlite3
+*.sqlite3-*

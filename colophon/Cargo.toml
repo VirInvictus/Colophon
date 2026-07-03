@@ -1,0 +1,12 @@
+[package]
+name = "colophon"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+colophon-core = { path = "../colophon-core" }
+gtk.workspace = true
+adw.workspace = true
+anyhow.workspace = true

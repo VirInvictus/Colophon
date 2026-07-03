@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Placeholder mark: an open book with a rising bar-chart, standing in
+       for a real colophon mark until an icon pass happens (roadmap Phase 4). -->
+  <rect width="128" height="128" rx="24" fill="#1D1C19"/>
+  <path d="M20 40 L64 32 L108 40 L108 96 L64 88 L20 96 Z" fill="#DCA561" opacity="0.15"/>
+  <path d="M64 32 V88" stroke="#DCA561" stroke-width="2"/>
+  <rect x="34" y="66" width="10" height="18" fill="#957FB8"/>
+  <rect x="50" y="56" width="10" height="28" fill="#7FB4CA"/>
+  <rect x="70" y="46" width="10" height="38" fill="#98BB6C"/>
+  <rect x="86" y="60" width="10" height="24" fill="#E46876"/>
+</svg>
