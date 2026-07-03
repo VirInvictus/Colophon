@@ -1,0 +1,20 @@
+/* Light mode: stock Adwaita light with Kanagawa accents only. Kanagawa
+ * Dragon has no light variant, so no full palette is faked here. */
+
+:root {
+  --accent-bg-color: #658594; /* blue */
+  --accent-fg-color: #ffffff;
+  --accent-color: #4d6b7a;    /* blue, darkened for contrast on light */
+}
+
+.book-row .stats {
+  color: #7a8382; /* gray3 */
+}
+
+.group-header label {
+  font-weight: 600;
+}
+
+.group-member {
+  border-left: 2px solid #737c73; /* ash */
+}

@@ -10,3 +10,4 @@ colophon-core = { path = "../colophon-core" }
 gtk.workspace = true
 adw.workspace = true
 anyhow.workspace = true
+chrono.workspace = true

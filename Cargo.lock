@@ -111,9 +111,10 @@ dependencies = [
 
 [[package]]
 name = "colophon"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "colophon-core",
  "gtk4",
  "libadwaita",
@@ -121,7 +122,7 @@ dependencies = [
 
 [[package]]
 name = "colophon-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "chrono",

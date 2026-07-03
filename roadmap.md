@@ -56,29 +56,36 @@ findings so far.
       live-sample reconciliation test that runs against the gitignored
       Kindle copy when present and skips cleanly when not.
 
-## Phase 2 — App shell
+## Phase 2 — App shell (complete, v0.2.0, 2026-07-03)
 
-- [ ] Real `adw::ApplicationWindow` layout (`NavigationSplitView` sidebar +
-      content area, matching the Atrium/Conservatory/Viaduct shape)
-      replacing the current placeholder `StatusPage`.
-- [ ] Database loading flow: pick a db copy via `FileDialog`, or point at a
-      mounted device and let `db::snapshot()` make the copy. Guard the
-      hard rule in the UI: if the chosen path looks live (e.g. under
-      `/mnt/Kindle` or next to a `-wal` sidecar), snapshot instead of
-      opening, and say so. Remember the last-used copy (XDG state dir).
-- [ ] Schema-version guard: warn, don't refuse, when `user_version` isn't
-      20221111. The plugin's migration history says older schemas exist in
-      the wild; Brandon's device is the only supported target for now, but
-      the failure mode should be a banner, not a crash.
-- [ ] Prove ingestion → UI end to end: a library list showing title,
-      author, total time, unique pages read (interval union), and last
-      open per book.
-- [ ] Junk filter as a first-class view toggle (default on, 5-minute
-      threshold). KOReader's own bulk purge uses the same "< N minutes"
-      buckets, so the concept will be familiar from the device.
-- [ ] Same-title/author grouping for the *Jingo* case (two files, two
-      md5s): group in the list UI, never merge in data.
-- [ ] Kanagawa Dragon theming pass.
+- [x] Real `adw::ApplicationWindow` layout: `NavigationSplitView` sidebar
+      (library) + content pane (Phase 3's detail slot), per-pane
+      `ToolbarView`/`HeaderBar`, breakpoint collapse, toast overlay.
+      Composite templates in the Viaduct house shape.
+- [x] Database loading flow, stricter than planned: imports *always*
+      snapshot (staging dir → validate → promote), so no user-chosen file
+      is ever opened in place and no heuristic is needed; a bad pick can't
+      clobber the good snapshot. Source path remembered in GSettings for
+      Refresh (Ctrl+R / F5); startup auto-opens the canonical copy.
+- [x] Schema-version guard: `adw::Banner` warning on unfamiliar
+      `user_version`, never a refusal.
+- [x] Ingestion → UI proven end to end: library list with title, author,
+      total time, interval-union unique pages, relative last-open; data
+      loads off the main thread (`gio::spawn_blocking`, no tokio).
+- [x] Junk filter as a stateful window action in the primary menu
+      (default on, 5-minute threshold), GSettings-persisted, live
+      refilter on change.
+- [x] Same-title/author grouping (the *Jingo* case): header row + inset
+      member rows disambiguated by page count and short md5; display-only,
+      data never merged.
+- [x] Kanagawa Dragon theming: full Dragon sheet on dark via adw 1.6+ CSS
+      variables, accent-only sheet on light (Dragon has no light variant),
+      swapped live on the system preference; palette exported as consts
+      for Phase 3 chart ramps.
+
+Verified against the real sample: 53 tests (11 app-side), plus a headless
+smoke run with screenshots (empty state, filtered/unfiltered library,
+live junk-toggle via gsettings).
 
 ## Phase 3 — Widget variety
 

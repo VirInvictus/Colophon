@@ -1,5 +1,29 @@
 # Patchnotes
 
+## v0.2.0 — 2026-07-03
+
+Phase 2: the real app shell. The placeholder window is gone; Colophon now
+opens, imports, and shows a library.
+
+The window is a NavigationSplitView (library sidebar, detail pane
+reserved for Phase 3) built from composite templates in the Viaduct house
+shape. Imports always snapshot: the chosen file is copied to a staging
+dir, validated, and only then promoted to the app's canonical copy, so no
+user-chosen database is ever opened in place and a bad pick can't destroy
+a good snapshot. Refresh (Ctrl+R/F5) re-imports from the remembered
+source. An adw::Banner warns on unfamiliar schema versions instead of
+refusing. The library list shows total time, interval-union unique pages,
+and relative last-open per book; same-title/author copies group under a
+header row without being merged in data; a persisted junk filter (default
+on, 5 minutes) hides plugin READMEs and other accidental "books".
+Kanagawa Dragon theming applies in full on dark and as accents on light,
+following the system preference live. All database work runs off the main
+thread via gio::spawn_blocking; no new dependencies.
+
+53 tests across the workspace (11 new app-side: formatting, grouping,
+staged-import protocol), plus a headless screenshot smoke run against the
+real sample data.
+
 ## v0.1.0 — 2026-07-03
 
 Phase 0 research completed and Phase 1 ingestion core shipped.
