@@ -18,48 +18,169 @@ findings so far.
 - [x] Clone existing third-party KOReader stats tools for reference into
       `~/.gitrepos/.studyrepos/`: `KoInsight`, `KoShelf`, `Kodashboard`,
       `readingstreak.koplugin`. See `RESEARCH.md` §4.
-- [ ] Actually read those four tools' source for (a) what KOReader's own
+- [x] Actually read those four tools' source for (a) what KOReader's own
       built-in stats screen already shows and (b) their full derived-metric
-      catalogues, to sanity-check/extend the widget list in `spec.md`. Not
-      done yet — cloning them is not the same as having read them.
-- [ ] Track down per-book `.sdr` sidecar metadata (highlight/note *content*,
-      as opposed to the `book.notes`/`book.highlights` counts already
-      confirmed) if highlight content ever becomes in-scope.
-- [ ] Once the above is done, update `spec.md`'s widget/chart list from a
-      brainstorm to something grounded in both the schema and what's
-      already been tried, then move to Phase 1.
+      catalogues. Done 2026-07-03: KOReader's UI surveyed from the plugin
+      source (`RESEARCH.md` §4), all four tools catalogued (§5), converged
+      conventions extracted (§6), underexplored territory mapped (§8).
+- [x] Track down per-book `.sdr` sidecar metadata. Structure, location,
+      and the `partial_md5_checksum` ↔ `book.md5` linkage fully documented
+      from KoShelf/Kodashboard source (`RESEARCH.md` §7). One real sample
+      file still to be copied next time the Kindle is mounted (wasn't,
+      this pass); a nice-to-have, not blocking. Content stays Tier C.
+- [x] Update `spec.md`'s widget/chart list from a brainstorm to a
+      commitment. Done 2026-07-03: normative derived-metric definitions
+      plus a three-tier catalogue (differentiators / table stakes /
+      deferred), each item checked against KOReader's UI and the four
+      tools.
 
-## Phase 1 — Ingestion core
+## Phase 1 — Ingestion core (complete, v0.1.0, 2026-07-03)
 
-- [ ] Lock the real schema into `colophon-core` (replace the placeholder
-      `table_names()` probe in `colophon-core/src/lib.rs`).
-- [ ] Typed query layer: per-book summaries, per-session records, derived
-      aggregates (streaks, pace, etc.) as plain Rust structs.
-- [ ] A way to get a copy of the live db onto disk (manual path for now;
-      revisit `/mnt/Kindle` SSHFS auto-detect later if it's worth it).
-- [ ] Test fixtures: a handful of representative sample databases checked
-      into the repo (synthetic or scrubbed) so tests don't depend on
-      Brandon's live device.
+- [x] Lock the real schema into `colophon-core` (the placeholder
+      `table_names()` probe is gone; `db.rs` speaks the confirmed schema).
+- [x] Typed query layer over the confirmed schema: books (md5-merged,
+      junk-filter helper), raw events, and the `page_stat` view.
+- [x] Derived-metric layer implementing `spec.md`'s normative definitions:
+      sessions (300 s gap), day buckets + daily totals, streaks
+      (today-or-yesterday rule), distinct-pages-read, capped and uncapped
+      totals, interval-union coverage/progress, reading-speed series
+      (day/week/month), completion detection (78 % / 20 % / 2 % with the
+      restart-split heuristic). All pure functions, timezone-generic.
+- [x] `db::snapshot()`: plain filesystem copy of the db (+ WAL/SHM
+      sidecars), then the *copy* is checkpointed; no SQLite connection
+      ever touches the source. `/mnt/Kindle` auto-detect deferred to the
+      app layer (Phase 2+).
+- [x] Test fixtures built programmatically (verbatim KOReader DDL,
+      including the `numbers` table and `page_stat` view, in a std-only
+      temp dir). 42 tests: 32 unit, 9 fixture-integration, plus a
+      live-sample reconciliation test that runs against the gitignored
+      Kindle copy when present and skips cleanly when not.
 
 ## Phase 2 — App shell
 
-- [ ] Real `adw::ApplicationWindow` layout (nav/sidebar + content area,
-      matching the Atrium/Conservatory/Viaduct shape) replacing the current
-      placeholder `StatusPage`.
-- [ ] Load a chosen db file, show *something* real from it (even a plain
-      list) to prove the ingestion → UI path end to end.
+- [ ] Real `adw::ApplicationWindow` layout (`NavigationSplitView` sidebar +
+      content area, matching the Atrium/Conservatory/Viaduct shape)
+      replacing the current placeholder `StatusPage`.
+- [ ] Database loading flow: pick a db copy via `FileDialog`, or point at a
+      mounted device and let `db::snapshot()` make the copy. Guard the
+      hard rule in the UI: if the chosen path looks live (e.g. under
+      `/mnt/Kindle` or next to a `-wal` sidecar), snapshot instead of
+      opening, and say so. Remember the last-used copy (XDG state dir).
+- [ ] Schema-version guard: warn, don't refuse, when `user_version` isn't
+      20221111. The plugin's migration history says older schemas exist in
+      the wild; Brandon's device is the only supported target for now, but
+      the failure mode should be a banner, not a crash.
+- [ ] Prove ingestion → UI end to end: a library list showing title,
+      author, total time, unique pages read (interval union), and last
+      open per book.
+- [ ] Junk filter as a first-class view toggle (default on, 5-minute
+      threshold). KOReader's own bulk purge uses the same "< N minutes"
+      buckets, so the concept will be familiar from the device.
+- [ ] Same-title/author grouping for the *Jingo* case (two files, two
+      md5s): group in the list UI, never merge in data.
 - [ ] Kanagawa Dragon theming pass.
 
 ## Phase 3 — Widget variety
 
-- [ ] Build out the widget/chart catalogue validated in Phase 0, one at a
-      time, each as an independent, reusable widget.
-- [ ] Decide the charting approach (cairo direct vs. a Rust charting crate)
-      once real chart shapes are known.
+The catalogue is locked in `spec.md`; this phase builds it. Definitions
+land in `spec.md` first, `colophon-core` grows the queries second, the
+widget renders third.
+
+Charting decision (first, it gates everything):
+
+- [ ] Decide cairo/Gsk custom drawing vs. a charting crate. The research
+      leans hard toward custom drawing: every shape Colophon needs (year
+      heatmap, 7×24 heatmap, per-page strip, session histogram, calendar
+      book spans, bar/area trends) is bespoke, all four studied tools
+      hand-rolled their charts (KoShelf in plain CSS grids, KOReader in
+      direct blitting), and a charting crate would fight the Kanagawa
+      theming anyway. Validate with a spike: one bar chart + one heatmap
+      as `GtkDrawingArea`/snapshot widgets before committing. Any crate
+      instead needs the usual dependency ask.
+- [ ] Shared chart scaffolding once the spike settles: Kanagawa Dragon
+      color ramps, hover/tooltip plumbing, empty states, a common
+      value→intensity quantizer (KoShelf-style discrete levels; explicitly
+      not Kodashboard's continuous alpha, which hides magnitude).
+
+Tier A widgets (the differentiators; nobody ships these):
+
+- [ ] Reading-speed trend: pages/hour bucketed day/week/month
+      (`metrics::speed_series`), library baseline with per-book overlay.
+- [ ] When-do-I-read heatmap: weekday × hour grid over the whole history,
+      windowable. Needs a small core addition (hour-of-day bucketing;
+      attribute by `start_time` like KOReader's calendar histograms).
+- [ ] Session analytics: session-length histogram, sessions per day,
+      start-time patterns, records (longest session, most sessions in a
+      day). All on `metrics::sessions`.
+- [ ] Book velocity: time per page position from the rescaled view
+      ("did it drag in the middle"), plus pace-per-day within each
+      completion.
+- [ ] Per-page activity strip: per-page total time and read count, sqrt
+      scaling with a 90th-percentile cap (KoShelf's numbers), annotation
+      *count* markers from `book.notes`/`book.highlights` until sidecars
+      are in scope.
+- [ ] Completions timeline: inferred read-throughs
+      (`metrics::completions`) on a time axis; books finished per
+      year/month; per-completion cards (dates, span, time, sessions,
+      pages/hour).
+
+Tier B widgets (expected furniture, done correctly):
+
+- [ ] Year heatmap calendar: GitHub-style day grid, quantized levels,
+      tooltips with time + pages + books.
+- [ ] Streak cards: current/longest with date ranges
+      (`metrics::streaks`; the today-or-yesterday grace rule is already
+      the tested convention).
+- [ ] Library totals: windowed 30/90/365/all tiles (total time, unique
+      pages, books touched, active days, busiest day/month records).
+      Windows are calendar windows, not "last N days that had data"
+      (Kodashboard's KPI bug; noted in RESEARCH §5.3).
+- [ ] Per-book stat cards with device parity: capped total labelled
+      "as shown on device", uncapped alongside, avg time/page and
+      time-left/finish-date estimates using KOReader's own capped
+      `avg_time` math so Colophon never contradicts the Kindle.
+- [ ] Weekday/monthly distributions: weekday *averages normalized by
+      weekdays elapsed* (KoInsight's raw-sum skew is the anti-pattern),
+      monthly totals with empty months rendered, not skipped.
 
 ## Phase 4 — Polish & packaging
 
 - [ ] Icon pass (replace the placeholder `logo.svg`).
-- [ ] Meson wrapper + desktop entry + AppStream metainfo + Flatpak manifest,
-      matching the Atrium/Conservatory/Viaduct pattern.
+- [ ] Performance pass on a realistic future db: the current sample is
+      695 rows, but years of reading produce hundreds of thousands of
+      `page_stat_data` rows and the `page_stat` view fans rows out up to
+      1000× via the `numbers` join. Widgets must aggregate in SQL against
+      the indexed `start_time`, not slurp the view into memory per
+      render. Generate a synthetic multi-year fixture to measure.
+- [ ] Meson wrapper + desktop entry + AppStream metainfo + Flatpak
+      manifest, matching the Atrium/Conservatory/Viaduct pattern.
 - [ ] `VERSION` → `1.0.0`.
+
+## Phase 5 — Post-1.0 candidates (each needs its own go/no-go)
+
+Ordered roughly by likelihood. None are commitments.
+
+- [ ] `.sdr` highlight/note *content*: sandboxed-Lua parsing (KoShelf's
+      `mlua` + `StdLib::NONE` pattern), joined via `partial_md5_checksum`
+      = `book.md5`. Unlocks a highlight browser, annotation markers with
+      text, and the sidecar `summary.status` user-declared finished flag
+      to cross-check inferred completions. Gated on: a real sidecar
+      sample from the Kindle, and the `mlua` dependency ask.
+- [ ] Vocabulary-builder widgets ("words looked up per book", lookup
+      timeline). Schema already documented (RESEARCH §2); Brandon's
+      `vocabulary_builder.sqlite3` is empty, so parked until the feature
+      sees real use.
+- [ ] "Day starts at HH:MM" shift for night owls (KOReader and KoShelf
+      both offer one; Colophon's day bucketing is already
+      timezone-generic, so this is a small `TimeConfig`-style addition).
+- [ ] Multi-device merge, only if a second KOReader device ever exists:
+      KoInsight's `(md5, device, page, start_time)` upsert is the
+      reference design; same-device re-imports are naturally idempotent
+      thanks to the schema's `UNIQUE (id_book, page, start_time)`.
+- [ ] Reference pages (manual canonical page count per book, KoInsight's
+      feature): only if cross-layout comparison starts to matter beyond
+      what interval-union progress already absorbs.
+- [ ] Hardcover cross-reference: `hardcoversync_settings.lua` on the
+      device implies a Hardcover plugin is in use; a read-only "also on
+      Hardcover" link-out is the most this should ever be (local-first
+      rule).

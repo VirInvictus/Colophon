@@ -9,7 +9,8 @@ it's a local desktop app that reads a copy of your KOReader statistics
 database and turns it into attractive, varied graphs and widgets. No
 server, no account, no cloud.
 
-**Status:** early scaffolding (v0.0.1). Not usable yet — see `roadmap.md`.
+**Status:** v0.1.0. The ingestion core (`colophon-core`) is real and
+tested; the GTK app is still a placeholder shell. See `roadmap.md`.
 
 ## What it is
 

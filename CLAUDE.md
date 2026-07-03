@@ -13,44 +13,46 @@ it exists: every KOReader stats tool Brandon has found is a web dashboard or
 a self-hosted Docker instance, and he doesn't want that. See `README.md` and
 `spec.md`.
 
-## Where this stands right now (2026-07-03)
+## Where this stands right now (2026-07-03, v0.1.0)
 
-This repo was scaffolded by Sonnet, then had a first Phase 0 research pass
-done the same day (also Sonnet, light-touch — schema confirmation and
-fetching reference material, not a deep feature survey). **The brunt of
-this project's design and build work still happens in Fable, not Sonnet.**
+Phases 0 and 1 are complete (both finished 2026-07-03; scaffolding was
+Sonnet's, research synthesis and the ingestion core are Fable's).
 
-What's done:
-- The Cargo workspace builds clean (empty GTK shell window, placeholder
-  `StatsDb` in `colophon-core`).
-- The real `statistics.sqlite3` schema is confirmed from source (not
-  guessed) — see `RESEARCH.md` §1. Real sample databases from Brandon's own
-  Kindle are at `research/samples/` (gitignored, don't commit them), and the
-  actual on-device plugin Lua source is checked into
-  `research/koreader-plugin-src/` for reference.
-- Four third-party KOReader stats tools are cloned for study into
-  `~/.gitrepos/.studyrepos/` (`KoInsight`, `KoShelf`, `Kodashboard`,
-  `readingstreak.koplugin`) — see `RESEARCH.md` §4. **They've only been
-  cloned, not read in depth yet.**
+- **Phase 0 (research) is done.** `RESEARCH.md` is the canonical record:
+  confirmed schema (§1), KOReader's own built-in stats UI surveyed from
+  the plugin source (§4), all four third-party tools read in depth (§5),
+  the converged conventions Colophon adopts (§6), the `.sdr` sidecar
+  format (§7), and the underexplored territory that justifies the project
+  (§8). `spec.md` is locked: normative derived-metric definitions plus a
+  three-tier widget catalogue.
+- **Phase 1 (ingestion core) is done.** `colophon-core` has the typed
+  read-only query layer (md5-merged books, raw events, the rescaled
+  `page_stat` view, WAL-safe `snapshot()`) and pure derived-metric
+  functions (sessions, daily totals, streaks, interval-union coverage,
+  capped/uncapped totals, speed series, completion detection). 42 tests;
+  fixtures are built programmatically from verbatim KOReader DDL, plus a
+  live-sample test that skips when the gitignored Kindle copy is absent.
+- Real sample databases from Brandon's own Kindle live at
+  `research/samples/` (**gitignored, never commit them**); the on-device
+  plugin Lua source is checked into `research/koreader-plugin-src/`.
 
-What's still open (read `RESEARCH.md` §5 and `roadmap.md` Phase 0 before
-doing anything else):
-- Actually reading those four tools' source for their metric/chart
-  catalogues and for what KOReader's own built-in stats screen shows, so
-  Colophon's widget set adds value instead of duplicating either.
-- Locating per-book `.sdr` sidecar metadata if highlight/note *content*
-  (not just the counts already confirmed) ever becomes in-scope.
-- `spec.md`'s widget/chart list is still a brainstorm, not validated
-  against either KOReader's own UI or the third-party tools' feature sets.
+Next up is Phase 2 (app shell): real `adw::ApplicationWindow` layout
+replacing the placeholder `StatusPage`, loading a chosen db copy and
+proving the ingestion → UI path. The charting approach (cairo vs. a crate)
+is still deliberately undecided; decide it in Phase 3 against real widget
+shapes, and ask before adding any dependency.
 
-## Mandatory next step before Phase 1 (ingestion core)
+Small outstanding research nicety (not blocking): copy one real `.sdr`
+sidecar (`<book>.sdr/metadata.epub.lua` for a highlighted book) into
+`research/samples/` next time the Kindle is SSHFS-mounted at
+`/mnt/Kindle`.
 
-Do not start building `colophon-core`'s real query layer against the
-confirmed schema until the remaining Phase 0 items above are done. The
-point of researching first is to avoid spending build effort re-inventing
-widgets those four existing tools (or KOReader itself) already cover well —
-read them, note what's genuinely underexplored, *then* lock `spec.md`'s
-widget list and move to Phase 1.
+## Spec discipline
+
+`spec.md`'s derived-metric definitions are normative: if a widget shows a
+number KOReader also shows, it must use KOReader's math (capped totals for
+its "time spent reading" and estimates) so the app never disagrees with
+the device. New metrics must be defined in `spec.md` before they're built.
 
 ## Hard constraints (from the top-level house style, restated because they
 matter a lot here)
