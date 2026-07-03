@@ -1,11 +1,11 @@
 # Colophon — spec
 
-**Status: draft, pre-research.** This spec is intentionally thin. Phase 0
-(see `roadmap.md`) is a deep research pass into what KOReader's statistics
-data actually contains; large parts of this document are placeholders until
-that pass locks the real schema and data model. Do not treat anything below
-as final — especially the widget list, which is a brainstorm, not a
-commitment.
+**Status: draft, Phase 0 partially done.** The real `statistics.sqlite3`
+schema is now confirmed (see `RESEARCH.md`) — this spec is no longer
+guessing at the data model. What's still open: the deeper read of existing
+third-party tools and KOReader's own built-in stats UI (roadmap Phase 0),
+which the widget list below still needs before it's a real commitment
+rather than a brainstorm.
 
 ## Core concept
 
@@ -31,26 +31,37 @@ service — it operates on a local copy of the data.
   cuts of the same underlying data — the value is in depth and variety, not
   in re-skinning what KOReader already shows.
 
+## Data model (confirmed — see `RESEARCH.md` §1 for full detail)
+
+`statistics.sqlite3` (`koreader/settings/statistics.sqlite3` on device) has
+three things that matter: a `book` table (title/authors/series/language/
+md5, `pages`, running `total_read_time`/`total_read_pages` totals, plus
+`notes`/`highlights` as **counts only**, not content); a raw
+`page_stat_data` table (one row per page-turn: book, page, start_time,
+duration, and the page count *at that moment*, which is how KOReader copes
+with font-size changes shifting pagination); and a `page_stat` view that
+rescales historical rows onto the book's current page count for
+apples-to-apples charting. Timestamps are unix epoch seconds, no stored
+timezone.
+
 ## Open questions (blocking a real spec)
 
-All of these require the Phase 0 research pass:
+Down to what Phase 0's second pass needs to finish (see `roadmap.md`):
 
-1. **Real schema.** Confirmed table/column names for `statistics.sqlite3`
-   (book-level table, per-page/session table, any others). Source of truth:
-   KOReader's own `plugins/statistics.koplugin/` Lua source, not guesswork.
-2. **Data granularity.** What's actually recorded per reading session —
-   timestamp resolution, page-level vs. chunk-level duration, whether page
-   count is stable per book (it isn't, if font size changes — need to know
-   how KOReader handles that).
-3. **What KOReader's own stats UI already shows**, so widget design doesn't
-   just duplicate it.
-4. **Other data sources on the device** worth mining beyond the core stats
-   DB (highlights/notes, vocabulary builder DB, per-book `.sdr` sidecar
-   metadata).
-5. **Existing third-party tools** in this space — what's been tried, what
-   metrics/visualizations they found compelling, what gaps remain.
-6. **Multi-device / re-read behavior** — how the data represents reading the
-   same book across devices or reading it more than once.
+1. **What KOReader's own stats UI already shows**, so widget design doesn't
+   just duplicate it. Not yet surveyed.
+2. **Existing third-party tools** in this space — `KoInsight`, `KoShelf`,
+   `Kodashboard`, `readingstreak.koplugin` are cloned into
+   `~/.gitrepos/.studyrepos/` (see `RESEARCH.md` §4) but not yet read in
+   depth for their metric/visualization catalogues.
+3. **Highlight/note *content*** (as opposed to the counts already
+   confirmed) lives in per-book `.sdr` sidecar metadata, not in this
+   database — not yet located. Only matters if Colophon wants to surface
+   highlight text, not just counts.
+4. **Multi-device merge.** The schema is purely local to one device; if
+   Brandon ever reads on more than one, merging two `statistics.sqlite3`
+   files is unsolved by KOReader itself (see `RESEARCH.md` §1's sync note).
+   Not a v1 concern, flagged for later.
 
 ## Widget/chart brainstorm (unvalidated — a starting list, not a commitment)
 

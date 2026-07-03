@@ -15,60 +15,42 @@ a self-hosted Docker instance, and he doesn't want that. See `README.md` and
 
 ## Where this stands right now (2026-07-03)
 
-This repo was scaffolded by Sonnet in a single session with **no research
-done yet** — the Cargo workspace, doc set, and empty GTK window exist purely
-to have a real toolchain and git history in place. `spec.md` is explicitly a
-draft with an "open questions" section instead of a real data model, and the
-`colophon-core` crate's `StatsDb` is a placeholder that only lists table
-names — it does not know the real schema.
+This repo was scaffolded by Sonnet, then had a first Phase 0 research pass
+done the same day (also Sonnet, light-touch — schema confirmation and
+fetching reference material, not a deep feature survey). **The brunt of
+this project's design and build work still happens in Fable, not Sonnet.**
 
-**The brunt of this project's design and build work happens in Fable, not
-Sonnet.** Sonnet's job was scaffolding only.
+What's done:
+- The Cargo workspace builds clean (empty GTK shell window, placeholder
+  `StatsDb` in `colophon-core`).
+- The real `statistics.sqlite3` schema is confirmed from source (not
+  guessed) — see `RESEARCH.md` §1. Real sample databases from Brandon's own
+  Kindle are at `research/samples/` (gitignored, don't commit them), and the
+  actual on-device plugin Lua source is checked into
+  `research/koreader-plugin-src/` for reference.
+- Four third-party KOReader stats tools are cloned for study into
+  `~/.gitrepos/.studyrepos/` (`KoInsight`, `KoShelf`, `Kodashboard`,
+  `readingstreak.koplugin`) — see `RESEARCH.md` §4. **They've only been
+  cloned, not read in depth yet.**
 
-## Mandatory first step: deep research (Phase 0)
+What's still open (read `RESEARCH.md` §5 and `roadmap.md` Phase 0 before
+doing anything else):
+- Actually reading those four tools' source for their metric/chart
+  catalogues and for what KOReader's own built-in stats screen shows, so
+  Colophon's widget set adds value instead of duplicating either.
+- Locating per-book `.sdr` sidecar metadata if highlight/note *content*
+  (not just the counts already confirmed) ever becomes in-scope.
+- `spec.md`'s widget/chart list is still a brainstorm, not validated
+  against either KOReader's own UI or the third-party tools' feature sets.
 
-Before writing any real feature code or locking `spec.md`, do a genuinely
-deep research pass — this is a hard requirement from Brandon, not a nice-to-
-have. Do not skip to building widgets against assumed columns. Specifically:
+## Mandatory next step before Phase 1 (ingestion core)
 
-1. **Get the real schema, from source, not memory or guesswork.** KOReader
-   is open source (`koreader/koreader` on GitHub). The statistics plugin
-   lives at `plugins/statistics.koplugin/` — read `main.lua` and any
-   schema/migration code directly. Confirm real table and column names for:
-   - the book-level table (title, authors, series, language, hash/md5,
-     total pages, total read pages, total read time, last-read timestamp)
-   - the per-session/per-page table (timestamp, duration, page number,
-     which book, total page count *at the time*, since KOReader's page
-     count is not stable across font-size changes — this is a known gotcha,
-     confirm exactly how it's handled)
-   - anything else in the same database (highlights/notes may or may not
-     live here vs. a separate per-book `.sdr` Lua metadata sidecar)
-   - schema version history if the format has changed over time
-   - timestamp format/timezone handling, and how re-reads and multi-device
-     sync show up in the data
-2. **Get a real sample database to test against.** `/mnt/Kindle` is
-   SSHFS-mounted and available — as of this scaffolding pass it was not
-   checked for a live `statistics.sqlite3` (do that first; the file
-   typically lives under a `koreader/settings/` path on the device). Copy
-   it out read-only. If a real device sample isn't available, build
-   synthetic fixtures matching the confirmed schema instead of guessing.
-3. **Survey what KOReader's own built-in statistics screen already shows**
-   (in-app calendar heatmap, per-book stats view) so Colophon's widget set
-   adds real value instead of re-skinning what's already there.
-4. **Survey existing third-party tools** that already visualize KOReader
-   stats (GitHub projects, scripts, dashboards). Note what metrics/chart
-   ideas they've already explored and which of those are worth adopting or
-   improving on, and confirm they're the "web/Docker" pattern Brandon wants
-   to avoid rather than something closer to what he actually wants.
-5. **Check for other on-device data sources** worth mining: KOReader's
-   vocabulary builder/flashcard feature has its own DB; highlights/notes and
-   per-book `.sdr` sidecars may add data the core stats DB doesn't have.
-
-Write the findings up (a `RESEARCH.md` dossier, matching the pattern used in
-`~/.gitrepos/Coffer/RESEARCH.md` for a similar Phase-0-research project) with
-real schema tables and citations, *then* update `spec.md` and `roadmap.md`
-with the confirmed data model and a real (not brainstormed) widget list.
-Only after that should Phase 1 (ingestion core) start for real.
+Do not start building `colophon-core`'s real query layer against the
+confirmed schema until the remaining Phase 0 items above are done. The
+point of researching first is to avoid spending build effort re-inventing
+widgets those four existing tools (or KOReader itself) already cover well —
+read them, note what's genuinely underexplored, *then* lock `spec.md`'s
+widget list and move to Phase 1.
 
 ## Hard constraints (from the top-level house style, restated because they
 matter a lot here)
