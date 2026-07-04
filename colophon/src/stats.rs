@@ -12,8 +12,8 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use chrono::{Datelike, Duration, NaiveDate, TimeZone};
-use colophon_core::metrics::{self, local_date};
-use colophon_core::model::{DayTotal, PageEvent, Streaks};
+use colophon_core::metrics::{self, Bucket, local_date};
+use colophon_core::model::{DayTotal, PageEvent, SpeedPoint, Streaks};
 
 use crate::library::LibraryEntry;
 
@@ -29,7 +29,38 @@ pub struct Overview {
     /// that weekday elapsed between the first reading day and `today`
     /// (not by days-with-data; raw sums skew toward old data).
     pub weekday_avg_secs: [i64; 7],
+    /// Weekday x hour-of-day seconds (Mon..Sun rows), whole history.
+    pub hourly: [[i64; 24]; 7],
+    /// Seconds per calendar month from the first reading month through
+    /// `today`'s month, empty months included (rendered, not skipped).
+    pub monthly: Vec<(NaiveDate, i64)>,
+    /// Reading speed over time (pages/hour per bucket, keyed by bucket
+    /// start): daily buckets under ~10 weeks of history, weekly after.
+    pub speed: Vec<(NaiveDate, SpeedPoint)>,
+    pub speed_bucket: Bucket,
+    pub sessions: SessionSummary,
 }
+
+#[derive(Debug, Default, PartialEq)]
+pub struct SessionSummary {
+    pub count: usize,
+    pub median_secs: i64,
+    pub longest_secs: i64,
+    pub longest_date: Option<NaiveDate>,
+    /// Session-length histogram; bucket bounds in `SESSION_BUCKETS`.
+    pub histogram: [u32; 6],
+}
+
+/// Histogram bucket labels and upper bounds in seconds; the last bucket
+/// is open-ended.
+pub const SESSION_BUCKETS: [(&str, i64); 6] = [
+    ("<5m", 300),
+    ("5\u{2013}15m", 900),
+    ("15\u{2013}30m", 1800),
+    ("30\u{2013}60m", 3600),
+    ("1\u{2013}2h", 7200),
+    (">2h", i64::MAX),
+];
 
 pub fn overview<Tz: TimeZone>(entries: &[Rc<LibraryEntry>], tz: &Tz, today: NaiveDate) -> Overview {
     let all_events: Vec<PageEvent> = entries
@@ -39,6 +70,16 @@ pub fn overview<Tz: TimeZone>(entries: &[Rc<LibraryEntry>], tz: &Tz, today: Naiv
     let daily = metrics::daily_totals(&all_events, tz);
     let days = daily.keys().copied().collect();
     let streaks = metrics::streaks(&days, today);
+
+    // Daily speed buckets read fine up to ~10 weeks; past that the trend
+    // needs weekly smoothing to stay legible.
+    let speed_bucket = match daily.keys().next() {
+        Some(first) if (today - *first).num_days() > 70 => Bucket::Week,
+        _ => Bucket::Day,
+    };
+    let speed = metrics::speed_series(&all_events, tz, speed_bucket)
+        .into_iter()
+        .collect();
 
     Overview {
         total_secs: entries.iter().map(|e| e.book.total_read_time).sum(),
@@ -50,8 +91,77 @@ pub fn overview<Tz: TimeZone>(entries: &[Rc<LibraryEntry>], tz: &Tz, today: Naiv
             .max_by_key(|(_, t)| t.seconds)
             .map(|(d, t)| (*d, t.seconds)),
         weekday_avg_secs: weekday_averages(&daily, today),
+        hourly: metrics::hourly_profile(&all_events, tz),
+        monthly: monthly_totals(&daily, today),
+        speed,
+        speed_bucket,
+        sessions: session_summary(&all_events, tz),
         daily,
         streaks,
+    }
+}
+
+/// Seconds per month, first reading month through today's month, empty
+/// months rendered as zeros.
+pub fn monthly_totals(
+    daily: &BTreeMap<NaiveDate, DayTotal>,
+    today: NaiveDate,
+) -> Vec<(NaiveDate, i64)> {
+    let Some((&first, _)) = daily.iter().next() else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    let mut month = first.with_day(1).expect("day 1 exists");
+    let last = today.with_day(1).expect("day 1 exists");
+    while month <= last {
+        out.push((month, 0));
+        month = next_month(month);
+    }
+    for (date, day) in daily {
+        let key = date.with_day(1).expect("day 1 exists");
+        if let Some(slot) = out.iter_mut().find(|(m, _)| *m == key) {
+            slot.1 += day.seconds;
+        }
+    }
+    out
+}
+
+fn next_month(month: NaiveDate) -> NaiveDate {
+    let (year, m) = (month.year(), month.month());
+    if m == 12 {
+        NaiveDate::from_ymd_opt(year + 1, 1, 1).expect("valid date")
+    } else {
+        NaiveDate::from_ymd_opt(year, m + 1, 1).expect("valid date")
+    }
+}
+
+pub fn session_summary<Tz: TimeZone>(events: &[PageEvent], tz: &Tz) -> SessionSummary {
+    let sessions = metrics::sessions(events, colophon_core::model::DEFAULT_SESSION_GAP_SECS);
+    if sessions.is_empty() {
+        return SessionSummary::default();
+    }
+    let mut lengths: Vec<i64> = sessions.iter().map(|s| s.seconds).collect();
+    lengths.sort_unstable();
+    let longest = sessions
+        .iter()
+        .max_by_key(|s| s.seconds)
+        .expect("non-empty");
+
+    let mut histogram = [0u32; 6];
+    for &len in &lengths {
+        let slot = SESSION_BUCKETS
+            .iter()
+            .position(|(_, bound)| len < *bound)
+            .unwrap_or(SESSION_BUCKETS.len() - 1);
+        histogram[slot] += 1;
+    }
+
+    SessionSummary {
+        count: sessions.len(),
+        median_secs: lengths[lengths.len() / 2],
+        longest_secs: longest.seconds,
+        longest_date: Some(metrics::local_date(longest.start_time, tz)),
+        histogram,
     }
 }
 
@@ -86,6 +196,59 @@ fn weekday_occurrences(from: NaiveDate, to: NaiveDate, weekday: usize) -> i64 {
     } else {
         (span_days - offset - 1) / 7 + 1
     }
+}
+
+/// Per-page reading intensity for the activity strip (spec.md Tier A
+/// #5), on the stable current page axis. Display uses sqrt scaling
+/// capped at the 90th percentile (KoShelf's numbers), so one page you
+/// fell asleep on doesn't flatten the rest of the book.
+pub struct PageActivity {
+    /// The book's current page count (the x axis).
+    pub pages: i64,
+    /// (page, total seconds, read count), sorted by page; only pages
+    /// with any activity appear.
+    pub per_page: Vec<(i64, i64, u32)>,
+    /// 90th-percentile of the nonzero per-page seconds; the display cap.
+    pub cap_secs: i64,
+}
+
+pub fn page_activity(entry: &LibraryEntry) -> PageActivity {
+    let mut acc: BTreeMap<i64, (i64, u32)> = BTreeMap::new();
+    for event in &entry.rescaled {
+        if event.duration <= 0 {
+            continue;
+        }
+        let slot = acc.entry(event.page).or_default();
+        slot.0 += event.duration;
+        slot.1 += 1;
+    }
+    let per_page: Vec<(i64, i64, u32)> = acc
+        .into_iter()
+        .map(|(page, (secs, count))| (page, secs, count))
+        .collect();
+
+    let mut durations: Vec<i64> = per_page.iter().map(|&(_, secs, _)| secs).collect();
+    durations.sort_unstable();
+    let cap_secs = if durations.is_empty() {
+        0
+    } else {
+        durations[(durations.len() * 9 / 10).min(durations.len() - 1)]
+    };
+
+    PageActivity {
+        pages: entry.book.pages,
+        per_page,
+        cap_secs,
+    }
+}
+
+/// Inferred read-throughs for one book (spec.md "Completion").
+pub fn book_completions(entry: &LibraryEntry) -> Vec<colophon_core::Completion> {
+    metrics::completions(
+        &entry.events,
+        entry.book.pages,
+        &metrics::CompletionConfig::default(),
+    )
 }
 
 pub struct BookDetail {
@@ -196,6 +359,7 @@ mod tests {
             },
             unique_pages: 0,
             events,
+            rescaled: Vec::new(),
             capped_secs: total,
             view_pages: 50,
             last_page: 50,
@@ -249,6 +413,65 @@ mod tests {
     }
 
     #[test]
+    fn monthly_totals_render_empty_months() {
+        let mut daily = BTreeMap::new();
+        daily.insert(
+            date("2026-03-15"),
+            DayTotal {
+                seconds: 100,
+                ..Default::default()
+            },
+        );
+        daily.insert(
+            date("2026-06-01"),
+            DayTotal {
+                seconds: 200,
+                ..Default::default()
+            },
+        );
+        let months = monthly_totals(&daily, date("2026-07-03"));
+        let expected = [
+            (date("2026-03-01"), 100),
+            (date("2026-04-01"), 0),
+            (date("2026-05-01"), 0),
+            (date("2026-06-01"), 200),
+            (date("2026-07-01"), 0),
+        ];
+        assert_eq!(months, expected);
+    }
+
+    #[test]
+    fn session_summary_buckets_and_records() {
+        // Three sessions: 2 min, 20 min, 90 min, on different days.
+        let mut events = Vec::new();
+        for (day, pages) in [(1, 2), (2, 20), (3, 90)] {
+            for i in 0..pages {
+                events.push(ev(i + 1, ts(2026, 7, day, 10) + i * 60, 60));
+            }
+        }
+        let summary = session_summary(&events, &Utc);
+        assert_eq!(summary.count, 3);
+        assert_eq!(summary.median_secs, 20 * 60);
+        assert_eq!(summary.longest_secs, 90 * 60);
+        assert_eq!(summary.longest_date, Some(date("2026-07-03")));
+        assert_eq!(summary.histogram, [1, 0, 1, 0, 1, 0]);
+    }
+
+    #[test]
+    fn overview_picks_daily_then_weekly_speed_buckets() {
+        // 9 days of history: daily buckets.
+        let young = entry(vec![ev(1, ts(2026, 6, 24, 10), 60)]);
+        let ov = overview(&[young], &Utc, date("2026-07-03"));
+        assert_eq!(ov.speed_bucket, Bucket::Day);
+
+        // Half a year: weekly buckets.
+        let old = entry(vec![ev(1, ts(2026, 1, 1, 10), 60)]);
+        let ov = overview(&[old], &Utc, date("2026-07-03"));
+        assert_eq!(ov.speed_bucket, Bucket::Week);
+        assert!(!ov.speed.is_empty());
+    }
+
+    #[test]
     fn overview_sums_and_streaks() {
         let a = entry(vec![
             ev(1, ts(2026, 7, 2, 10), 60),
@@ -284,12 +507,70 @@ mod tests {
     }
 
     #[test]
+    fn page_activity_aggregates_on_the_stable_axis() {
+        use colophon_core::RescaledEvent;
+        let mut e = entry(Vec::new());
+        // Page 5 read twice (60 + 40 s), page 6 once; ten light pages to
+        // give the percentile something to cap against.
+        let mut rescaled = vec![
+            RescaledEvent {
+                book_id: 1,
+                page: 5,
+                start_time: 0,
+                duration: 60,
+            },
+            RescaledEvent {
+                book_id: 1,
+                page: 5,
+                start_time: 100,
+                duration: 40,
+            },
+            RescaledEvent {
+                book_id: 1,
+                page: 6,
+                start_time: 200,
+                duration: 30,
+            },
+        ];
+        for p in 10..20 {
+            rescaled.push(RescaledEvent {
+                book_id: 1,
+                page: p,
+                start_time: 300 + p,
+                duration: 10,
+            });
+        }
+        Rc::get_mut(&mut e).unwrap().rescaled = rescaled;
+
+        let activity = page_activity(&e);
+        assert_eq!(activity.pages, 100);
+        assert_eq!(activity.per_page[0], (5, 100, 2));
+        assert_eq!(activity.per_page[1], (6, 30, 1));
+        assert_eq!(activity.per_page.len(), 12);
+        // p90 of [10x10, 30, 100]: index (12-1)*9/10 = 9 -> 30.
+        assert_eq!(activity.cap_secs, 30);
+    }
+
+    #[test]
+    fn book_completions_plumb_through() {
+        // A full read at one page a minute is one completion.
+        let events: Vec<_> = (1..=100)
+            .map(|p| ev(p, ts(2026, 6, 1, 8) + p * 60, 60))
+            .collect();
+        let e = entry(events);
+        let completions = book_completions(&e);
+        assert_eq!(completions.len(), 1);
+        assert_eq!(completions[0].pages_read, 100);
+    }
+
+    #[test]
     fn book_detail_handles_no_data() {
         let e = Rc::new(LibraryEntry {
             capped_secs: 0,
             view_pages: 0,
             last_page: 0,
             events: Vec::new(),
+            rescaled: Vec::new(),
             unique_pages: 0,
             book: entry(Vec::new()).book.clone(),
         });

@@ -13,7 +13,7 @@ it exists: every KOReader stats tool Brandon has found is a web dashboard or
 a self-hosted Docker instance, and he doesn't want that. See `README.md` and
 `spec.md`.
 
-## Where this stands right now (2026-07-03, v0.3.0)
+## Where this stands right now (2026-07-03, v0.4.0)
 
 Phases 0, 1, and 2 are complete and Phase 3 is underway (all on
 2026-07-03; scaffolding was Sonnet's, everything since is Fable's).
@@ -45,17 +45,19 @@ Phases 0, 1, and 2 are complete and Phase 3 is underway (all on
   plugin Lua source is checked into `research/koreader-plugin-src/`.
 
 - **Phase 3 (widget variety) is underway.** The charting decision is
-  settled: custom cairo on `GtkDrawingArea` (`colophon/src/charts/`), no
-  charting crate; validated by shipping the year heatmap and weekday bar
-  chart as production widgets. The sidebar has an "All Books" entry
-  (library-wide overview: tiles, streaks, heatmap, weekday averages) and
-  clicking a book shows the device-parity stat cards. Aggregates live in
+  settled: custom cairo on `GtkDrawingArea` (`colophon/src/charts/`:
+  year heatmap, 7×24 hour heatmap, bar chart, line chart, page-activity
+  strip on shared ramp/quantizer/tooltip scaffolding), no charting
+  crate. The sidebar has an "All Books" entry (tiles, streaks, year
+  heatmap, when-do-I-read, speed trend, session histogram, weekday and
+  monthly bars) and clicking a book shows device-parity stat cards, the
+  per-page activity strip, and read-through cards. Aggregates live in
   `colophon/src/stats.rs` (pure, tested); both surfaces respect the junk
-  filter. Still open in Phase 3: Tier A charts (speed trend, 7×24
-  heatmap, session analytics, velocity, page activity, completions
-  timeline), monthly distribution, and time-window selectors. Ask before
-  adding any dependency. Every widget's metric must be defined in
-  `spec.md` first.
+  filter. Still open in Phase 3 (see roadmap sub-items): per-book speed
+  overlay, sessions-per-day/start-time patterns, pace-per-day within
+  read-throughs, annotation markers, overview completions timeline,
+  library-totals window selector. Ask before adding any dependency.
+  Every widget's metric must be defined in `spec.md` first.
 
 Small outstanding research nicety (not blocking): copy one real `.sdr`
 sidecar (`<book>.sdr/metadata.epub.lua` for a highlighted book) into

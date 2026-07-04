@@ -1,5 +1,29 @@
 # Patchnotes
 
+## v0.4.0 — 2026-07-03
+
+The Tier A widgets land: the analytics nobody else ships.
+
+On the All Books overview: a weekday-by-hour "When do I read" heatmap
+over the whole history (per-cell tooltips; the aggregate profile KOReader
+only shows one day at a time), a reading-speed trend (pages/hour as a
+cairo line/area chart, daily buckets while the history is young and
+weekly past ten weeks, nearest-point tooltips), session analytics (a
+session-length histogram from under-5-minutes to over-2-hours, with
+count, median, and longest-session records), and the monthly distribution
+with empty months rendered rather than skipped.
+
+On the book page: the per-page activity strip (per-page time and read
+count on the stable page axis, sqrt scaling capped at the 90th
+percentile, pixel-binned so long books stay readable, per-range
+tooltips), which doubles as the "did it drag in the middle" velocity
+view; and read-through cards from the completion detector (dates, time,
+sessions, pages/hour, coverage), hidden for books with none.
+
+New core metric: `hourly_profile` (weekday x hour bucketing, attribution
+by start time). Two new chart widgets (hour heatmap, line chart) plus the
+activity strip, all on the same cairo scaffolding. 66 tests.
+
 ## v0.3.0 — 2026-07-03
 
 Phase 3 opens: the charting decision is settled and the first widgets

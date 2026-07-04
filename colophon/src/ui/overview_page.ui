@@ -49,6 +49,59 @@
                 </child>
                 <child>
                   <object class="GtkLabel">
+                    <property name="label">When do I read</property>
+                    <property name="xalign">0</property>
+                    <style>
+                      <class name="title-4"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkScrolledWindow">
+                    <property name="vscrollbar-policy">never</property>
+                    <property name="hscrollbar-policy">automatic</property>
+                    <child>
+                      <object class="HourHeatmap" id="hour_heatmap">
+                        <property name="halign">start</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="speed_title">
+                    <property name="label">Reading speed</property>
+                    <property name="xalign">0</property>
+                    <style>
+                      <class name="title-4"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="LineChart" id="speed_chart"/>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="label">Sessions</property>
+                    <property name="xalign">0</property>
+                    <style>
+                      <class name="title-4"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="session_caption">
+                    <property name="xalign">0</property>
+                    <property name="wrap">true</property>
+                    <style>
+                      <class name="dim-label"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="BarChart" id="session_chart"/>
+                </child>
+                <child>
+                  <object class="GtkLabel">
                     <property name="label">Average time by weekday</property>
                     <property name="xalign">0</property>
                     <style>
@@ -58,6 +111,18 @@
                 </child>
                 <child>
                   <object class="BarChart" id="weekday_chart"/>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="label">By month</property>
+                    <property name="xalign">0</property>
+                    <style>
+                      <class name="title-4"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="BarChart" id="monthly_chart"/>
                 </child>
               </object>
             </child>

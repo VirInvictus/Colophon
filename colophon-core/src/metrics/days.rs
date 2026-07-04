@@ -7,7 +7,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use chrono::{Duration, NaiveDate, TimeZone};
+use chrono::{Datelike, Duration, NaiveDate, TimeZone};
 
 use crate::model::{DayTotal, PageEvent, Streak, Streaks};
 
@@ -47,6 +47,27 @@ pub fn daily_totals<Tz: TimeZone>(events: &[PageEvent], tz: &Tz) -> BTreeMap<Nai
             (date, total)
         })
         .collect()
+}
+
+/// Weekday x hour-of-day reading profile: seconds per (weekday, hour)
+/// cell, weekday-major with Monday = 0. Each event's whole duration is
+/// attributed to its start hour, matching KOReader's own per-day
+/// histograms (spec.md Tier A "When-do-I-read heatmap").
+pub fn hourly_profile<Tz: TimeZone>(events: &[PageEvent], tz: &Tz) -> [[i64; 24]; 7] {
+    let mut grid = [[0i64; 24]; 7];
+    for event in events {
+        if event.duration <= 0 {
+            continue;
+        }
+        let local = tz
+            .timestamp_opt(event.start_time, 0)
+            .single()
+            .expect("epoch timestamp maps to exactly one instant");
+        let weekday = local.date_naive().weekday().num_days_from_monday() as usize;
+        let hour = chrono::Timelike::hour(&local) as usize;
+        grid[weekday][hour] += event.duration;
+    }
+    grid
 }
 
 /// Streaks over a set of reading days, per the converged convention
@@ -98,6 +119,56 @@ mod tests {
 
     fn day_set(dates: &[&str]) -> BTreeSet<NaiveDate> {
         dates.iter().map(|s| d(s)).collect()
+    }
+
+    #[test]
+    fn hourly_profile_buckets_by_start_hour_and_weekday() {
+        // 2026-07-02 is a Thursday (weekday 3); 21:30 local.
+        let thu_evening = Utc
+            .with_ymd_and_hms(2026, 7, 2, 21, 30, 0)
+            .unwrap()
+            .timestamp();
+        let events = vec![
+            PageEvent {
+                book_id: 1,
+                page: 1,
+                start_time: thu_evening,
+                duration: 60,
+                total_pages: 100,
+            },
+            // Spills past the hour but is attributed to its start hour.
+            PageEvent {
+                book_id: 1,
+                page: 2,
+                start_time: thu_evening + 29 * 60,
+                duration: 120,
+                total_pages: 100,
+            },
+        ];
+        let grid = hourly_profile(&events, &Utc);
+        assert_eq!(grid[3][21], 180);
+        assert_eq!(grid[3][22], 0);
+        assert_eq!(grid.iter().flatten().sum::<i64>(), 180);
+    }
+
+    #[test]
+    fn hourly_profile_respects_timezone() {
+        // 01:00 UTC Friday is 21:00 Thursday in UTC-4.
+        let ts = Utc
+            .with_ymd_and_hms(2026, 7, 3, 1, 0, 0)
+            .unwrap()
+            .timestamp();
+        let events = vec![PageEvent {
+            book_id: 1,
+            page: 1,
+            start_time: ts,
+            duration: 60,
+            total_pages: 100,
+        }];
+        let toronto = chrono::FixedOffset::west_opt(4 * 3600).unwrap();
+        let grid = hourly_profile(&events, &toronto);
+        assert_eq!(grid[3][21], 60); // Thursday 21:00 local
+        assert_eq!(hourly_profile(&events, &Utc)[4][1], 60); // Friday 01:00 UTC
     }
 
     #[test]

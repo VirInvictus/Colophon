@@ -10,10 +10,11 @@ use gtk::glib;
 
 use crate::fmt::{humanize_secs, short_date};
 use crate::library::LibraryEntry;
-use crate::stats::BookDetail;
+use crate::stats::{self, BookDetail};
 
 mod imp {
     use super::*;
+    use crate::charts::PageActivityStrip;
     use gtk::CompositeTemplate;
 
     #[derive(CompositeTemplate, Default)]
@@ -27,6 +28,12 @@ mod imp {
         pub progress: TemplateChild<gtk::ProgressBar>,
         #[template_child]
         pub rows: TemplateChild<gtk::ListBox>,
+        #[template_child]
+        pub activity_strip: TemplateChild<PageActivityStrip>,
+        #[template_child]
+        pub completions_title: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub completion_rows: TemplateChild<gtk::ListBox>,
     }
 
     #[glib::object_subclass]
@@ -36,6 +43,7 @@ mod imp {
         type ParentType = adw::Bin;
 
         fn class_init(klass: &mut Self::Class) {
+            PageActivityStrip::ensure_type();
             klass.bind_template();
         }
 
@@ -135,6 +143,40 @@ impl BookPage {
             format!("{} \u{b7} {}", book.highlights, book.notes),
             None,
         );
+
+        imp.activity_strip.set_data(stats::page_activity(entry));
+
+        let completions = stats::book_completions(entry);
+        let has_completions = !completions.is_empty();
+        imp.completions_title.set_visible(has_completions);
+        imp.completion_rows.set_visible(has_completions);
+        imp.completion_rows.remove_all();
+        for (i, completion) in completions.iter().enumerate() {
+            let start = chrono::DateTime::from_timestamp(completion.start_time, 0)
+                .map(|d| short_date(d.with_timezone(&chrono::Local).date_naive()));
+            let end = chrono::DateTime::from_timestamp(completion.end_time, 0)
+                .map(|d| short_date(d.with_timezone(&chrono::Local).date_naive()));
+            let row = adw::ActionRow::builder()
+                .title(format!("Read-through {}", i + 1))
+                .subtitle(match (start, end) {
+                    (Some(s), Some(e)) if s != e => format!("{s} \u{2013} {e}"),
+                    (Some(s), _) => s,
+                    _ => String::new(),
+                })
+                .build();
+            let value = gtk::Label::builder()
+                .label(format!(
+                    "{} \u{b7} {} sessions \u{b7} {:.0} pages/hour \u{b7} {:.0}% covered",
+                    humanize_secs(completion.seconds),
+                    completion.sessions,
+                    completion.pages_per_hour,
+                    completion.coverage * 100.0
+                ))
+                .css_classes(["dim-label"])
+                .build();
+            row.add_suffix(&value);
+            imp.completion_rows.append(&row);
+        }
     }
 }
 

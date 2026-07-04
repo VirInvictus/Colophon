@@ -8,12 +8,13 @@ use gtk::glib;
 use gtk::prelude::*;
 
 use crate::charts::bar::Bar;
+use crate::charts::line::Point;
 use crate::fmt::{humanize_secs, short_date};
-use crate::stats::Overview;
+use crate::stats::{Overview, SESSION_BUCKETS};
 
 mod imp {
     use super::*;
-    use crate::charts::{BarChart, YearHeatmap};
+    use crate::charts::{BarChart, HourHeatmap, LineChart, YearHeatmap};
     use gtk::CompositeTemplate;
 
     #[derive(CompositeTemplate, Default)]
@@ -24,7 +25,19 @@ mod imp {
         #[template_child]
         pub heatmap: TemplateChild<YearHeatmap>,
         #[template_child]
+        pub hour_heatmap: TemplateChild<HourHeatmap>,
+        #[template_child]
+        pub speed_title: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub speed_chart: TemplateChild<LineChart>,
+        #[template_child]
+        pub session_caption: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub session_chart: TemplateChild<BarChart>,
+        #[template_child]
         pub weekday_chart: TemplateChild<BarChart>,
+        #[template_child]
+        pub monthly_chart: TemplateChild<BarChart>,
     }
 
     #[glib::object_subclass]
@@ -35,6 +48,8 @@ mod imp {
 
         fn class_init(klass: &mut Self::Class) {
             YearHeatmap::ensure_type();
+            HourHeatmap::ensure_type();
+            LineChart::ensure_type();
             BarChart::ensure_type();
             klass.bind_template();
         }
@@ -98,6 +113,56 @@ impl OverviewPage {
         }
 
         imp.heatmap.set_data(&overview.daily, today);
+        imp.hour_heatmap.set_grid(overview.hourly);
+
+        imp.speed_title.set_text(match overview.speed_bucket {
+            colophon_core::metrics::Bucket::Day => "Reading speed \u{b7} pages/hour by day",
+            _ => "Reading speed \u{b7} pages/hour by week",
+        });
+        imp.speed_chart.set_points(
+            overview
+                .speed
+                .iter()
+                .map(|(date, point)| Point {
+                    date: *date,
+                    value: point.pages_per_hour,
+                    display: format!(
+                        "{:.0} pages/hour \u{b7} {} pages in {}",
+                        point.pages_per_hour,
+                        point.pages,
+                        humanize_secs(point.seconds)
+                    ),
+                })
+                .collect(),
+        );
+
+        let sessions = &overview.sessions;
+        imp.session_caption.set_text(&format!(
+            "{} sessions \u{b7} median {} \u{b7} longest {}{}",
+            sessions.count,
+            humanize_secs(sessions.median_secs),
+            humanize_secs(sessions.longest_secs),
+            sessions
+                .longest_date
+                .map(|d| format!(" ({})", short_date(d)))
+                .unwrap_or_default(),
+        ));
+        imp.session_chart.set_bars(
+            sessions
+                .histogram
+                .iter()
+                .zip(SESSION_BUCKETS)
+                .map(|(&count, (label, _))| Bar {
+                    label: label.into(),
+                    value: f64::from(count),
+                    display: if count > 0 {
+                        count.to_string()
+                    } else {
+                        String::new()
+                    },
+                })
+                .collect(),
+        );
 
         imp.weekday_chart.set_bars(
             overview
@@ -115,6 +180,35 @@ impl OverviewPage {
                 })
                 .collect(),
         );
+
+        imp.monthly_chart.set_bars(
+            overview
+                .monthly
+                .iter()
+                .map(|&(month, secs)| Bar {
+                    label: month_label(month),
+                    value: secs as f64,
+                    display: if secs > 0 {
+                        humanize_secs(secs)
+                    } else {
+                        String::new()
+                    },
+                })
+                .collect(),
+        );
+    }
+}
+
+fn month_label(month: NaiveDate) -> String {
+    use chrono::Datelike;
+    let abbr = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ][(month.month() as usize) - 1];
+    // Disambiguate January across year boundaries.
+    if month.month() == 1 {
+        format!("{abbr} {}", month.year())
+    } else {
+        abbr.to_owned()
     }
 }
 

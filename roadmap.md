@@ -122,25 +122,33 @@ Charting decision (first, it gates everything):
 
 Tier A widgets (the differentiators; nobody ships these):
 
-- [ ] Reading-speed trend: pages/hour bucketed day/week/month
-      (`metrics::speed_series`), library baseline with per-book overlay.
-- [ ] When-do-I-read heatmap: weekday × hour grid over the whole history,
-      windowable. Needs a small core addition (hour-of-day bucketing;
-      attribute by `start_time` like KOReader's calendar histograms).
-- [ ] Session analytics: session-length histogram, sessions per day,
-      start-time patterns, records (longest session, most sessions in a
-      day). All on `metrics::sessions`.
-- [ ] Book velocity: time per page position from the rescaled view
-      ("did it drag in the middle"), plus pace-per-day within each
-      completion.
-- [ ] Per-page activity strip: per-page total time and read count, sqrt
-      scaling with a 90th-percentile cap (KoShelf's numbers), annotation
-      *count* markers from `book.notes`/`book.highlights` until sidecars
-      are in scope.
-- [ ] Completions timeline: inferred read-throughs
-      (`metrics::completions`) on a time axis; books finished per
-      year/month; per-completion cards (dates, span, time, sessions,
-      pages/hour).
+- [x] Reading-speed trend, library-wide (v0.4.0): pages/hour on a cairo
+      line/area chart, daily buckets under ~10 weeks of history and
+      weekly past that, nearest-point tooltips.
+      - [ ] Per-book overlay against the library baseline.
+- [x] When-do-I-read heatmap (v0.4.0): weekday × hour grid over the
+      whole history (`metrics::hourly_profile`, attribution by
+      `start_time` like KOReader's calendar histograms), per-cell
+      tooltips.
+      - [ ] Time-window filtering (with the overview window selector).
+- [x] Session analytics, first cut (v0.4.0): session-length histogram
+      (<5m … >2h buckets) + caption records (count, median, longest with
+      date).
+      - [ ] Sessions per day and start-time patterns.
+- [x] Per-page activity strip (v0.4.0): per-page total time and read
+      count from the rescaled view, sqrt scaling with a 90th-percentile
+      cap (KoShelf's numbers), pixel binning for long books, per-range
+      tooltips. This is also the "did it drag in the middle" velocity
+      view (Tier A #4's page axis).
+      - [ ] Annotation count markers.
+- [ ] Book velocity, remaining piece: pace-per-day *within* each
+      read-through (the page axis is covered by the activity strip).
+- [x] Per-completion cards (v0.4.0): inferred read-throughs on the book
+      page (dates, time, sessions, pages/hour, coverage), hidden for
+      books with none.
+      - [ ] Overview completions timeline / books finished per
+            year/month (waiting on data that actually contains finished
+            books to design against).
 
 Tier B widgets (expected furniture, done correctly):
 
@@ -159,8 +167,8 @@ Tier B widgets (expected furniture, done correctly):
       `avg_time` math so Colophon never contradicts the Kindle.
 - [x] Weekday distribution (v0.3.0): averages normalized by weekdays
       elapsed (KoInsight's raw-sum skew is the anti-pattern).
-- [ ] Monthly distribution: totals with empty months rendered, not
-      skipped. (The `BarChart` widget is ready for it.)
+- [x] Monthly distribution (v0.4.0): totals with empty months rendered,
+      not skipped; January labels carry the year.
 
 ## Phase 4 — Polish & packaging
 

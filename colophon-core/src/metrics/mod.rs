@@ -13,7 +13,7 @@ pub mod sessions;
 pub mod speed;
 
 pub use completion::{CompletionConfig, completions};
-pub use days::{daily_totals, local_date, streaks};
+pub use days::{daily_totals, hourly_profile, local_date, streaks};
 pub use progress::{
     avg_seconds_per_page, capped_seconds, coverage, uncapped_seconds, unique_pages_read,
 };

@@ -50,6 +50,7 @@ pub fn load_snapshot(path: &Path) -> Result<LibrarySnapshot> {
         entries.push(LibraryEntry {
             unique_pages: metrics::unique_pages_read(coverage, book.pages),
             events,
+            rescaled,
             capped_secs,
             view_pages,
             last_page,
