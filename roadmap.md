@@ -93,21 +93,32 @@ The catalogue is locked in `spec.md`; this phase builds it. Definitions
 land in `spec.md` first, `colophon-core` grows the queries second, the
 widget renders third.
 
+UI shape (Brandon, 2026-07-03): the sidebar gets an **"All Books"** entry
+above the book list. Selecting it shows library-wide widgets in the
+content pane; selecting a book shows that book's stats. Both surfaces
+grow widgets over the phase.
+
+- [x] "All Books" overview surface (v0.3.0): totals tiles (time, pages,
+      books, active days, busiest day), streak tiles with date ranges,
+      year heatmap, weekday averages. Respects the junk filter (recomputes
+      live on toggle). Time-window selector (30/90/365/all) still to come.
+- [x] Per-book surface, first cut (v0.3.0): the Tier B stat card set
+      (capped total labelled "as shown on device" with uncapped alongside,
+      days reading, averages, sessions, KOReader-math time-left and
+      finish-date estimates, interval-union progress bar). The Tier A
+      per-book charts (velocity, page activity) are still open below.
+
 Charting decision (first, it gates everything):
 
-- [ ] Decide cairo/Gsk custom drawing vs. a charting crate. The research
-      leans hard toward custom drawing: every shape Colophon needs (year
-      heatmap, 7×24 heatmap, per-page strip, session histogram, calendar
-      book spans, bar/area trends) is bespoke, all four studied tools
-      hand-rolled their charts (KoShelf in plain CSS grids, KOReader in
-      direct blitting), and a charting crate would fight the Kanagawa
-      theming anyway. Validate with a spike: one bar chart + one heatmap
-      as `GtkDrawingArea`/snapshot widgets before committing. Any crate
-      instead needs the usual dependency ask.
-- [ ] Shared chart scaffolding once the spike settles: Kanagawa Dragon
-      color ramps, hover/tooltip plumbing, empty states, a common
-      value→intensity quantizer (KoShelf-style discrete levels; explicitly
-      not Kodashboard's continuous alpha, which hides magnitude).
+- [x] **Decided: custom cairo drawing on `GtkDrawingArea`, no charting
+      crate.** Validated 2026-07-03 by building the year heatmap and the
+      weekday bar chart as production widgets (`colophon/src/charts/`):
+      both shapes came out clean, theme-reactive, and dependency-free
+      (cairo toy text for short labels keeps pangocairo out too).
+- [x] Shared chart scaffolding (`charts/mod.rs`): Kanagawa ramps for
+      light/dark, KoShelf-style discrete intensity quantizer (explicitly
+      not Kodashboard's continuous alpha), tooltip plumbing, dark-notify
+      redraw wiring.
 
 Tier A widgets (the differentiators; nobody ships these):
 
@@ -133,22 +144,23 @@ Tier A widgets (the differentiators; nobody ships these):
 
 Tier B widgets (expected furniture, done correctly):
 
-- [ ] Year heatmap calendar: GitHub-style day grid, quantized levels,
-      tooltips with time + pages + books.
-- [ ] Streak cards: current/longest with date ranges
-      (`metrics::streaks`; the today-or-yesterday grace rule is already
-      the tested convention).
-- [ ] Library totals: windowed 30/90/365/all tiles (total time, unique
-      pages, books touched, active days, busiest day/month records).
-      Windows are calendar windows, not "last N days that had data"
-      (Kodashboard's KPI bug; noted in RESEARCH §5.3).
-- [ ] Per-book stat cards with device parity: capped total labelled
-      "as shown on device", uncapped alongside, avg time/page and
-      time-left/finish-date estimates using KOReader's own capped
+- [x] Year heatmap calendar (v0.3.0): GitHub-style Monday-start grid,
+      quantized levels, per-day tooltips (date, time, pages); the grid
+      shrinks for young histories instead of rendering a year of blanks.
+- [x] Streak tiles (v0.3.0): current/longest with date ranges
+      (`metrics::streaks`).
+- [ ] Library totals *windowing*: the all-time tiles shipped in v0.3.0;
+      the 30/90/365/all window selector is still open. Windows are
+      calendar windows, not "last N days that had data" (Kodashboard's
+      KPI bug; noted in RESEARCH §5.3).
+- [x] Per-book stat cards with device parity (v0.3.0): capped total
+      labelled "as shown on device", uncapped alongside, avg time/page
+      and time-left/finish-date estimates using KOReader's own capped
       `avg_time` math so Colophon never contradicts the Kindle.
-- [ ] Weekday/monthly distributions: weekday *averages normalized by
-      weekdays elapsed* (KoInsight's raw-sum skew is the anti-pattern),
-      monthly totals with empty months rendered, not skipped.
+- [x] Weekday distribution (v0.3.0): averages normalized by weekdays
+      elapsed (KoInsight's raw-sum skew is the anti-pattern).
+- [ ] Monthly distribution: totals with empty months rendered, not
+      skipped. (The `BarChart` widget is ready for it.)
 
 ## Phase 4 — Polish & packaging
 

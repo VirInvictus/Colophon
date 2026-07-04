@@ -41,6 +41,16 @@ pub fn relative_date(epoch_secs: i64, now: DateTime<Local>) -> String {
     }
 }
 
+/// Absolute short date: "Jul 24 2026".
+pub fn short_date(date: chrono::NaiveDate) -> String {
+    format!(
+        "{} {} {}",
+        month_abbr(date.month()),
+        date.day(),
+        date.year()
+    )
+}
+
 fn month_abbr(month: u32) -> &'static str {
     [
         "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",

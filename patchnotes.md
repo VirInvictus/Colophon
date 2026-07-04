@@ -1,5 +1,30 @@
 # Patchnotes
 
+## v0.3.0 — 2026-07-03
+
+Phase 3 opens: the charting decision is settled and the first widgets
+ship on two new content surfaces.
+
+The sidebar gains an "All Books" entry (Brandon's request) above the book
+list. Selecting it shows the library-wide overview: totals tiles (time,
+pages read, books, active days, busiest day), current and longest streak
+tiles with date ranges, a GitHub-style year heatmap (quantized intensity,
+per-day tooltips, grid sized to the history), and average time by weekday
+(normalized by weekdays elapsed, strongest day highlighted). Selecting a
+book shows the per-book page: interval-union progress bar and the
+device-parity stat cards (capped "as shown on device" total with the
+uncapped sum alongside, days reading, averages, sessions, and KOReader's
+own time-left and finish-date estimate math). Both surfaces respect the
+junk filter and recompute live when it toggles.
+
+Charting verdict: custom cairo drawing on GtkDrawingArea, no charting
+crate. The heatmap and bar chart shipped as production widgets with
+shared Kanagawa ramps for light and dark, a discrete intensity quantizer,
+and theme-reactive redraws. Zero new dependencies.
+
+59 tests (new: overview/book-detail aggregate math, weekday
+normalization, heat quantizer).
+
 ## v0.2.0 — 2026-07-03
 
 Phase 2: the real app shell. The placeholder window is gone; Colophon now

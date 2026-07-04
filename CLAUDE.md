@@ -13,10 +13,10 @@ it exists: every KOReader stats tool Brandon has found is a web dashboard or
 a self-hosted Docker instance, and he doesn't want that. See `README.md` and
 `spec.md`.
 
-## Where this stands right now (2026-07-03, v0.2.0)
+## Where this stands right now (2026-07-03, v0.3.0)
 
-Phases 0, 1, and 2 are complete (all finished 2026-07-03; scaffolding was
-Sonnet's, everything since is Fable's).
+Phases 0, 1, and 2 are complete and Phase 3 is underway (all on
+2026-07-03; scaffolding was Sonnet's, everything since is Fable's).
 
 - **Phase 0 (research) is done.** `RESEARCH.md` is the canonical record:
   confirmed schema (§1), KOReader's own built-in stats UI surveyed from
@@ -44,11 +44,18 @@ Sonnet's, everything since is Fable's).
   `research/samples/` (**gitignored, never commit them**); the on-device
   plugin Lua source is checked into `research/koreader-plugin-src/`.
 
-Next up is Phase 3 (widget variety), and it opens with the charting
-decision: the research leans hard toward custom cairo/Gsk drawing (see
-`roadmap.md`), validated by a spike (one bar chart + one heatmap) before
-committing. Ask before adding any dependency. Every widget's metric must
-be defined in `spec.md` first.
+- **Phase 3 (widget variety) is underway.** The charting decision is
+  settled: custom cairo on `GtkDrawingArea` (`colophon/src/charts/`), no
+  charting crate; validated by shipping the year heatmap and weekday bar
+  chart as production widgets. The sidebar has an "All Books" entry
+  (library-wide overview: tiles, streaks, heatmap, weekday averages) and
+  clicking a book shows the device-parity stat cards. Aggregates live in
+  `colophon/src/stats.rs` (pure, tested); both surfaces respect the junk
+  filter. Still open in Phase 3: Tier A charts (speed trend, 7×24
+  heatmap, session analytics, velocity, page activity, completions
+  timeline), monthly distribution, and time-window selectors. Ask before
+  adding any dependency. Every widget's metric must be defined in
+  `spec.md` first.
 
 Small outstanding research nicety (not blocking): copy one real `.sdr`
 sidecar (`<book>.sdr/metadata.epub.lua` for a highlighted book) into

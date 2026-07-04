@@ -24,7 +24,10 @@ pub struct LibrarySnapshot {
 }
 
 /// Opens the canonical snapshot read-only and computes the per-book
-/// display data (interval-union unique pages).
+/// display data: interval-union unique pages from the raw events, plus
+/// the KOReader-parity numbers that must come from the rescaled
+/// `page_stat` view (capped totals, distinct current-axis pages, last
+/// read page) because that is what the device's own queries run on.
 pub fn load_snapshot(path: &Path) -> Result<LibrarySnapshot> {
     let db = StatsDb::open(path)?;
     let schema_version = db.schema_version()?;
@@ -32,8 +35,24 @@ pub fn load_snapshot(path: &Path) -> Result<LibrarySnapshot> {
     for book in db.books()? {
         let events = db.events(&book)?;
         let coverage = metrics::coverage(&events);
+
+        let rescaled = db.rescaled_events(&book)?;
+        let (capped_secs, view_pages) = metrics::capped_seconds(
+            rescaled.iter().map(|e| (e.page, e.duration)),
+            colophon_core::model::KOREADER_DEFAULT_MAX_SEC,
+        );
+        let last_page = rescaled
+            .iter()
+            .max_by_key(|e| e.start_time)
+            .map(|e| e.page)
+            .unwrap_or(0);
+
         entries.push(LibraryEntry {
             unique_pages: metrics::unique_pages_read(coverage, book.pages),
+            events,
+            capped_secs,
+            view_pages,
+            last_page,
             book,
         });
     }

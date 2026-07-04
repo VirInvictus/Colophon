@@ -1,5 +1,8 @@
 //! One book in the library list.
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use adw::subclass::prelude::*;
 use gtk::glib;
 use gtk::prelude::*;
@@ -20,6 +23,7 @@ mod imp {
         pub authors_label: TemplateChild<gtk::Label>,
         #[template_child]
         pub stats_label: TemplateChild<gtk::Label>,
+        pub entry: RefCell<Option<Rc<LibraryEntry>>>,
     }
 
     #[glib::object_subclass]
@@ -49,10 +53,15 @@ glib::wrapper! {
 }
 
 impl BookRow {
-    pub fn new(entry: &LibraryEntry, in_group: bool) -> Self {
+    pub fn new(entry: &Rc<LibraryEntry>, in_group: bool) -> Self {
         let row: Self = glib::Object::new();
         row.bind(entry, in_group);
+        row.imp().entry.replace(Some(Rc::clone(entry)));
         row
+    }
+
+    pub fn entry(&self) -> Option<Rc<LibraryEntry>> {
+        self.imp().entry.borrow().clone()
     }
 
     fn bind(&self, entry: &LibraryEntry, in_group: bool) {

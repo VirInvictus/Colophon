@@ -1,10 +1,12 @@
 //! Colophon: a native GTK4/libadwaita statistics viewer for KOReader.
 
+mod charts;
 mod fmt;
 mod library;
 mod loader;
 mod paths;
 mod settings;
+mod stats;
 mod theme;
 mod ui;
 

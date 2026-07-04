@@ -4,19 +4,24 @@
 
 use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
+use chrono::Local;
 use gtk::{gio, glib};
 
 use crate::library::LibraryEntry;
 use crate::loader::LibrarySnapshot;
-use crate::{library, loader, paths, settings};
+use crate::ui::library_view::Selection;
+use crate::{library, loader, paths, settings, stats};
 
 mod imp {
     use super::*;
+    use crate::ui::book_page::BookPage;
     use crate::ui::book_row::BookRow;
     use crate::ui::library_view::LibraryView;
+    use crate::ui::overview_page::OverviewPage;
     use gtk::CompositeTemplate;
 
     #[derive(CompositeTemplate, Default)]
@@ -34,8 +39,17 @@ mod imp {
         pub library_view: TemplateChild<LibraryView>,
         #[template_child]
         pub refresh_button: TemplateChild<gtk::Button>,
+        #[template_child]
+        pub content_page: TemplateChild<adw::NavigationPage>,
+        #[template_child]
+        pub content_stack: TemplateChild<gtk::Stack>,
+        #[template_child]
+        pub overview_page: TemplateChild<OverviewPage>,
+        #[template_child]
+        pub book_page: TemplateChild<BookPage>,
         /// Unfiltered master copy; refilter() derives the visible groups.
-        pub entries: RefCell<Vec<LibraryEntry>>,
+        pub entries: RefCell<Vec<Rc<LibraryEntry>>>,
+        pub selection: RefCell<Selection>,
         /// Reentrancy guard for import/refresh.
         pub loading: Cell<bool>,
     }
@@ -49,6 +63,8 @@ mod imp {
         fn class_init(klass: &mut Self::Class) {
             LibraryView::ensure_type();
             BookRow::ensure_type();
+            OverviewPage::ensure_type();
+            BookPage::ensure_type();
             klass.bind_template();
         }
 
@@ -63,6 +79,11 @@ mod imp {
             let window = self.obj();
             crate::ui::actions::install_window_actions(&window);
             window.restore_geometry();
+            self.library_view.set_selection_handler(glib::clone!(
+                #[weak]
+                window,
+                move |selection| window.on_select(selection)
+            ));
         }
     }
 
@@ -233,26 +254,119 @@ impl ColophonWindow {
         }
 
         let has_books = !snap.entries.is_empty();
-        imp.entries.replace(snap.entries);
+        imp.entries
+            .replace(snap.entries.into_iter().map(Rc::new).collect());
+
+        // A re-import may have dropped the selected book (or renumbered
+        // ids); fall back to the overview rather than a stale page.
+        let selection = *imp.selection.borrow();
+        if let Selection::Book(id) = selection {
+            let still_there = imp.entries.borrow().iter().any(|e| e.book.id == id);
+            if !still_there {
+                imp.selection.replace(Selection::Overview);
+            }
+        }
+
         self.refilter();
         imp.library_stack
             .set_visible_child_name(if has_books { "list" } else { "empty" });
     }
 
-    /// Re-derives the visible groups from the unfiltered master list and
-    /// the junk-filter action state. Pure recompute; no db round-trip.
-    pub fn refilter(&self) {
-        let junk_filter = self
-            .lookup_action("junk-filter")
+    fn junk_filter_on(&self) -> bool {
+        self.lookup_action("junk-filter")
             .and_then(|a| a.state())
             .and_then(|v| v.get::<bool>())
-            .unwrap_or(true);
+            .unwrap_or(true)
+    }
+
+    /// The entries the current junk-filter state admits. Library-wide
+    /// widgets respect the filter too (spec.md "Junk filter").
+    fn filtered_entries(&self) -> Vec<Rc<LibraryEntry>> {
+        let junk_filter = self.junk_filter_on();
+        self.imp()
+            .entries
+            .borrow()
+            .iter()
+            .filter(|e| {
+                !junk_filter
+                    || !e
+                        .book
+                        .is_junk(colophon_core::model::DEFAULT_JUNK_THRESHOLD_SECS)
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Re-derives the visible groups from the unfiltered master list and
+    /// the junk-filter action state, then refreshes the content pane.
+    /// Pure recompute; no db round-trip.
+    pub fn refilter(&self) {
+        let entries = self.imp().entries.borrow();
         let groups = library::grouped(
-            self.imp().entries.borrow().clone(),
-            junk_filter,
+            &entries,
+            self.junk_filter_on(),
             colophon_core::model::DEFAULT_JUNK_THRESHOLD_SECS,
         );
-        self.imp().library_view.set_groups(&groups);
+        drop(entries);
+
+        // If the selected book just got junk-filtered away, fall back.
+        let selection = *self.imp().selection.borrow();
+        if let Selection::Book(id) = selection {
+            let visible = groups
+                .iter()
+                .flat_map(|g| &g.entries)
+                .any(|e| e.book.id == id);
+            if !visible {
+                self.imp().selection.replace(Selection::Overview);
+            }
+        }
+
+        self.imp()
+            .library_view
+            .set_groups(&groups, *self.imp().selection.borrow());
+        self.refresh_content();
+    }
+
+    fn on_select(&self, selection: Selection) {
+        if *self.imp().selection.borrow() == selection {
+            return;
+        }
+        self.imp().selection.replace(selection);
+        self.refresh_content();
+        // In collapsed (narrow) mode, selecting navigates forward.
+        self.imp().split_view.set_show_content(true);
+    }
+
+    /// Renders the content pane for the current selection.
+    fn refresh_content(&self) {
+        let imp = self.imp();
+        let entries = self.filtered_entries();
+        let today = Local::now().date_naive();
+
+        if imp.entries.borrow().is_empty() {
+            imp.content_stack.set_visible_child_name("placeholder");
+            imp.content_page.set_title("Colophon");
+            return;
+        }
+
+        match *imp.selection.borrow() {
+            Selection::Overview => {
+                let overview = stats::overview(&entries, &Local, today);
+                imp.overview_page.set_data(&overview, today);
+                imp.content_stack.set_visible_child_name("overview");
+                imp.content_page.set_title("All Books");
+            }
+            Selection::Book(id) => {
+                let Some(entry) = entries.iter().find(|e| e.book.id == id) else {
+                    imp.content_stack.set_visible_child_name("placeholder");
+                    return;
+                };
+                let detail = stats::book_detail(entry, &Local, today);
+                imp.book_page.set_book(entry, &detail);
+                imp.content_stack.set_visible_child_name("book");
+                imp.content_page.set_title(entry.book.title.trim());
+            }
+        }
     }
 
     fn set_busy(&self, busy: bool) {

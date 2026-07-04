@@ -2,23 +2,36 @@
 //! Pure and GTK-free. Grouping is display-only (spec.md "Book identity"):
 //! two files of the same work (the Jingo case, same title/authors,
 //! different md5s) sit together in the list but stay separate entries.
+//!
+//! Entries are shared as `Rc`: the loader builds them once per import and
+//! every refilter/regroup just clones pointers, not event vectors.
 
 use std::collections::HashMap;
+use std::rc::Rc;
 
-use colophon_core::Book;
+use colophon_core::{Book, PageEvent};
 
 #[derive(Debug, Clone)]
 pub struct LibraryEntry {
     pub book: Book,
     /// Interval-union unique pages read, out of `book.pages`.
     pub unique_pages: i64,
+    /// Raw page-turn events (time axis), chronological.
+    pub events: Vec<PageEvent>,
+    /// KOReader-parity numbers computed from the rescaled `page_stat`
+    /// view at load time (the device's own math runs on the view):
+    /// capped total seconds, distinct pages on the current page axis,
+    /// and the most recently read page.
+    pub capped_secs: i64,
+    pub view_pages: i64,
+    pub last_page: i64,
 }
 
 #[derive(Debug, Clone)]
 pub struct LibraryGroup {
     pub title: String,
     pub authors: String,
-    pub entries: Vec<LibraryEntry>,
+    pub entries: Vec<Rc<LibraryEntry>>,
 }
 
 impl LibraryGroup {
@@ -34,7 +47,7 @@ fn group_key(book: &Book) -> (String, String) {
 /// Junk-filters, groups by (title, authors), and orders: groups by their
 /// most recently opened member (desc), members within a group likewise.
 pub fn grouped(
-    entries: Vec<LibraryEntry>,
+    entries: &[Rc<LibraryEntry>],
     junk_filter: bool,
     junk_threshold_secs: i64,
 ) -> Vec<LibraryGroup> {
@@ -47,13 +60,13 @@ pub fn grouped(
         }
         let key = group_key(&entry.book);
         match index.get(&key) {
-            Some(&i) => groups[i].entries.push(entry),
+            Some(&i) => groups[i].entries.push(Rc::clone(entry)),
             None => {
                 index.insert(key.clone(), groups.len());
                 groups.push(LibraryGroup {
                     title: key.0,
                     authors: key.1,
-                    entries: vec![entry],
+                    entries: vec![Rc::clone(entry)],
                 });
             }
         }
@@ -77,8 +90,14 @@ mod tests {
     use super::*;
     use colophon_core::model::DEFAULT_JUNK_THRESHOLD_SECS;
 
-    fn book(title: &str, authors: &str, md5: &str, read_secs: i64, last_open: i64) -> LibraryEntry {
-        LibraryEntry {
+    fn book(
+        title: &str,
+        authors: &str,
+        md5: &str,
+        read_secs: i64,
+        last_open: i64,
+    ) -> Rc<LibraryEntry> {
+        Rc::new(LibraryEntry {
             book: Book {
                 id: 0,
                 all_ids: vec![0],
@@ -95,7 +114,11 @@ mod tests {
                 last_open,
             },
             unique_pages: 0,
-        }
+            events: Vec::new(),
+            capped_secs: 0,
+            view_pages: 0,
+            last_page: 0,
+        })
     }
 
     #[test]
@@ -104,7 +127,7 @@ mod tests {
             book("Jingo", "Terry Pratchett", "aaaa", 632, 200),
             book("Jingo", "Terry Pratchett", "bbbb", 400, 300),
         ];
-        let groups = grouped(entries, true, DEFAULT_JUNK_THRESHOLD_SECS);
+        let groups = grouped(&entries, true, DEFAULT_JUNK_THRESHOLD_SECS);
         assert_eq!(groups.len(), 1);
         assert!(groups[0].is_multi());
         assert_eq!(groups[0].entries.len(), 2);
@@ -119,7 +142,7 @@ mod tests {
             book("Jingo", "Terry Pratchett", "aaaa", 632, 200),
             book("Royal Assassin", "Robin Hobb", "cccc", 36_047, 100),
         ];
-        let groups = grouped(entries, true, DEFAULT_JUNK_THRESHOLD_SECS);
+        let groups = grouped(&entries, true, DEFAULT_JUNK_THRESHOLD_SECS);
         assert_eq!(groups.len(), 2);
         assert!(!groups[0].is_multi());
     }
@@ -130,11 +153,11 @@ mod tests {
             book("Royal Assassin", "Robin Hobb", "cccc", 36_047, 100),
             book("Some Plugin README", "N/A", "dddd", 40, 400),
         ];
-        let on = grouped(entries.clone(), true, DEFAULT_JUNK_THRESHOLD_SECS);
+        let on = grouped(&entries, true, DEFAULT_JUNK_THRESHOLD_SECS);
         assert_eq!(on.len(), 1);
         assert_eq!(on[0].title, "Royal Assassin");
 
-        let off = grouped(entries, false, DEFAULT_JUNK_THRESHOLD_SECS);
+        let off = grouped(&entries, false, DEFAULT_JUNK_THRESHOLD_SECS);
         assert_eq!(off.len(), 2);
     }
 
@@ -146,7 +169,7 @@ mod tests {
             book("Jingo", "Terry Pratchett", "aaaa", 632, 200),
             book("Jingo", "Terry Pratchett", "bbbb", 10, 300),
         ];
-        let groups = grouped(entries, true, DEFAULT_JUNK_THRESHOLD_SECS);
+        let groups = grouped(&entries, true, DEFAULT_JUNK_THRESHOLD_SECS);
         assert_eq!(groups.len(), 1);
         assert!(!groups[0].is_multi());
     }
@@ -158,7 +181,7 @@ mod tests {
             book("New", "B", "bbbb", 1000, 900),
             book("Old", "A", "cccc", 1000, 950), // second copy bumps the group
         ];
-        let groups = grouped(entries, true, DEFAULT_JUNK_THRESHOLD_SECS);
+        let groups = grouped(&entries, true, DEFAULT_JUNK_THRESHOLD_SECS);
         assert_eq!(groups[0].title, "Old");
         assert_eq!(groups[1].title, "New");
     }
@@ -169,13 +192,13 @@ mod tests {
             book("Jingo ", "Terry Pratchett", "aaaa", 1000, 100),
             book("Jingo", "Terry Pratchett ", "bbbb", 1000, 200),
         ];
-        let groups = grouped(entries, true, DEFAULT_JUNK_THRESHOLD_SECS);
+        let groups = grouped(&entries, true, DEFAULT_JUNK_THRESHOLD_SECS);
         assert_eq!(groups.len(), 1);
         assert!(groups[0].is_multi());
     }
 
     #[test]
     fn empty_in_empty_out() {
-        assert!(grouped(Vec::new(), true, DEFAULT_JUNK_THRESHOLD_SECS).is_empty());
+        assert!(grouped(&[], true, DEFAULT_JUNK_THRESHOLD_SECS).is_empty());
     }
 }
