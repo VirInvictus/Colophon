@@ -1,5 +1,27 @@
 # Patchnotes
 
+## v0.5.0 — 2026-07-03
+
+Time windows, the per-book speed overlay, and session patterns.
+
+The All Books overview gains a 30d / 90d / 365d / all-time selector. It
+scopes the totals tiles and the behaviour charts (when-do-I-read, speed,
+sessions, weekday averages) to calendar windows ending today; streaks,
+the year heatmap, and the monthly bars deliberately stay whole-history,
+since windowing a streak or a year grid would just lie. Windowed totals
+are computed from event sums (identical to the device counters for
+all-time, verified against the sample).
+
+The book page gets its own reading-speed trend with the library baseline
+muted behind it, on the same bucket so the two series are comparable
+(the line chart grew date-scaled multi-series support). Session
+analytics add sessions-per-active-day and a starts-by-hour chart with
+per-bar tooltips (bar charts now support tooltips generally). Read-
+through cards carry pages/day over the calendar span, completing the
+book-velocity item.
+
+68 tests (new: window scoping, session starts/density).
+
 ## v0.4.0 — 2026-07-03
 
 The Tier A widgets land: the analytics nobody else ships.

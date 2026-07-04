@@ -18,6 +18,38 @@
                 <property name="margin-start">12</property>
                 <property name="margin-end">12</property>
                 <child>
+                  <object class="GtkBox">
+                    <property name="halign">start</property>
+                    <style>
+                      <class name="linked"/>
+                    </style>
+                    <child>
+                      <object class="GtkToggleButton" id="win_30">
+                        <property name="label">30d</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkToggleButton" id="win_90">
+                        <property name="label">90d</property>
+                        <property name="group">win_30</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkToggleButton" id="win_365">
+                        <property name="label">365d</property>
+                        <property name="group">win_30</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkToggleButton" id="win_all">
+                        <property name="label">All time</property>
+                        <property name="active">true</property>
+                        <property name="group">win_30</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
                   <object class="GtkFlowBox" id="tiles">
                     <property name="selection-mode">none</property>
                     <property name="homogeneous">true</property>
@@ -99,6 +131,19 @@
                 </child>
                 <child>
                   <object class="BarChart" id="session_chart"/>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="label">Session starts by hour</property>
+                    <property name="xalign">0</property>
+                    <style>
+                      <class name="caption"/>
+                      <class name="dim-label"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="BarChart" id="session_starts_chart"/>
                 </child>
                 <child>
                   <object class="GtkLabel">

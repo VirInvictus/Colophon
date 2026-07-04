@@ -2,6 +2,8 @@
 //! library-wide charts. Respects the junk filter by construction: the
 //! window hands it the already-filtered entry set via `stats::overview`.
 
+use std::cell::RefCell;
+
 use adw::subclass::prelude::*;
 use chrono::NaiveDate;
 use gtk::glib;
@@ -11,6 +13,8 @@ use crate::charts::bar::Bar;
 use crate::charts::line::Point;
 use crate::fmt::{humanize_secs, short_date};
 use crate::stats::{Overview, SESSION_BUCKETS};
+
+type WindowChangedHandler = Box<dyn Fn()>;
 
 mod imp {
     use super::*;
@@ -35,9 +39,20 @@ mod imp {
         #[template_child]
         pub session_chart: TemplateChild<BarChart>,
         #[template_child]
+        pub session_starts_chart: TemplateChild<BarChart>,
+        #[template_child]
         pub weekday_chart: TemplateChild<BarChart>,
         #[template_child]
         pub monthly_chart: TemplateChild<BarChart>,
+        #[template_child]
+        pub win_30: TemplateChild<gtk::ToggleButton>,
+        #[template_child]
+        pub win_90: TemplateChild<gtk::ToggleButton>,
+        #[template_child]
+        pub win_365: TemplateChild<gtk::ToggleButton>,
+        #[template_child]
+        pub win_all: TemplateChild<gtk::ToggleButton>,
+        pub on_window_changed: RefCell<Option<super::WindowChangedHandler>>,
     }
 
     #[glib::object_subclass]
@@ -59,7 +74,27 @@ mod imp {
         }
     }
 
-    impl ObjectImpl for OverviewPage {}
+    impl ObjectImpl for OverviewPage {
+        fn constructed(&self) {
+            self.parent_constructed();
+            let page = self.obj();
+            for button in [&self.win_30, &self.win_90, &self.win_365, &self.win_all] {
+                button.connect_toggled(glib::clone!(
+                    #[weak(rename_to = this)]
+                    page,
+                    move |button| {
+                        // Each switch fires two toggled signals (off +
+                        // on); recompute once, on the activation.
+                        if button.is_active()
+                            && let Some(handler) = this.imp().on_window_changed.borrow().as_ref()
+                        {
+                            handler();
+                        }
+                    }
+                ));
+            }
+        }
+    }
     impl WidgetImpl for OverviewPage {}
     impl BinImpl for OverviewPage {}
 }
@@ -73,6 +108,26 @@ glib::wrapper! {
 const WEEKDAY_LABELS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 impl OverviewPage {
+    /// The selected time window in days (`None` = all time).
+    pub fn window_days(&self) -> Option<i64> {
+        let imp = self.imp();
+        if imp.win_30.is_active() {
+            Some(30)
+        } else if imp.win_90.is_active() {
+            Some(90)
+        } else if imp.win_365.is_active() {
+            Some(365)
+        } else {
+            None
+        }
+    }
+
+    pub fn set_on_window_changed(&self, handler: impl Fn() + 'static) {
+        self.imp()
+            .on_window_changed
+            .replace(Some(Box::new(handler)));
+    }
+
     pub fn set_data(&self, overview: &Overview, today: NaiveDate) {
         let imp = self.imp();
 
@@ -138,8 +193,9 @@ impl OverviewPage {
 
         let sessions = &overview.sessions;
         imp.session_caption.set_text(&format!(
-            "{} sessions \u{b7} median {} \u{b7} longest {}{}",
+            "{} sessions \u{b7} {:.1} per active day \u{b7} median {} \u{b7} longest {}{}",
             sessions.count,
+            sessions.per_active_day,
             humanize_secs(sessions.median_secs),
             humanize_secs(sessions.longest_secs),
             sessions
@@ -160,6 +216,26 @@ impl OverviewPage {
                     } else {
                         String::new()
                     },
+                    tooltip: Some(format!("{label}: {count} sessions")),
+                })
+                .collect(),
+        );
+        imp.session_starts_chart.set_bars(
+            sessions
+                .starts_by_hour
+                .iter()
+                .enumerate()
+                .map(|(hour, &count)| Bar {
+                    // 24 columns are too narrow for per-bar text; label
+                    // the quarters, let tooltips carry the numbers.
+                    label: if hour % 6 == 0 {
+                        format!("{hour:02}")
+                    } else {
+                        String::new()
+                    },
+                    value: f64::from(count),
+                    display: String::new(),
+                    tooltip: Some(format!("{hour:02}:00 \u{b7} {count} sessions")),
                 })
                 .collect(),
         );
@@ -177,6 +253,7 @@ impl OverviewPage {
                     } else {
                         String::new()
                     },
+                    tooltip: Some(format!("{label}: {} on average", humanize_secs(secs))),
                 })
                 .collect(),
         );
@@ -193,6 +270,7 @@ impl OverviewPage {
                     } else {
                         String::new()
                     },
+                    tooltip: Some(format!("{}: {}", month_label(month), humanize_secs(secs))),
                 })
                 .collect(),
         );

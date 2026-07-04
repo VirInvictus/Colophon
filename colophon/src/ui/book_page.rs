@@ -14,7 +14,7 @@ use crate::stats::{self, BookDetail};
 
 mod imp {
     use super::*;
-    use crate::charts::PageActivityStrip;
+    use crate::charts::{LineChart, PageActivityStrip};
     use gtk::CompositeTemplate;
 
     #[derive(CompositeTemplate, Default)]
@@ -31,6 +31,12 @@ mod imp {
         #[template_child]
         pub activity_strip: TemplateChild<PageActivityStrip>,
         #[template_child]
+        pub speed_title: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub speed_caption: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub speed_chart: TemplateChild<LineChart>,
+        #[template_child]
         pub completions_title: TemplateChild<gtk::Label>,
         #[template_child]
         pub completion_rows: TemplateChild<gtk::ListBox>,
@@ -44,6 +50,7 @@ mod imp {
 
         fn class_init(klass: &mut Self::Class) {
             PageActivityStrip::ensure_type();
+            LineChart::ensure_type();
             klass.bind_template();
         }
 
@@ -164,12 +171,14 @@ impl BookPage {
                     _ => String::new(),
                 })
                 .build();
+            let span_days = ((completion.end_time - completion.start_time) / 86_400).max(0) + 1;
             let value = gtk::Label::builder()
                 .label(format!(
-                    "{} \u{b7} {} sessions \u{b7} {:.0} pages/hour \u{b7} {:.0}% covered",
+                    "{} \u{b7} {} sessions \u{b7} {:.0} pages/hour \u{b7} {:.0} pages/day \u{b7} {:.0}% covered",
                     humanize_secs(completion.seconds),
                     completion.sessions,
                     completion.pages_per_hour,
+                    completion.pages_read as f64 / span_days as f64,
                     completion.coverage * 100.0
                 ))
                 .css_classes(["dim-label"])
@@ -177,6 +186,40 @@ impl BookPage {
             row.add_suffix(&value);
             imp.completion_rows.append(&row);
         }
+    }
+
+    /// The book's speed trend over the library baseline. Both series
+    /// share the bucket so they stay commensurable.
+    pub fn set_speed(
+        &self,
+        book: Vec<crate::charts::line::Point>,
+        library: Vec<crate::charts::line::Point>,
+        bucket: colophon_core::metrics::Bucket,
+    ) {
+        let imp = self.imp();
+        let has_data = !book.is_empty();
+        imp.speed_title.set_visible(has_data);
+        imp.speed_caption.set_visible(has_data);
+        imp.speed_chart.set_visible(has_data);
+        if !has_data {
+            return;
+        }
+        imp.speed_title.set_text(match bucket {
+            colophon_core::metrics::Bucket::Day => "Reading speed \u{b7} pages/hour by day",
+            _ => "Reading speed \u{b7} pages/hour by week",
+        });
+        imp.speed_caption
+            .set_text("this book, with the whole library shown muted behind it");
+        imp.speed_chart.set_series(vec![
+            crate::charts::line::Series {
+                points: library,
+                muted: true,
+            },
+            crate::charts::line::Series {
+                points: book,
+                muted: false,
+            },
+        ]);
     }
 }
 

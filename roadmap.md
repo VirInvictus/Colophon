@@ -125,24 +125,28 @@ Tier A widgets (the differentiators; nobody ships these):
 - [x] Reading-speed trend, library-wide (v0.4.0): pages/hour on a cairo
       line/area chart, daily buckets under ~10 weeks of history and
       weekly past that, nearest-point tooltips.
-      - [ ] Per-book overlay against the library baseline.
+      - [x] Per-book overlay (v0.5.0): the book page shows its own trend
+            with the library baseline muted behind it, same bucket so
+            the series stay commensurable.
 - [x] When-do-I-read heatmap (v0.4.0): weekday × hour grid over the
       whole history (`metrics::hourly_profile`, attribution by
       `start_time` like KOReader's calendar histograms), per-cell
       tooltips.
-      - [ ] Time-window filtering (with the overview window selector).
+      - [x] Time-window filtering (v0.5.0, via the overview window
+            selector).
 - [x] Session analytics, first cut (v0.4.0): session-length histogram
       (<5m … >2h buckets) + caption records (count, median, longest with
       date).
-      - [ ] Sessions per day and start-time patterns.
+      - [x] Sessions per active day + starts-by-hour chart (v0.5.0).
 - [x] Per-page activity strip (v0.4.0): per-page total time and read
       count from the rescaled view, sqrt scaling with a 90th-percentile
       cap (KoShelf's numbers), pixel binning for long books, per-range
       tooltips. This is also the "did it drag in the middle" velocity
       view (Tier A #4's page axis).
       - [ ] Annotation count markers.
-- [ ] Book velocity, remaining piece: pace-per-day *within* each
-      read-through (the page axis is covered by the activity strip).
+- [x] Book velocity, remaining piece (v0.5.0): read-through cards now
+      carry pages/day over the calendar span (the page axis was already
+      covered by the activity strip).
 - [x] Per-completion cards (v0.4.0): inferred read-throughs on the book
       page (dates, time, sessions, pages/hour, coverage), hidden for
       books with none.
@@ -157,10 +161,12 @@ Tier B widgets (expected furniture, done correctly):
       shrinks for young histories instead of rendering a year of blanks.
 - [x] Streak tiles (v0.3.0): current/longest with date ranges
       (`metrics::streaks`).
-- [ ] Library totals *windowing*: the all-time tiles shipped in v0.3.0;
-      the 30/90/365/all window selector is still open. Windows are
-      calendar windows, not "last N days that had data" (Kodashboard's
-      KPI bug; noted in RESEARCH §5.3).
+- [x] Library totals windowing (v0.5.0): 30/90/365/all-time selector on
+      the overview, scoping the totals tiles and the behaviour charts
+      (hourly, speed, sessions, weekday) while streaks, the year
+      heatmap, and monthly stay whole-history. Windows are calendar
+      windows, not "last N days that had data" (Kodashboard's KPI bug;
+      noted in RESEARCH §5.3).
 - [x] Per-book stat cards with device parity (v0.3.0): capped total
       labelled "as shown on device", uncapped alongside, avg time/page
       and time-left/finish-date estimates using KOReader's own capped

@@ -13,7 +13,7 @@ it exists: every KOReader stats tool Brandon has found is a web dashboard or
 a self-hosted Docker instance, and he doesn't want that. See `README.md` and
 `spec.md`.
 
-## Where this stands right now (2026-07-03, v0.4.0)
+## Where this stands right now (2026-07-03, v0.5.0)
 
 Phases 0, 1, and 2 are complete and Phase 3 is underway (all on
 2026-07-03; scaffolding was Sonnet's, everything since is Fable's).
@@ -53,11 +53,14 @@ Phases 0, 1, and 2 are complete and Phase 3 is underway (all on
   monthly bars) and clicking a book shows device-parity stat cards, the
   per-page activity strip, and read-through cards. Aggregates live in
   `colophon/src/stats.rs` (pure, tested); both surfaces respect the junk
-  filter. Still open in Phase 3 (see roadmap sub-items): per-book speed
-  overlay, sessions-per-day/start-time patterns, pace-per-day within
-  read-throughs, annotation markers, overview completions timeline,
-  library-totals window selector. Ask before adding any dependency.
-  Every widget's metric must be defined in `spec.md` first.
+  filter, and the overview has a 30/90/365/all-time window selector
+  (behaviour charts windowed; streaks/year-heatmap/monthly stay
+  whole-history on purpose). The book page overlays its speed trend on
+  the muted library baseline. Still open in Phase 3: annotation markers
+  on the activity strip (needs sidecars) and the overview completions
+  timeline (parked until the data contains finished books). Ask before
+  adding any dependency. Every widget's metric must be defined in
+  `spec.md` first.
 
 Small outstanding research nicety (not blocking): copy one real `.sdr`
 sidecar (`<book>.sdr/metadata.epub.lua` for a highlighted book) into

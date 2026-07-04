@@ -84,6 +84,11 @@ mod imp {
                 window,
                 move |selection| window.on_select(selection)
             ));
+            self.overview_page.set_on_window_changed(glib::clone!(
+                #[weak]
+                window,
+                move || window.refresh_content()
+            ));
         }
     }
 
@@ -351,7 +356,8 @@ impl ColophonWindow {
 
         match *imp.selection.borrow() {
             Selection::Overview => {
-                let overview = stats::overview(&entries, &Local, today);
+                let overview =
+                    stats::overview(&entries, &Local, today, imp.overview_page.window_days());
                 imp.overview_page.set_data(&overview, today);
                 imp.content_stack.set_visible_child_name("overview");
                 imp.content_page.set_title("All Books");
@@ -363,6 +369,37 @@ impl ColophonWindow {
                 };
                 let detail = stats::book_detail(entry, &Local, today);
                 imp.book_page.set_book(entry, &detail);
+
+                // Speed trend: this book against the library baseline,
+                // bucketed by the library's full span so the series stay
+                // commensurable.
+                let all_events: Vec<colophon_core::PageEvent> = entries
+                    .iter()
+                    .flat_map(|e| e.events.iter().copied())
+                    .collect();
+                let first_day = all_events
+                    .iter()
+                    .map(|e| colophon_core::metrics::local_date(e.start_time, &Local))
+                    .min();
+                let bucket = stats::speed_bucket_for(first_day, today);
+                let to_points = |events: &[colophon_core::PageEvent]| {
+                    colophon_core::metrics::speed_series(events, &Local, bucket)
+                        .into_iter()
+                        .map(|(date, point)| crate::charts::line::Point {
+                            date,
+                            value: point.pages_per_hour,
+                            display: format!(
+                                "{:.0} pages/hour \u{b7} {} pages in {}",
+                                point.pages_per_hour,
+                                point.pages,
+                                crate::fmt::humanize_secs(point.seconds)
+                            ),
+                        })
+                        .collect::<Vec<_>>()
+                };
+                imp.book_page
+                    .set_speed(to_points(&entry.events), to_points(&all_events), bucket);
+
                 imp.content_stack.set_visible_child_name("book");
                 imp.content_page.set_title(entry.book.title.trim());
             }

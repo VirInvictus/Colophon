@@ -8,12 +8,15 @@ use adw::subclass::prelude::*;
 use gtk::glib;
 use gtk::prelude::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Bar {
     pub label: String,
     pub value: f64,
     /// Pre-formatted value shown above the bar (e.g. "1h 5m").
     pub display: String,
+    /// Hover text; useful when bars are too narrow for `display` (the
+    /// 24-column session-starts chart) or labels are elided.
+    pub tooltip: Option<String>,
 }
 
 const HEIGHT: i32 = 150;
@@ -47,6 +50,16 @@ mod imp {
                 widget,
                 move |_, cr, w, h| this.draw(cr, w, h)
             ));
+            widget.set_has_tooltip(true);
+            widget.connect_query_tooltip(|this, x, _, _, tooltip| {
+                match this.tooltip_at(f64::from(x)) {
+                    Some(text) => {
+                        tooltip.set_text(Some(&text));
+                        true
+                    }
+                    None => false,
+                }
+            });
             let weak = widget.downgrade();
             adw::StyleManager::default().connect_dark_notify(move |_| {
                 if let Some(this) = weak.upgrade() {
@@ -75,6 +88,16 @@ impl BarChart {
     pub fn set_bars(&self, bars: Vec<Bar>) {
         self.imp().bars.replace(bars);
         self.queue_draw();
+    }
+
+    fn tooltip_at(&self, x: f64) -> Option<String> {
+        let bars = self.imp().bars.borrow();
+        if bars.is_empty() {
+            return None;
+        }
+        let slot = f64::from(self.width()) / bars.len() as f64;
+        let index = ((x / slot).floor() as usize).min(bars.len() - 1);
+        bars[index].tooltip.clone()
     }
 
     fn draw(&self, cr: &gtk::cairo::Context, w: i32, h: i32) {

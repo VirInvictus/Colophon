@@ -49,6 +49,10 @@ pub struct SessionSummary {
     pub longest_date: Option<NaiveDate>,
     /// Session-length histogram; bucket bounds in `SESSION_BUCKETS`.
     pub histogram: [u32; 6],
+    /// Sessions by local start hour (00..23).
+    pub starts_by_hour: [u32; 24],
+    /// Mean sessions per day *with reading* (not per calendar day).
+    pub per_active_day: f64,
 }
 
 /// Histogram bucket labels and upper bounds in seconds; the last bucket
@@ -62,7 +66,18 @@ pub const SESSION_BUCKETS: [(&str, i64); 6] = [
     (">2h", i64::MAX),
 ];
 
-pub fn overview<Tz: TimeZone>(entries: &[Rc<LibraryEntry>], tz: &Tz, today: NaiveDate) -> Overview {
+/// Computes the overview. `window_days = None` means all-time;
+/// `Some(n)` scopes the totals tiles and the behaviour charts (hourly,
+/// speed, sessions, weekday) to the last `n` *calendar* days ending
+/// today (not "last n days with data", Kodashboard's KPI bug). The
+/// whole-history sections (streaks, year heatmap, monthly) always show
+/// everything: windowing a streak or a year grid would just lie.
+pub fn overview<Tz: TimeZone>(
+    entries: &[Rc<LibraryEntry>],
+    tz: &Tz,
+    today: NaiveDate,
+    window_days: Option<i64>,
+) -> Overview {
     let all_events: Vec<PageEvent> = entries
         .iter()
         .flat_map(|e| e.events.iter().copied())
@@ -71,33 +86,68 @@ pub fn overview<Tz: TimeZone>(entries: &[Rc<LibraryEntry>], tz: &Tz, today: Naiv
     let days = daily.keys().copied().collect();
     let streaks = metrics::streaks(&days, today);
 
-    // Daily speed buckets read fine up to ~10 weeks; past that the trend
-    // needs weekly smoothing to stay legible.
-    let speed_bucket = match daily.keys().next() {
-        Some(first) if (today - *first).num_days() > 70 => Bucket::Week,
-        _ => Bucket::Day,
+    let cutoff = window_days.map(|n| today - Duration::days(n - 1));
+    let in_window =
+        |e: &PageEvent| cutoff.is_none_or(|c| metrics::local_date(e.start_time, tz) >= c);
+    let windowed: Vec<PageEvent> = all_events
+        .iter()
+        .copied()
+        .filter(|e| in_window(e))
+        .collect();
+    let windowed_daily = match cutoff {
+        Some(c) => daily.range(c..).map(|(d, t)| (*d, *t)).collect(),
+        None => daily.clone(),
     };
-    let speed = metrics::speed_series(&all_events, tz, speed_bucket)
+
+    // Windowed totals: event sums, not the cached book counters (those
+    // are all-time only; for all-time the two reconcile exactly).
+    let mut unique_pages = 0;
+    let mut books = 0usize;
+    for entry in entries {
+        let events: Vec<PageEvent> = entry
+            .events
+            .iter()
+            .copied()
+            .filter(|e| in_window(e))
+            .collect();
+        if events.is_empty() {
+            continue;
+        }
+        books += 1;
+        unique_pages += metrics::unique_pages_read(metrics::coverage(&events), entry.book.pages);
+    }
+
+    let speed_bucket = speed_bucket_for(windowed_daily.keys().next().copied(), today);
+    let speed = metrics::speed_series(&windowed, tz, speed_bucket)
         .into_iter()
         .collect();
 
     Overview {
-        total_secs: entries.iter().map(|e| e.book.total_read_time).sum(),
-        unique_pages: entries.iter().map(|e| e.unique_pages).sum(),
-        books: entries.len(),
-        active_days: daily.len(),
-        busiest: daily
+        total_secs: windowed.iter().map(|e| e.duration).sum(),
+        unique_pages,
+        books,
+        active_days: windowed_daily.len(),
+        busiest: windowed_daily
             .iter()
             .max_by_key(|(_, t)| t.seconds)
             .map(|(d, t)| (*d, t.seconds)),
-        weekday_avg_secs: weekday_averages(&daily, today),
-        hourly: metrics::hourly_profile(&all_events, tz),
+        weekday_avg_secs: weekday_averages(&windowed_daily, today),
+        hourly: metrics::hourly_profile(&windowed, tz),
         monthly: monthly_totals(&daily, today),
         speed,
         speed_bucket,
-        sessions: session_summary(&all_events, tz),
+        sessions: session_summary(&windowed, tz),
         daily,
         streaks,
+    }
+}
+
+/// The speed-trend bucket rule, shared with the per-book trend so the
+/// two series stay commensurable.
+pub fn speed_bucket_for(first: Option<NaiveDate>, today: NaiveDate) -> Bucket {
+    match first {
+        Some(first) if (today - first).num_days() > 70 => Bucket::Week,
+        _ => Bucket::Day,
     }
 }
 
@@ -156,12 +206,26 @@ pub fn session_summary<Tz: TimeZone>(events: &[PageEvent], tz: &Tz) -> SessionSu
         histogram[slot] += 1;
     }
 
+    let mut starts_by_hour = [0u32; 24];
+    let mut active_days = std::collections::BTreeSet::new();
+    for session in &sessions {
+        let local = tz
+            .timestamp_opt(session.start_time, 0)
+            .single()
+            .expect("epoch timestamp maps to exactly one instant");
+        starts_by_hour[chrono::Timelike::hour(&local) as usize] += 1;
+        active_days.insert(local.date_naive());
+    }
+    let per_active_day = sessions.len() as f64 / active_days.len().max(1) as f64;
+
     SessionSummary {
         count: sessions.len(),
         median_secs: lengths[lengths.len() / 2],
         longest_secs: longest.seconds,
         longest_date: Some(metrics::local_date(longest.start_time, tz)),
         histogram,
+        starts_by_hour,
+        per_active_day,
     }
 }
 
@@ -461,14 +525,59 @@ mod tests {
     fn overview_picks_daily_then_weekly_speed_buckets() {
         // 9 days of history: daily buckets.
         let young = entry(vec![ev(1, ts(2026, 6, 24, 10), 60)]);
-        let ov = overview(&[young], &Utc, date("2026-07-03"));
+        let ov = overview(&[young], &Utc, date("2026-07-03"), None);
         assert_eq!(ov.speed_bucket, Bucket::Day);
 
         // Half a year: weekly buckets.
         let old = entry(vec![ev(1, ts(2026, 1, 1, 10), 60)]);
-        let ov = overview(&[old], &Utc, date("2026-07-03"));
+        let ov = overview(&[old], &Utc, date("2026-07-03"), None);
         assert_eq!(ov.speed_bucket, Bucket::Week);
         assert!(!ov.speed.is_empty());
+    }
+
+    #[test]
+    fn overview_window_scopes_totals_but_not_history() {
+        // One old book (June 1) and one recent (July 2-3).
+        let old = entry(vec![ev(1, ts(2026, 6, 1, 10), 600)]);
+        let recent = entry(vec![
+            ev(1, ts(2026, 7, 2, 10), 60),
+            ev(2, ts(2026, 7, 3, 10), 120),
+        ]);
+        let ov = overview(&[old, recent], &Utc, date("2026-07-03"), Some(30));
+
+        // Windowed tiles: only the recent book's events count.
+        assert_eq!(ov.total_secs, 180);
+        assert_eq!(ov.books, 1);
+        assert_eq!(ov.active_days, 2);
+
+        // Whole-history sections still see June: monthly covers Jun+Jul,
+        // and the daily map keeps the old day for the year heatmap.
+        assert_eq!(ov.monthly.len(), 2);
+        assert!(ov.daily.contains_key(&date("2026-06-01")));
+
+        // A 1-day window cuts yesterday's event too.
+        let recent2 = entry(vec![
+            ev(1, ts(2026, 7, 2, 10), 60),
+            ev(2, ts(2026, 7, 3, 10), 120),
+        ]);
+        let ov = overview(&[recent2], &Utc, date("2026-07-03"), Some(1));
+        assert_eq!(ov.total_secs, 120);
+    }
+
+    #[test]
+    fn session_summary_tracks_starts_and_density() {
+        // Two sessions on one day (10:00, 21:00), one the next (10:00).
+        let mut events = vec![
+            ev(1, ts(2026, 7, 1, 10), 60),
+            ev(2, ts(2026, 7, 1, 21), 60),
+            ev(3, ts(2026, 7, 2, 10), 60),
+        ];
+        events.sort_by_key(|e| e.start_time);
+        let summary = session_summary(&events, &Utc);
+        assert_eq!(summary.count, 3);
+        assert_eq!(summary.starts_by_hour[10], 2);
+        assert_eq!(summary.starts_by_hour[21], 1);
+        assert!((summary.per_active_day - 1.5).abs() < 1e-9);
     }
 
     #[test]
@@ -478,7 +587,7 @@ mod tests {
             ev(2, ts(2026, 7, 3, 10), 120),
         ]);
         let b = entry(vec![ev(1, ts(2026, 7, 3, 12), 30)]);
-        let ov = overview(&[a, b], &Utc, date("2026-07-03"));
+        let ov = overview(&[a, b], &Utc, date("2026-07-03"), None);
         assert_eq!(ov.books, 2);
         assert_eq!(ov.total_secs, 210);
         assert_eq!(ov.active_days, 2);
