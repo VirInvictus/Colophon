@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: fmt + clippy + test
+    runs-on: ubuntu-latest
+    # Colophon requires gtk4 >= 4.16 (v4_16) and libadwaita >= 1.7 (v1_7);
+    # Ubuntu runners ship 4.14 / 1.5, so the build aborts in gdk4-sys.
+    # Fedora carries a new-enough GTK and matches the project's actual
+    # target environment (GNOME 49). rusqlite is bundled and mlua vendored,
+    # so both compile from source and need only a C toolchain.
+    container: fedora:latest
+    steps:
+      - name: Install system dependencies
+        run: |
+          dnf install -y \
+            gcc \
+            git \
+            pkgconf-pkg-config \
+            glib2-devel \
+            gtk4-devel \
+            libadwaita-devel \
+            sqlite-devel \
+            xorg-x11-server-Xvfb
+
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo fmt --check
+        run: cargo fmt --all --check
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: cargo test
+        # No current test calls gtk::init(), but the GTK binary crate links
+        # gtk4 and a widget test could land later; running under xvfb keeps a
+        # display available so the suite never depends on a headful runner.
+        env:
+          GDK_BACKEND: x11
+        run: xvfb-run -a cargo test --workspace
