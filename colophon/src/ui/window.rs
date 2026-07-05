@@ -136,9 +136,13 @@ impl ColophonWindow {
             return;
         }
         self.imp().library_stack.set_visible_child_name("loading");
+        let library_dir = crate::settings::library_dir();
         let weak = self.downgrade();
         glib::spawn_future_local(async move {
-            let result = gio::spawn_blocking(move || loader::load_snapshot(&snapshot)).await;
+            let result = gio::spawn_blocking(move || {
+                loader::load_snapshot(&snapshot, library_dir.as_deref())
+            })
+            .await;
             let Some(window) = weak.upgrade() else { return };
             match result {
                 Ok(Ok(snap)) => window.apply_snapshot(snap),
@@ -214,11 +218,17 @@ impl ColophonWindow {
             self.imp().library_stack.set_visible_child_name("loading");
         }
 
+        let library_dir = crate::settings::library_dir();
         let weak = self.downgrade();
         glib::spawn_future_local(async move {
             let task_source = source.clone();
             let result = gio::spawn_blocking(move || {
-                loader::import(&task_source, &paths::staging_dir(), &paths::snapshot_path())
+                loader::import(
+                    &task_source,
+                    &paths::staging_dir(),
+                    &paths::snapshot_path(),
+                    library_dir.as_deref(),
+                )
             })
             .await;
 
@@ -292,6 +302,20 @@ impl ColophonWindow {
         }
         crate::theme::set(selection);
         self.refresh_content();
+    }
+
+    /// Persist the KOReader library folder and reload from the canonical
+    /// snapshot, so the sidecar-derived finished status is re-read (or
+    /// dropped when cleared). A no-op path is stored as the empty string.
+    pub fn set_library_dir(&self, dir: Option<std::path::PathBuf>) {
+        if let Some(s) = settings::settings() {
+            let value = dir
+                .as_ref()
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let _ = s.set_string(settings::KEY_LIBRARY_DIR, &value);
+        }
+        self.startup_load();
     }
 
     fn junk_filter_on(&self) -> bool {

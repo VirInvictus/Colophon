@@ -81,12 +81,21 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
   measure ("how far through the book you got"), and unlike coverage it is
   unaffected by an unlogged leading gap. For a book read to its final
   page it is 1.0 even when coverage is well below that.
-- **Reached the end / finished (inferred)**: furthest position `>= 0.98`
-  (the last-2 % endpoint the completion detector also uses). Drives the
-  per-book "Finished" marker today. The `.sdr` `summary.status` field is
-  the only *user-declared* finished flag and, once sidecars are in scope,
-  overrides the inference (a book can be declared finished without the
-  device having logged the end, and vice versa).
+- **Reached the end / finished**: the sidecar's user-declared
+  `summary.status` is authoritative when a library folder is configured and
+  the book's sidecar is found (implemented v0.15.0); otherwise the inferred
+  furthest position `>= 0.98` (the last-2 % endpoint the completion detector
+  also uses). A book can be declared finished without the device having
+  logged the end, and vice versa. This single reconciled value
+  (`LibraryEntry::is_finished`) drives the per-book "Finished" marker and
+  every finished count (series, author, recap, completion rate).
+- **Library folder (optional, read-only)**: a configured path to the folder
+  holding the books and their `.sdr` sidecars. When set and reachable,
+  Colophon scans it read-only, parses each `metadata.*.lua` sidecar in a
+  sandboxed Lua VM (no stdlib, text chunks only, UTF-8 repaired lossily),
+  and joins `partial_md5_checksum` to `book.md5`. It is opportunistic: an
+  unset or unmounted folder simply leaves the finished state inferred. This
+  is the only path outside `statistics.sqlite3`, and it is never written.
 - **Per-book progress display**: a positional span bar drawing the
   read-span coverage on the `[0, 1]` page axis (read regions filled,
   unlogged gaps empty) with a marker at the furthest position, plus the
@@ -229,8 +238,10 @@ Nothing below exists in KOReader or any of the four tools.
 
 ### Tier C — deferred until the data or a dependency justifies it
 
-- Highlight/note content browser (needs `.sdr` ingestion, an `mlua` dep,
-  and a real sidecar sample; counts-only until then).
+- Highlight/note content browser. The `.sdr` sidecar parser and its `mlua`
+  dependency landed with the finished-status reconciliation (v0.15.0); this
+  now needs only the `annotations` array read out and a browser UI (counts
+  only until then).
 - Vocabulary-builder widgets (Brandon's `vocabulary_builder.sqlite3` is
   empty; revisit if the feature gets used).
 - Language rollups (schema supports it; Brandon's library is

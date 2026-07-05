@@ -268,20 +268,20 @@ in.
 - [ ] **Completions / year timeline.** Books-per-month/year and a
       completions timeline, unblocked now the data contains a finished book;
       grows as Brandon re-imports after finishing each book.
-- [ ] **`.sdr` finished-flag reconciliation.** Parse the sidecar's declared
-      `summary.status` + `percent_finished` to make "finished" authoritative
-      and cross-check inferred completions. Gated on an `mlua`-vs-stdlib
-      dependency decision (the sidecar is a Lua chunk; stdlib can't eval it,
-      so this is a real dep ask — see `RESEARCH.md` §7.2 for KoShelf's
-      sandboxed `mlua` pattern, plus hidden-flows and the UTF-8-lossy guard
-      to replicate).
-      - **✓ UNBLOCKED 2026-07-05.** Real sidecar sample now at
-        `research/samples/Royal Assassin - Robin Hobb (1705).sdr/
-        metadata.epub.lua` (finished, one highlight) plus the Jingo
-        dup-title sidecar. The parser can be designed against real data;
-        Royal Assassin is the exact case this fixes (KOReader logged ~69 %
-        coverage but the sidecar says `status="complete"`, so the declared
-        flag overrides the coverage inference).
+- [x] **`.sdr` finished-flag reconciliation** (v0.15.0). Brandon chose the
+      sandboxed `mlua` route over a stdlib parser. `colophon-core::sidecar`
+      parses each `metadata.*.lua` in a locked-down Lua VM (`StdLib::NONE`,
+      text-only, UTF-8-lossy) and joins `partial_md5_checksum` to
+      `book.md5`; an optional read-only "KOReader library folder" set in
+      Preferences (GSettings `library-dir`) is scanned on load, and the
+      declared `summary.status` becomes authoritative through the single
+      `LibraryEntry::is_finished` used by every finished count and marker.
+      The book page shows the device's status. Opportunistic: an unset or
+      unmounted folder falls back to inference. Verified by a round-trip
+      test that reconciles the real Royal Assassin sidecar
+      (`status="complete"`) against the live stats DB. Reading the
+      `annotations` array (highlight content, annotation markers) is the
+      remaining sidecar work, now that the parser and dep are in place.
 
 **Data-provisioning errands:** the `.sdr` sidecar sample and a fresh
 `statistics.sqlite3` were pulled 2026-07-05 (750 events). Standing errand,

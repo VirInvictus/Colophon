@@ -12,14 +12,18 @@
 //! - [`metrics`] — pure derived-metric functions implementing `spec.md`'s
 //!   normative definitions (sessions, streaks, coverage, capped totals,
 //!   speed, completion detection).
+//! - [`sidecar`] — reads KOReader's per-book `.sdr` sidecar (a Lua table)
+//!   for the user-declared finished status the stats DB doesn't carry.
 //! - [`model`] — the plain types both share.
 
 pub mod db;
 pub mod metrics;
 pub mod model;
+pub mod sidecar;
 
 pub use db::{EXPECTED_SCHEMA_VERSION, StatsDb, snapshot};
 pub use model::{
     Book, Completion, DayTotal, PageEvent, PageTotal, RescaledEvent, Session, SpeedPoint, Streak,
     Streaks,
 };
+pub use sidecar::{ReadStatus, SidecarMeta, scan_sidecars};

@@ -9,7 +9,10 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use colophon_core::{Book, PageEvent, PageTotal};
+use colophon_core::sidecar::ReadStatus;
+use colophon_core::{Book, PageEvent, PageTotal, metrics};
+
+use crate::stats::FINISHED_THRESHOLD;
 
 #[derive(Debug, Clone)]
 pub struct LibraryEntry {
@@ -29,6 +32,22 @@ pub struct LibraryEntry {
     pub capped_secs: i64,
     pub view_pages: i64,
     pub last_page: i64,
+    /// User-declared status from the book's `.sdr` sidecar, when a library
+    /// folder is configured and the sidecar was found; `None` otherwise.
+    pub declared_status: Option<ReadStatus>,
+}
+
+impl LibraryEntry {
+    /// Whether the book is finished. The sidecar's declared status is
+    /// authoritative when present (spec.md); otherwise fall back to the
+    /// inferred furthest-position heuristic. This is the single source of
+    /// "finished" for every aggregate and marker.
+    pub fn is_finished(&self) -> bool {
+        match &self.declared_status {
+            Some(status) => status.is_finished(),
+            None => metrics::furthest_position(&self.events) >= FINISHED_THRESHOLD,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -123,6 +142,7 @@ mod tests {
             capped_secs: 0,
             view_pages: 0,
             last_page: 0,
+            declared_status: None,
         })
     }
 

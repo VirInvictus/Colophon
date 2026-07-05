@@ -4,7 +4,7 @@ default-members = ["colophon"]
 resolver = "2"
 
 [workspace.package]
-version = "0.14.0"
+version = "0.15.0"
 edition = "2024"
 license = "MIT"
 authors = ["Brandon LaRocque"]
@@ -14,5 +14,8 @@ rusqlite = { version = "0.32", features = ["bundled", "time"] }
 anyhow = "1.0"
 thiserror = "2.0"
 chrono = "0.4"
+# Sandboxed Lua VM for reading KOReader's `.sdr` sidecars (a Lua table
+# chunk). Vendored so it builds from source, like rusqlite's bundled sqlite.
+mlua = { version = "0.10", features = ["lua54", "vendored"] }
 gtk = { version = "0.9", package = "gtk4", features = ["v4_16"] }
 adw = { version = "0.7", package = "libadwaita", features = ["v1_7"] }

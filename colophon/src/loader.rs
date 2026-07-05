@@ -28,7 +28,7 @@ pub struct LibrarySnapshot {
 /// the KOReader-parity numbers that must come from the rescaled
 /// `page_stat` view (capped totals, distinct current-axis pages, last
 /// read page) because that is what the device's own queries run on.
-pub fn load_snapshot(path: &Path) -> Result<LibrarySnapshot> {
+pub fn load_snapshot(path: &Path, library_dir: Option<&Path>) -> Result<LibrarySnapshot> {
     let db = StatsDb::open(path)?;
     let schema_version = db.schema_version()?;
     let mut entries = Vec::new();
@@ -61,7 +61,22 @@ pub fn load_snapshot(path: &Path) -> Result<LibrarySnapshot> {
             view_pages,
             last_page,
             book,
+            declared_status: None,
         });
+    }
+    // Reconcile the inferred "finished" against the device's own declared
+    // status from the `.sdr` sidecars, when a library folder is configured
+    // and reachable. Opportunistic: an absent or unmounted folder just
+    // leaves the inference in place (spec.md).
+    if let Some(dir) = library_dir {
+        let sidecars = colophon_core::sidecar::scan_sidecars(dir);
+        for entry in &mut entries {
+            if let Some(md5) = &entry.book.md5
+                && let Some(meta) = sidecars.get(&md5.to_lowercase())
+            {
+                entry.declared_status = meta.status.clone();
+            }
+        }
     }
     Ok(LibrarySnapshot {
         schema_version,
@@ -71,7 +86,12 @@ pub fn load_snapshot(path: &Path) -> Result<LibrarySnapshot> {
 
 /// Staged import: snapshot `source` into `staging_dir`, validate the
 /// staged copy, promote it to `canonical`, then load it.
-pub fn import(source: &Path, staging_dir: &Path, canonical: &Path) -> Result<LibrarySnapshot> {
+pub fn import(
+    source: &Path,
+    staging_dir: &Path,
+    canonical: &Path,
+    library_dir: Option<&Path>,
+) -> Result<LibrarySnapshot> {
     let staged = colophon_core::snapshot(source, staging_dir)
         .context("copying the database (is the device still mounted?)")?;
 
@@ -96,7 +116,7 @@ pub fn import(source: &Path, staging_dir: &Path, canonical: &Path) -> Result<Lib
         .with_context(|| format!("installing snapshot at {}", canonical.display()))?;
     let _ = std::fs::remove_dir_all(staging_dir);
 
-    load_snapshot(canonical)
+    load_snapshot(canonical, library_dir)
 }
 
 #[cfg(test)]
@@ -129,7 +149,7 @@ mod tests {
         let canonical = root.join("statistics.sqlite3");
 
         let source_mtime = std::fs::metadata(&source).unwrap().modified().unwrap();
-        let snap = import(&source, &staging, &canonical).unwrap();
+        let snap = import(&source, &staging, &canonical, None).unwrap();
 
         assert!(canonical.exists());
         assert!(!staging.exists(), "staging dir cleaned after promote");
@@ -144,8 +164,41 @@ mod tests {
             source_mtime
         );
 
-        let reloaded = load_snapshot(&canonical).unwrap();
+        let reloaded = load_snapshot(&canonical, None).unwrap();
         assert_eq!(reloaded.entries.len(), snap.entries.len());
+
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn load_snapshot_reconciles_declared_status_from_sidecars() {
+        // Needs both the gitignored stats DB and the `.sdr` sidecar samples.
+        let Some(source) = sample() else {
+            eprintln!("live sample not present; skipping");
+            return;
+        };
+        let samples = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../research/samples");
+        if !samples.exists() {
+            eprintln!("sidecar samples not present; skipping");
+            return;
+        }
+        let root = temp_dir("sidecar-reconcile");
+        let canonical = root.join("statistics.sqlite3");
+        import(&source, &root.join("staging"), &canonical, None).unwrap();
+
+        // With no library dir, nothing is declared.
+        let bare = load_snapshot(&canonical, None).unwrap();
+        assert!(bare.entries.iter().all(|e| e.declared_status.is_none()));
+
+        // With the samples as the library dir, the md5 join lands and Royal
+        // Assassin comes back declared complete (finished on the device).
+        let snap = load_snapshot(&canonical, Some(&samples)).unwrap();
+        assert!(
+            snap.entries.iter().any(|e| e.declared_status
+                == Some(colophon_core::sidecar::ReadStatus::Complete)
+                && e.is_finished()),
+            "expected a sidecar-declared complete book"
+        );
 
         std::fs::remove_dir_all(&root).ok();
     }
@@ -160,7 +213,7 @@ mod tests {
         let bogus = root.join("bogus.sqlite3");
         std::fs::write(&bogus, b"not a database at all").unwrap();
 
-        assert!(import(&bogus, &staging, &canonical).is_err());
+        assert!(import(&bogus, &staging, &canonical, None).is_err());
         assert_eq!(
             std::fs::read(&canonical).unwrap(),
             b"pretend this is a good snapshot"

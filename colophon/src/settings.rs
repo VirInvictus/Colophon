@@ -10,6 +10,7 @@ use gtk::prelude::*;
 
 pub const KEY_JUNK_FILTER: &str = "junk-filter";
 pub const KEY_SOURCE_PATH: &str = "source-path";
+pub const KEY_LIBRARY_DIR: &str = "library-dir";
 pub const KEY_THEME: &str = "theme";
 pub const KEY_WINDOW_WIDTH: &str = "window-width";
 pub const KEY_WINDOW_HEIGHT: &str = "window-height";
@@ -39,6 +40,12 @@ pub fn settings() -> Option<gio::Settings> {
 /// The saved import source, if any.
 pub fn source_path() -> Option<std::path::PathBuf> {
     let raw = settings()?.string(KEY_SOURCE_PATH);
+    (!raw.is_empty()).then(|| std::path::PathBuf::from(raw.as_str()))
+}
+
+/// The configured KOReader library folder (for `.sdr` sidecars), if set.
+pub fn library_dir() -> Option<std::path::PathBuf> {
+    let raw = settings()?.string(KEY_LIBRARY_DIR);
     (!raw.is_empty()).then(|| std::path::PathBuf::from(raw.as_str()))
 }
 

@@ -1,5 +1,30 @@
 # Patchnotes
 
+## v0.15.0 — 2026-07-05
+
+The device gets the final say on "finished".
+
+Until now Colophon guessed whether a book was finished from how far into it
+you read. That misses books you finished partly off the device (read the
+last stretch on a jailbroken Kindle before KOReader was logging, say), and
+it can't tell a genuinely abandoned book from one you simply stopped near
+the end. KOReader already records your own verdict in each book's `.sdr`
+sidecar; Colophon now reads it.
+
+Point Colophon at your **KOReader library folder** in Preferences (read
+only, and optional). It scans the folder for the sidecars, matches each to
+your stats by content hash, and takes the declared status as authoritative:
+finished, reading, or abandoned. That reconciled verdict drives the
+Finished marker and every finished count (series, authors, recap,
+completion rate), and the book page shows the device's status directly.
+Leave the folder unset and everything falls back to the old inference, so
+nothing changes until you opt in. The sidecar is parsed in a locked-down
+Lua sandbox and the folder is never written to.
+
+New dependency: `mlua` (a sandboxed Lua VM, vendored and built from source
+like the bundled SQLite), for reading the Lua sidecars. 95 tests, including
+a round-trip that reconciles a real finished book from its sidecar.
+
 ## v0.14.0 — 2026-07-05
 
 Trajectory: where each book is heading, and how many you finish.

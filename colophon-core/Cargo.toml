@@ -10,6 +10,7 @@ rusqlite.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 chrono.workspace = true
+mlua.workspace = true
 
 [dev-dependencies]
 # Already a normal dependency above; re-declared so integration tests can

@@ -100,6 +100,19 @@ impl BookPage {
                 .append(&stat_row(title, &value, subtitle.as_deref()));
         };
 
+        // The device's own declared status, when a library folder is set and
+        // the sidecar was found. This is what makes "finished" authoritative.
+        if let Some(status) = &entry.declared_status {
+            use colophon_core::sidecar::ReadStatus;
+            let label = match status {
+                ReadStatus::Reading => "Reading",
+                ReadStatus::Complete => "Finished",
+                ReadStatus::Abandoned => "Abandoned",
+                ReadStatus::Other(s) => s.as_str(),
+            };
+            add("Status", label.to_string(), Some("from your device".into()));
+        }
+
         add(
             "Time spent reading",
             humanize_secs(detail.capped_secs),

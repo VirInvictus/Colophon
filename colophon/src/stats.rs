@@ -90,7 +90,7 @@ pub fn series_breakdown(entries: &[Rc<LibraryEntry>]) -> Vec<SeriesStat> {
         let Some(name) = series_name(&entry.book.series) else {
             continue;
         };
-        let finished = metrics::furthest_position(&entry.events) >= FINISHED_THRESHOLD;
+        let finished = entry.is_finished();
         let acc = map.entry(name).or_insert(Acc {
             works: HashMap::new(),
             secs: 0,
@@ -152,7 +152,7 @@ pub fn author_breakdown(entries: &[Rc<LibraryEntry>]) -> Vec<AuthorStat> {
         let Some(name) = author_name(&entry.book.authors) else {
             continue;
         };
-        let finished = metrics::furthest_position(&entry.events) >= FINISHED_THRESHOLD;
+        let finished = entry.is_finished();
         let acc = map.entry(name).or_insert(Acc {
             works: HashMap::new(),
             secs: 0,
@@ -330,7 +330,7 @@ pub fn forgotten_books<Tz: TimeZone>(
         else {
             continue;
         };
-        let finished = metrics::furthest_position(&entry.events) >= FINISHED_THRESHOLD;
+        let finished = entry.is_finished();
         let title = entry.book.title.trim().to_string();
         let acc = by_title.entry(title).or_insert(Acc {
             finished: false,
@@ -429,7 +429,7 @@ pub fn overview_base<Tz: TimeZone>(
     let records = personal_records(&all_sessions, &daily);
     let finished_works: std::collections::HashSet<String> = entries
         .iter()
-        .filter(|e| metrics::furthest_position(&e.events) >= FINISHED_THRESHOLD)
+        .filter(|e| e.is_finished())
         .map(|e| e.book.title.trim().to_string())
         .collect();
     let started_works: std::collections::HashSet<String> = entries
@@ -853,7 +853,7 @@ pub fn progress(entry: &LibraryEntry) -> Progress {
     Progress {
         spans,
         furthest,
-        finished: furthest >= FINISHED_THRESHOLD,
+        finished: entry.is_finished(),
         unique_pages: entry.unique_pages,
         pages: entry.book.pages,
     }
@@ -1066,6 +1066,7 @@ mod tests {
             capped_secs: total,
             view_pages: 50,
             last_page: 50,
+            declared_status: None,
         })
     }
 
@@ -1615,6 +1616,7 @@ mod tests {
             page_totals: Vec::new(),
             unique_pages: 0,
             book: entry(Vec::new()).book.clone(),
+            declared_status: None,
         });
         let d = book_detail(&e, &Utc, date("2026-07-03"));
         assert_eq!(d.days_reading, 0);
