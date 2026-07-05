@@ -2,47 +2,114 @@
 
 A native GNOME (GTK4 / libadwaita) statistics viewer for [KOReader](https://koreader.rocks/).
 
-KOReader already tracks a surprising amount about how you read: per-page
-timing, per-book totals, session history. The existing ways to look at that
-data are web dashboards or self-hosted Docker services. Colophon is neither:
-it's a local desktop app that reads a copy of your KOReader statistics
-database and turns it into attractive, varied graphs and widgets. No
-server, no account, no cloud.
+KOReader quietly tracks a surprising amount about how you read: per-page
+timing, per-book totals, whole session histories. The existing ways to look
+at that data are web dashboards and self-hosted Docker services. Colophon is
+neither. It is a local desktop app that reads a copy of your KOReader
+statistics database and turns it into a wide set of attractive, varied
+graphs and widgets. No server, no account, no cloud, and it never touches
+the live file on your device.
 
-**Status:** v0.2.0. The ingestion core and the app shell are real: import
-a copy of your `statistics.sqlite3` and browse the library. Charts and
-stat widgets are next (Phase 3); see `roadmap.md`.
+**Status:** v0.19.0, feature-complete and approaching 1.0. Ingestion, the
+app shell, the full widget catalogue, per-book sidecar reconciliation, eight
+themes, and Meson + Flatpak packaging are all shipped. See `roadmap.md` for
+what is deferred to post-1.0.
 
-## What it is
+## What you get
 
-- Reads a **copy** of KOReader's `statistics.sqlite3` (never the live file on
-  the device, always read-only).
-- A widget-based dashboard: a wide variety of small, focused stat/graph
-  widgets rather than one fixed report, so the app can grow new views as we
-  learn what the data actually supports.
-- Kanagawa Dragon themed, matching the rest of the [Vir Invictus](https://github.com/VirInvictus) portfolio.
-- Local-first: no telemetry, no accounts, works fully offline.
+**The library.** Import a copy of your `statistics.sqlite3` and browse it.
+Short "junk" reads (plugin READMEs and the like) are filtered by default,
+and two files of one work group together without being merged.
+
+**The "All Books" overview.** A scrolling dashboard of focused widgets:
+
+- Totals (time, pages, books, active days, busiest day) over a
+  30 / 90 / 365 / all-time window, with a period-over-period trend against
+  the previous equal window.
+- Current and longest reading streaks.
+- A GitHub-style **year heatmap** and a 7x24 **"when do I read" heatmap**.
+- A **reading-speed trend** (pages/hour over time).
+- **Session analytics**: length histogram, sessions per day, start-time
+  patterns, records.
+- Weekday and monthly distribution bars.
+- A **reading personality** card: synthesised traits (chronotype, session
+  style, weekly rhythm, author variety) read off your own behaviour.
+- A **records** card (longest session, biggest day, most pages in a day) and
+  a whole-history **recap** (books finished, completion rate, longest streak,
+  most-active month).
+- **Series** and **author** rollups, a **finished-books timeline**, and a
+  gentle **set-aside** list of books you started and left for a month.
+
+**Per book.** An honest positional progress bar (so a book read partly off
+the device does not look half-done), stat cards that reproduce KOReader's
+own math so the numbers match your device, an estimated finish date with a
+confidence, a recent-pace momentum read, a per-page **activity strip** that
+shows where your reading concentrated, and inferred read-through cards.
+
+## Bring your own files
+
+Colophon only ever sees files you hand it, exactly as it does the statistics
+database. It does not scan or read anything on your device.
+
+KOReader keeps each book's user-declared finished status and your highlights
+in a per-book `.sdr` sidecar next to the book. Give Colophon a book's sidecar
+from that book's page and it reads two things from it: the device's own
+**finished / reading / abandoned** verdict (which becomes authoritative over
+Colophon's position-based guess), and your **highlights, notes, and
+bookmarks**, drawn as markers at their true place on the activity strip. A
+book you have not provided a sidecar for simply keeps the inferred stats. The
+same principle governs anything Colophon might ever need beyond the stats
+database: if a statistic needs a file you have not given it, that statistic
+stays hidden until you do.
+
+## Themes
+
+Eight palettes (Kanagawa Dragon, Wave, and Lotus; Gruvbox Dark and Light;
+Nord; Rosé Pine; Solarized Light) plus a Follow-system mode. One theme drives
+both the window chrome and the hand-drawn charts; switch it live in
+Preferences (Ctrl+comma). The default is Kanagawa Dragon, matching the rest
+of the [Vir Invictus](https://github.com/VirInvictus) portfolio.
+
+## Local-first, always
+
+- Reads a **copy** of `statistics.sqlite3`, opened strictly read-only. The
+  live file on your device is never opened in place and never written to.
+- No telemetry, no accounts, fully offline.
+- No web UI, no Docker, no hosted service. That is the entire reason Colophon
+  exists instead of the tools already out there.
 
 ## Why "Colophon"
 
-A colophon is the note printers historically placed at the end of a book —
-press, date, paper, edition details. It's the book's own record of its
-production. This app is that idea turned toward *reading* instead of
-printing: the technical record of how a book was actually read.
+A colophon is the note printers historically placed at the end of a book,
+recording its production: press, date, paper, edition. It is the book's own
+record of how it was made. This app turns that idea toward *reading* instead
+of printing: the technical record of how a book was actually read.
 
 ## Stack
 
-Rust 2024, GTK4 / libadwaita, `rusqlite` (read-only). Two crates:
-`colophon-core` (KOReader stats ingestion) and `colophon` (the GTK app).
+Rust 2024, GTK4 / libadwaita, `rusqlite` (read-only opens only), and `mlua`
+(a sandboxed Lua VM for the `.sdr` sidecars). Charts are hand-drawn on cairo,
+no charting crate. Two crates: `colophon-core` (KOReader stats ingestion and
+the pure derived-metric layer) and `colophon` (the GTK app).
 
 ## Building
 
+From source with Cargo:
+
 ```sh
-cargo build
+cargo build --release
 ```
 
-(No Meson/Flatpak packaging yet — that arrives once the UI design is locked;
-see `roadmap.md`.)
+Or the packaged GNOME build with Meson (installs the binary, GSettings
+schema, desktop entry, AppStream metainfo, and icon):
+
+```sh
+meson setup build
+meson install -C build
+```
+
+A Flatpak manifest (`org.virinvictus.Colophon.json`) builds it against the
+GNOME 49 runtime with a read-only host sandbox.
 
 ## License
 
