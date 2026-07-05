@@ -1,5 +1,21 @@
 # Patchnotes
 
+## v0.16.0 — 2026-07-05
+
+A fairer read on how you read.
+
+The reading personality judged your session style from the plain median
+session length, which a heap of tiny sessions (fiddling with KOReader
+settings, quick dictionary lookups, opening a book to check something) drags
+right down. That mislabelled steady readers as "Sipper" on the strength of
+noise that holds almost no actual reading time.
+
+Session style now classifies on a time-weighted typical session: the length
+at or below which half of your total reading time has accumulated. Thirty
+one-minute tinkering sessions barely register against a handful of real
+half-hour reads, so the label reflects how long you actually sit and read.
+The session list still reports the plain median as a factual stat. 96 tests.
+
 ## v0.15.0 — 2026-07-05
 
 The device gets the final say on "finished".

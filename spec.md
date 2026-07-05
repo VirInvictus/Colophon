@@ -132,8 +132,13 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
   named traits (no new data; classification only). Three are computed over
   the selected window. *Chronotype* from the hour-of-day totals' peak hour:
   early bird (05–10), daytime (11–16), evening (17–20), night owl (21–04).
-  *Session style* from the median session length: marathoner (>= 45 min),
-  sipper (<= 10 min), otherwise steady. *Weekly rhythm* from the mean
+  *Session style* from the **time-weighted typical** session (the length at
+  or below which half of total reading time accumulates, not the plain
+  count-median): marathoner (>= 45 min), sipper (<= 10 min), otherwise
+  steady. Time-weighting is deliberate: a pile of tiny sessions (device
+  tinkering, quick lookups) drags the count-median down and would mislabel a
+  real reader a sipper, but holds little actual time, so it barely moves the
+  typical. *Weekly rhythm* from the mean
   weekday seconds: weekend reader when the Sat/Sun mean is >= 1.3x the
   Mon–Fri mean, weekday reader when <= 0.77x, otherwise all-week. A fourth
   trait, *Variety*, is whole-library instead (author identity does not

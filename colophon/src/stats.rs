@@ -368,6 +368,11 @@ pub fn forgotten_books<Tz: TimeZone>(
 pub struct SessionSummary {
     pub count: usize,
     pub median_secs: i64,
+    /// Time-weighted "typical" session: the length at or below which half of
+    /// total reading time accumulates. Unlike the plain median it is robust
+    /// to many tiny sessions (e.g. KOReader tinkering) that hold little time,
+    /// so it is what the reader profile classifies session style on.
+    pub typical_secs: i64,
     pub longest_secs: i64,
     pub longest_date: Option<NaiveDate>,
     /// Session-length histogram; bucket bounds in `SESSION_BUCKETS`.
@@ -616,6 +621,21 @@ pub fn session_summary<Tz: TimeZone>(events: &[PageEvent], tz: &Tz) -> SessionSu
         .max_by_key(|s| s.seconds)
         .expect("non-empty");
 
+    // Time-weighted typical session: walk the sorted lengths accumulating
+    // duration and stop at the halfway point of total reading time. A pile
+    // of tiny (tinkering) sessions barely moves it, so it reflects how long
+    // real reading sittings run, not how many trivial ones exist.
+    let total: i64 = lengths.iter().sum();
+    let mut acc = 0i64;
+    let mut typical_secs = *lengths.last().expect("non-empty");
+    for &len in &lengths {
+        acc += len;
+        if acc * 2 >= total {
+            typical_secs = len;
+            break;
+        }
+    }
+
     let mut histogram = [0u32; 6];
     for &len in &lengths {
         let slot = SESSION_BUCKETS
@@ -640,6 +660,7 @@ pub fn session_summary<Tz: TimeZone>(events: &[PageEvent], tz: &Tz) -> SessionSu
     SessionSummary {
         count: sessions.len(),
         median_secs: lengths[lengths.len() / 2],
+        typical_secs,
         longest_secs: longest.seconds,
         longest_date: Some(metrics::local_date(longest.start_time, tz)),
         histogram,
@@ -695,25 +716,28 @@ pub fn reader_profile(o: &Overview) -> Option<ReaderProfile> {
         detail: format!("peak around {}", crate::fmt::hour_label(peak)),
     };
 
-    // Session style: from the median session length.
-    let median = o.sessions.median_secs;
-    let session_style = if median >= 45 * 60 {
+    // Session style from the time-weighted typical session, not the plain
+    // median: a heap of tiny device-tinkering sessions drags the median down
+    // and mislabels a real reader a "Sipper", but holds little actual time so
+    // it barely moves the typical (spec.md "Reader profile").
+    let typical = o.sessions.typical_secs;
+    let session_style = if typical >= 45 * 60 {
         ProfileTrait {
             label: "Marathoner",
-            detail: format!("median session {}", crate::fmt::humanize_secs(median)),
+            detail: format!("typical session {}", crate::fmt::humanize_secs(typical)),
         }
-    } else if median <= 10 * 60 {
+    } else if typical <= 10 * 60 {
         ProfileTrait {
             label: "Sipper",
             detail: format!(
-                "short sittings, median {}",
-                crate::fmt::humanize_secs(median)
+                "short sittings, typically {}",
+                crate::fmt::humanize_secs(typical)
             ),
         }
     } else {
         ProfileTrait {
             label: "Steady",
-            detail: format!("median session {}", crate::fmt::humanize_secs(median)),
+            detail: format!("typical session {}", crate::fmt::humanize_secs(typical)),
         }
     };
 
@@ -1156,9 +1180,30 @@ mod tests {
         let summary = session_summary(&events, &Utc);
         assert_eq!(summary.count, 3);
         assert_eq!(summary.median_secs, 20 * 60);
+        // Most reading time is in the 90-min session, so that is the typical.
+        assert_eq!(summary.typical_secs, 90 * 60);
         assert_eq!(summary.longest_secs, 90 * 60);
         assert_eq!(summary.longest_date, Some(date("2026-07-03")));
         assert_eq!(summary.histogram, [1, 0, 1, 0, 1, 0]);
+    }
+
+    #[test]
+    fn typical_session_ignores_tinkering_noise() {
+        // 30 one-minute tinkering sessions, then 5 real 20-minute reads.
+        let mut events = Vec::new();
+        for d in 1..=30 {
+            events.push(ev(1, ts(2026, 5, d, 8), 60));
+        }
+        for d in 1..=5 {
+            for i in 0..20 {
+                events.push(ev(i + 1, ts(2026, 6, d, 8) + i * 60, 60));
+            }
+        }
+        let s = session_summary(&events, &Utc);
+        // The plain median is dragged to the tiny end (would read "Sipper")...
+        assert_eq!(s.median_secs, 60);
+        // ...but the time-weighted typical reflects the real 20-minute reads.
+        assert_eq!(s.typical_secs, 20 * 60);
     }
 
     #[test]
@@ -1324,7 +1369,7 @@ mod tests {
     fn reader_profile_classifies_traits() {
         let mut o = base_overview();
         o.hourly[2][23] = 1000; // Wednesday 23:00 is the peak hour
-        o.sessions.median_secs = 50 * 60; // marathoner
+        o.sessions.typical_secs = 50 * 60; // marathoner (classified on typical)
         o.weekday_avg_secs = [100, 100, 100, 100, 100, 400, 400]; // weekend-heavy
         let p = reader_profile(&o).expect("enough data");
         assert_eq!(p.chronotype.label, "Night owl");

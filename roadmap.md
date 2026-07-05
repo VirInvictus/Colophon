@@ -258,6 +258,9 @@ in.
       - [x] Reader-profile (v0.9.0): "Reading personality" on the overview,
             three synthesised traits (chronotype, session style, weekly
             rhythm) classified from the existing hourly/session/weekday data.
+            (v0.16.0: session style now classifies on a time-weighted typical
+            session, not the plain median, so a pile of tiny device-tinkering
+            sessions no longer mislabels a steady reader a "Sipper".)
       - [x] Series aggregation (v0.10.0): overview "Series" section grouping
             books by the `series` field ("Name #index" parsed, "N/A"
             skipped, files of one work deduped), with finished counts.
