@@ -235,14 +235,15 @@ in.
       Follow-system mode. One `Theme` drives both the generated adwaita CSS
       and the chart colours; a Preferences dialog (Ctrl+comma) switches
       live. The two static CSS sheets are gone; new GSettings `theme` key.
-- [~] **Mine today's data for new cards.** No new deps.
+- [x] **Mine today's data for new cards.** No new deps.
       - [x] Reader-profile (v0.9.0): "Reading personality" on the overview,
             three synthesised traits (chronotype, session style, weekly
             rhythm) classified from the existing hourly/session/weekday data.
-      - [ ] Series aggregation (the `series` field is populated: "The
-            Farseer Trilogy #2", "Discworld #21"; treat "N/A" as none).
-      - [ ] Re-read detection (pages visited more than once; 58 in Royal
-            Assassin) as a per-book stat.
+      - [x] Series aggregation (v0.10.0): overview "Series" section grouping
+            books by the `series` field ("Name #index" parsed, "N/A"
+            skipped, files of one work deduped), with finished counts.
+      - [x] Re-read detection (v0.10.0): "Pages revisited" per-book stat
+            from `page_totals` (reads > 1).
       - [ ] Language breakdown deferred: Brandon's library is single-language
             ("en"), so it would render dull; revisit if that changes.
 - [ ] **Completions / year timeline.** Books-per-month/year and a

@@ -1,5 +1,22 @@
 # Patchnotes
 
+## v0.10.0 — 2026-07-05
+
+More from the data you already have.
+
+The overview gains a **Series** section: books grouped by their series
+metadata (Calibre-style "Name #index"), each row showing how many works
+it holds, how many you have finished, and total time. Two files of one
+work (the same title appearing twice) count once; books without series
+metadata are left out.
+
+The book page gains **re-read detection**: "Pages revisited", the count
+of current-axis pages read more than once, shown when there are any.
+
+Both come straight from data already loaded, no new dependencies. Series
+composition is whole-library, so it does not move with the time-window
+selector. 81 tests.
+
 ## v0.9.0 — 2026-07-05
 
 Reading personality.

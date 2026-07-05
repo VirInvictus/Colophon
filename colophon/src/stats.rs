@@ -8,7 +8,7 @@
 //! pages left x avg_time, finish date = today + time_left / (capped
 //! time per reading day).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
 use chrono::{Datelike, Duration, NaiveDate, TimeZone};
@@ -39,6 +39,73 @@ pub struct Overview {
     pub speed: Vec<(NaiveDate, SpeedPoint)>,
     pub speed_bucket: Bucket,
     pub sessions: SessionSummary,
+    /// Series in the library, most-recently-read first (whole-library,
+    /// window-independent).
+    pub series: Vec<SeriesStat>,
+}
+
+/// One series' library-wide aggregate (spec.md "Series"). Files of one
+/// work (same title in a series) count once toward `books`/`finished`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SeriesStat {
+    pub name: String,
+    pub books: usize,
+    pub finished: usize,
+    pub total_secs: i64,
+}
+
+/// The series name from a Calibre-style `"Name #index"` string, or `None`
+/// for the empty / `"N/A"` placeholders KOReader writes when metadata is
+/// absent.
+fn series_name(raw: &Option<String>) -> Option<String> {
+    let s = raw.as_deref()?.trim();
+    let name = s.rsplit_once(" #").map(|(n, _)| n).unwrap_or(s).trim();
+    (!name.is_empty() && name != "N/A").then(|| name.to_string())
+}
+
+/// Groups the filtered entries by series. A work counts as finished if any
+/// of its files reached the end (furthest position, spec.md); read time
+/// sums across all files of the series.
+pub fn series_breakdown(entries: &[Rc<LibraryEntry>]) -> Vec<SeriesStat> {
+    struct Acc {
+        /// title -> finished-by-any-file
+        works: HashMap<String, bool>,
+        secs: i64,
+        last_open: i64,
+    }
+    let mut map: HashMap<String, Acc> = HashMap::new();
+    for entry in entries {
+        let Some(name) = series_name(&entry.book.series) else {
+            continue;
+        };
+        let finished = metrics::furthest_position(&entry.events) >= FINISHED_THRESHOLD;
+        let acc = map.entry(name).or_insert(Acc {
+            works: HashMap::new(),
+            secs: 0,
+            last_open: 0,
+        });
+        let title = entry.book.title.trim().to_string();
+        let slot = acc.works.entry(title).or_insert(false);
+        *slot = *slot || finished;
+        acc.secs += entry.book.total_read_time;
+        acc.last_open = acc.last_open.max(entry.book.last_open);
+    }
+    let mut out: Vec<(i64, SeriesStat)> = map
+        .into_iter()
+        .map(|(name, acc)| {
+            (
+                acc.last_open,
+                SeriesStat {
+                    name,
+                    books: acc.works.len(),
+                    finished: acc.works.values().filter(|&&f| f).count(),
+                    total_secs: acc.secs,
+                },
+            )
+        })
+        .collect();
+    out.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.name.cmp(&b.1.name)));
+    out.into_iter().map(|(_, s)| s).collect()
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -79,6 +146,7 @@ pub struct OverviewBase {
     daily: BTreeMap<NaiveDate, DayTotal>,
     streaks: Streaks,
     monthly: Vec<(NaiveDate, i64)>,
+    series: Vec<SeriesStat>,
 }
 
 /// Builds the window-independent aggregates once for a filtered entry set.
@@ -100,6 +168,7 @@ pub fn overview_base<Tz: TimeZone>(
         daily,
         streaks,
         monthly,
+        series: series_breakdown(entries),
     }
 }
 
@@ -171,6 +240,7 @@ pub fn overview_windowed<Tz: TimeZone>(
         sessions: session_summary(&windowed, tz),
         daily: base.daily.clone(),
         streaks: base.streaks,
+        series: base.series.clone(),
     }
 }
 
@@ -494,6 +564,8 @@ pub struct BookDetail {
     pub est_secs_left: Option<i64>,
     /// KOReader's estimate: today + time_left / (capped secs per day).
     pub est_finish: Option<NaiveDate>,
+    /// Current-axis pages visited more than once (re-read detection).
+    pub revisited_pages: usize,
 }
 
 pub fn book_detail<Tz: TimeZone>(entry: &LibraryEntry, tz: &Tz, today: NaiveDate) -> BookDetail {
@@ -539,6 +611,7 @@ pub fn book_detail<Tz: TimeZone>(entry: &LibraryEntry, tz: &Tz, today: NaiveDate
         longest_session_secs: sessions.iter().map(|s| s.seconds).max().unwrap_or(0),
         est_secs_left,
         est_finish,
+        revisited_pages: entry.page_totals.iter().filter(|p| p.reads > 1).count(),
     }
 }
 
@@ -846,6 +919,7 @@ mod tests {
                 median_secs: 1800,
                 ..Default::default()
             },
+            series: Vec::new(),
         }
     }
 
@@ -859,6 +933,37 @@ mod tests {
         assert_eq!(p.chronotype.label, "Night owl");
         assert_eq!(p.session_style.label, "Marathoner");
         assert_eq!(p.weekly_rhythm.label, "Weekend reader");
+    }
+
+    #[test]
+    fn series_breakdown_groups_dedupes_and_skips_placeholders() {
+        let mk = |title: &str, series: Option<&str>, last: i64| {
+            // Reading pages 1..=last of 100; last==100 reaches the end.
+            let events: Vec<_> = (1..=last).map(|p| ev(p, p * 60, 60)).collect();
+            let mut e = entry(events);
+            let b = Rc::get_mut(&mut e).unwrap();
+            b.book.title = title.into();
+            b.book.series = series.map(|s| s.into());
+            b.book.total_read_time = last * 60;
+            e
+        };
+        let entries = vec![
+            mk("Royal Assassin", Some("The Farseer Trilogy #2"), 100), // finished
+            mk("Jingo", Some("Discworld #21"), 50),                    // two files,
+            mk("Jingo", Some("Discworld #21"), 40),                    // one work
+            mk("A README", Some("N/A"), 30),                           // skipped
+            mk("Loose", None, 20),                                     // skipped
+        ];
+        let series = series_breakdown(&entries);
+        assert_eq!(series.len(), 2);
+        let farseer = series
+            .iter()
+            .find(|s| s.name == "The Farseer Trilogy")
+            .unwrap();
+        assert_eq!((farseer.books, farseer.finished), (1, 1));
+        let discworld = series.iter().find(|s| s.name == "Discworld").unwrap();
+        assert_eq!((discworld.books, discworld.finished), (1, 0)); // Jingo deduped
+        assert_eq!(discworld.total_secs, (50 + 40) * 60); // both files' time
     }
 
     #[test]

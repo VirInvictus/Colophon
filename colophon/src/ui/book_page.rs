@@ -147,6 +147,13 @@ impl BookPage {
             format!("{} \u{b7} {}", book.highlights, book.notes),
             None,
         );
+        if detail.revisited_pages > 0 {
+            add(
+                "Pages revisited",
+                detail.revisited_pages.to_string(),
+                Some("read more than once".into()),
+            );
+        }
 
         imp.activity_strip.set_data(stats::page_activity(entry));
 

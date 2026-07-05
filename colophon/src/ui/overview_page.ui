@@ -188,6 +188,23 @@
                 <child>
                   <object class="BarChart" id="monthly_chart"/>
                 </child>
+                <child>
+                  <object class="GtkLabel" id="series_title">
+                    <property name="label">Series</property>
+                    <property name="xalign">0</property>
+                    <style>
+                      <class name="title-4"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkListBox" id="series_rows">
+                    <property name="selection-mode">none</property>
+                    <style>
+                      <class name="boxed-list"/>
+                    </style>
+                  </object>
+                </child>
               </object>
             </child>
           </object>

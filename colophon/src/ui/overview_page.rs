@@ -4,10 +4,10 @@
 
 use std::cell::RefCell;
 
+use adw::prelude::*;
 use adw::subclass::prelude::*;
 use chrono::NaiveDate;
 use gtk::glib;
-use gtk::prelude::*;
 
 use crate::charts::bar::Bar;
 use crate::charts::line::Point;
@@ -48,6 +48,10 @@ mod imp {
         pub weekday_chart: TemplateChild<BarChart>,
         #[template_child]
         pub monthly_chart: TemplateChild<BarChart>,
+        #[template_child]
+        pub series_title: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub series_rows: TemplateChild<gtk::ListBox>,
         #[template_child]
         pub win_30: TemplateChild<gtk::ToggleButton>,
         #[template_child]
@@ -299,6 +303,31 @@ impl OverviewPage {
                 })
                 .collect(),
         );
+
+        // Series (spec.md "Series"): whole-library composition, hidden when
+        // no book carries series metadata.
+        imp.series_rows.remove_all();
+        let has_series = !overview.series.is_empty();
+        imp.series_title.set_visible(has_series);
+        imp.series_rows.set_visible(has_series);
+        for s in &overview.series {
+            let plural = if s.books == 1 { "" } else { "s" };
+            let subtitle = if s.finished > 0 {
+                format!("{} book{plural} \u{b7} {} finished", s.books, s.finished)
+            } else {
+                format!("{} book{plural}", s.books)
+            };
+            let row = adw::ActionRow::builder()
+                .title(&s.name)
+                .subtitle(&subtitle)
+                .build();
+            let time = gtk::Label::builder()
+                .label(humanize_secs(s.total_secs))
+                .css_classes(["dim-label"])
+                .build();
+            row.add_suffix(&time);
+            imp.series_rows.append(&row);
+        }
     }
 }
 
