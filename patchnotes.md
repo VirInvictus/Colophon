@@ -1,5 +1,21 @@
 # Patchnotes
 
+## v0.12.0 — 2026-07-05
+
+Bests, and books you set down.
+
+The overview gains a **Records** card: your longest single reading session,
+your biggest reading day by time, and the most pages you turned in a day,
+each with the date it happened. These are all-time bests, so unlike the
+totals tiles above them they hold still when you change the time window.
+
+It also gains a **Set aside** section: books you started, never finished,
+and have not opened in over a month, most-neglected first. Two files of one
+work count once, and reading either copy recently keeps the work off the
+list. It stays hidden when nothing qualifies.
+
+Both come from data already loaded, no new dependencies. 85 tests.
+
 ## v0.11.0 — 2026-07-05
 
 Two more ways to read the same data.

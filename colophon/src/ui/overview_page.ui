@@ -79,6 +79,25 @@
                   </object>
                 </child>
                 <child>
+                  <object class="GtkLabel" id="record_title">
+                    <property name="label">Records</property>
+                    <property name="xalign">0</property>
+                    <style>
+                      <class name="title-4"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkFlowBox" id="record_tiles">
+                    <property name="selection-mode">none</property>
+                    <property name="homogeneous">true</property>
+                    <property name="column-spacing">12</property>
+                    <property name="row-spacing">12</property>
+                    <property name="max-children-per-line">3</property>
+                    <property name="min-children-per-line">1</property>
+                  </object>
+                </child>
+                <child>
                   <object class="GtkLabel">
                     <property name="label">Reading activity</property>
                     <property name="xalign">0</property>
@@ -216,6 +235,23 @@
                 </child>
                 <child>
                   <object class="GtkListBox" id="author_rows">
+                    <property name="selection-mode">none</property>
+                    <style>
+                      <class name="boxed-list"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="forgotten_title">
+                    <property name="label">Set aside</property>
+                    <property name="xalign">0</property>
+                    <style>
+                      <class name="title-4"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkListBox" id="forgotten_rows">
                     <property name="selection-mode">none</property>
                     <style>
                       <class name="boxed-list"/>

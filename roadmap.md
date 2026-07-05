@@ -303,12 +303,15 @@ third. Ordered cheapest-first.
       rolled up per author (top 10), an overview "Authors" card ranked by
       time. Whole-library like Series; files of one work count once.
       `stats::author_breakdown`.
-- [ ] **Personal records.** Longest single session, biggest reading day by
-      time, most pages in a day — a small records card. Max over structures
-      the overview already builds (sessions, the daily map).
-- [ ] **Forgotten books.** Books with logged reading whose furthest read is
-      not "finished" and whose last reading-day is > 30 days ago. A gentle
-      "pick these back up" rail. Cheap.
+- [x] **Personal records** (v0.12.0). Longest single session, biggest
+      reading day by time, most pages in a day, each with its date, as an
+      all-time "Records" card. Whole-history (does not move with the
+      window). `stats::personal_records`.
+- [x] **Forgotten books** (v0.12.0). A "Set aside" rail of books with
+      logged reading whose furthest read is not "finished" and whose last
+      reading-day is > 30 days ago, most-neglected first. Files of one work
+      collapse; reading either copy recently keeps the work off the list.
+      `stats::forgotten_books`.
 - [ ] **Period-over-period delta.** On the windowed overview, show the
       current window against the immediately preceding equal-length window
       (% change), returning nothing rather than a fake ∞% when the prior

@@ -45,6 +45,10 @@ pub struct Overview {
     /// Authors in the library, most-read first (whole-library,
     /// window-independent).
     pub authors: Vec<AuthorStat>,
+    /// All-time personal bests (whole-history, window-independent).
+    pub records: Records,
+    /// Unfinished books left untouched for a while (whole-history).
+    pub forgotten: Vec<ForgottenBook>,
 }
 
 /// One series' library-wide aggregate (spec.md "Series"). Files of one
@@ -206,6 +210,118 @@ fn variety_trait(authors: &[AuthorStat]) -> Option<ProfileTrait> {
     Some(ProfileTrait { label, detail })
 }
 
+/// All-time personal bests (spec.md "Records"). Whole-history, so unlike the
+/// windowed totals tiles these never move with the time-window selector.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct Records {
+    pub longest_session_secs: i64,
+    pub longest_session_date: Option<NaiveDate>,
+    pub biggest_day_secs: i64,
+    pub biggest_day_date: Option<NaiveDate>,
+    pub most_pages: i64,
+    pub most_pages_date: Option<NaiveDate>,
+}
+
+impl Records {
+    /// No reading anywhere yet; the card is hidden.
+    pub fn is_empty(&self) -> bool {
+        self.biggest_day_date.is_none()
+    }
+}
+
+/// The all-time records from whole-history events and the whole-history daily
+/// map. Longest session reuses [`session_summary`]'s clustering; biggest day
+/// and most-pages come straight off the daily totals.
+pub fn personal_records<Tz: TimeZone>(
+    events: &[PageEvent],
+    daily: &BTreeMap<NaiveDate, DayTotal>,
+    tz: &Tz,
+) -> Records {
+    let sessions = session_summary(events, tz);
+    let biggest_day = daily.iter().max_by_key(|(_, t)| t.seconds);
+    let most_pages_day = daily.iter().max_by_key(|(_, t)| t.pages);
+    Records {
+        longest_session_secs: sessions.longest_secs,
+        longest_session_date: sessions.longest_date,
+        biggest_day_secs: biggest_day.map(|(_, t)| t.seconds).unwrap_or(0),
+        biggest_day_date: biggest_day.map(|(d, _)| *d),
+        most_pages: most_pages_day.map(|(_, t)| i64::from(t.pages)).unwrap_or(0),
+        most_pages_date: most_pages_day.map(|(d, _)| *d),
+    }
+}
+
+/// A book with logged reading that was left unfinished and untouched for a
+/// while (spec.md "Forgotten books").
+#[derive(Debug, Clone, PartialEq)]
+pub struct ForgottenBook {
+    pub title: String,
+    pub author: String,
+    pub last_read: NaiveDate,
+    pub days_since: i64,
+}
+
+/// Days a book must sit untouched before it counts as set aside.
+const FORGOTTEN_DAYS: i64 = 30;
+
+/// Unfinished books whose most recent reading day is more than
+/// [`FORGOTTEN_DAYS`] before `today`, most-forgotten first. Files of one work
+/// (same title) collapse to one entry: the work is skipped if any file
+/// reached the end, and dated by the most recently read file (so reading one
+/// copy recently keeps the work off the list).
+pub fn forgotten_books<Tz: TimeZone>(
+    entries: &[Rc<LibraryEntry>],
+    tz: &Tz,
+    today: NaiveDate,
+) -> Vec<ForgottenBook> {
+    struct Acc {
+        finished: bool,
+        last_read: NaiveDate,
+        author: String,
+    }
+    let mut by_title: HashMap<String, Acc> = HashMap::new();
+    for entry in entries {
+        let Some(last_read) = entry
+            .events
+            .iter()
+            .map(|e| local_date(e.start_time, tz))
+            .max()
+        else {
+            continue;
+        };
+        let finished = metrics::furthest_position(&entry.events) >= FINISHED_THRESHOLD;
+        let title = entry.book.title.trim().to_string();
+        let acc = by_title.entry(title).or_insert(Acc {
+            finished: false,
+            last_read,
+            author: entry.book.authors.clone(),
+        });
+        acc.finished |= finished;
+        if last_read >= acc.last_read {
+            acc.last_read = last_read;
+            acc.author = entry.book.authors.clone();
+        }
+    }
+    let mut out: Vec<ForgottenBook> = by_title
+        .into_iter()
+        .filter(|(_, a)| !a.finished)
+        .filter_map(|(title, a)| {
+            let days_since = (today - a.last_read).num_days();
+            (days_since > FORGOTTEN_DAYS).then_some(ForgottenBook {
+                title,
+                author: a.author,
+                last_read: a.last_read,
+                days_since,
+            })
+        })
+        .collect();
+    out.sort_by(|a, b| {
+        b.days_since
+            .cmp(&a.days_since)
+            .then_with(|| a.title.cmp(&b.title))
+    });
+    out
+}
+
 #[derive(Debug, Default, PartialEq)]
 pub struct SessionSummary {
     pub count: usize,
@@ -246,6 +362,8 @@ pub struct OverviewBase {
     monthly: Vec<(NaiveDate, i64)>,
     series: Vec<SeriesStat>,
     authors: Vec<AuthorStat>,
+    records: Records,
+    forgotten: Vec<ForgottenBook>,
 }
 
 /// Builds the window-independent aggregates once for a filtered entry set.
@@ -262,10 +380,13 @@ pub fn overview_base<Tz: TimeZone>(
     let days = daily.keys().copied().collect();
     let streaks = metrics::streaks(&days, today);
     let monthly = monthly_totals(&daily, today);
+    let records = personal_records(&all_events, &daily, tz);
     OverviewBase {
         all_events,
         daily,
         streaks,
+        records,
+        forgotten: forgotten_books(entries, tz, today),
         monthly,
         series: series_breakdown(entries),
         authors: author_breakdown(entries),
@@ -342,6 +463,8 @@ pub fn overview_windowed<Tz: TimeZone>(
         streaks: base.streaks,
         series: base.series.clone(),
         authors: base.authors.clone(),
+        records: base.records.clone(),
+        forgotten: base.forgotten.clone(),
     }
 }
 
@@ -1025,6 +1148,8 @@ mod tests {
             },
             series: Vec::new(),
             authors: Vec::new(),
+            records: Records::default(),
+            forgotten: Vec::new(),
         }
     }
 
@@ -1122,6 +1247,57 @@ mod tests {
         // Three even authors: 1 - HHI = 0.667 -> varied (between the poles).
         let even3: Vec<_> = ["A", "B", "C"].iter().map(|n| mk(n, 100)).collect();
         assert_eq!(variety_trait(&even3).unwrap().label, "Varied reader");
+    }
+
+    #[test]
+    fn personal_records_finds_all_time_bests() {
+        let mut events = Vec::new();
+        // Jun 1: pages 1..=5, 60s each -> 300s, 5 pages.
+        for p in 1..=5 {
+            events.push(ev(p, ts(2026, 6, 1, 8) + p * 100, 60));
+        }
+        // Jun 2: pages 6..=20 back to back -> one 1800s session, 15 pages.
+        for p in 6..=20 {
+            events.push(ev(p, ts(2026, 6, 2, 8) + (p - 6) * 130, 120));
+        }
+        let daily = metrics::daily_totals(&events, &Utc);
+        let records = personal_records(&events, &daily, &Utc);
+        assert_eq!(records.biggest_day_date, Some(date("2026-06-02")));
+        assert_eq!(records.biggest_day_secs, 1800);
+        assert_eq!(records.most_pages, 15);
+        assert_eq!(records.most_pages_date, Some(date("2026-06-02")));
+        assert_eq!(records.longest_session_date, Some(date("2026-06-02")));
+        assert_eq!(records.longest_session_secs, 1800);
+    }
+
+    #[test]
+    fn forgotten_books_lists_stale_unfinished_deduped_by_work() {
+        let today = date("2026-07-05");
+        // Read pages 1..=last of 100 on a given June day.
+        let mk = |title: &str, day: u32, last: i64| {
+            let events: Vec<_> = (1..=last)
+                .map(|p| ev(p, ts(2026, 6, day, 8) + p, 60))
+                .collect();
+            let mut e = entry(events);
+            Rc::get_mut(&mut e).unwrap().book.title = title.into();
+            e
+        };
+        let entries = vec![
+            mk("Stale", 1, 40),    // Jun 1 -> 34d ago, unfinished -> forgotten
+            mk("Recent", 20, 40),  // Jun 20 -> 15d ago -> not forgotten
+            mk("Done", 1, 100),    // Jun 1 but reached the end -> skipped
+            mk("TwoFile", 1, 40),  // old copy of a work,
+            mk("TwoFile", 25, 30), // recent copy dates the work -> not forgotten
+        ];
+        let forgotten = forgotten_books(&entries, &Utc, today);
+        assert_eq!(
+            forgotten
+                .iter()
+                .map(|f| f.title.as_str())
+                .collect::<Vec<_>>(),
+            ["Stale"]
+        );
+        assert_eq!(forgotten[0].days_since, 34);
     }
 
     #[test]

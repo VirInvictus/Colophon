@@ -57,6 +57,14 @@ mod imp {
         #[template_child]
         pub author_rows: TemplateChild<gtk::ListBox>,
         #[template_child]
+        pub record_title: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub record_tiles: TemplateChild<gtk::FlowBox>,
+        #[template_child]
+        pub forgotten_title: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub forgotten_rows: TemplateChild<gtk::ListBox>,
+        #[template_child]
         pub win_30: TemplateChild<gtk::ToggleButton>,
         #[template_child]
         pub win_90: TemplateChild<gtk::ToggleButton>,
@@ -204,6 +212,35 @@ impl OverviewPage {
                 imp.profile_title.set_visible(false);
                 imp.profile_tiles.set_visible(false);
             }
+        }
+
+        // Records (spec.md "Records"): all-time bests, hidden until there
+        // is any reading. Unlike the totals tiles these are whole-history,
+        // so they hold still when the window changes.
+        imp.record_tiles.remove_all();
+        let records = &overview.records;
+        let has_records = !records.is_empty();
+        imp.record_title.set_visible(has_records);
+        imp.record_tiles.set_visible(has_records);
+        if has_records {
+            let longest_date = records.longest_session_date.map(short_date);
+            imp.record_tiles.append(&tile(
+                &humanize_secs(records.longest_session_secs),
+                "longest session",
+                longest_date.as_deref(),
+            ));
+            let biggest_date = records.biggest_day_date.map(short_date);
+            imp.record_tiles.append(&tile(
+                &humanize_secs(records.biggest_day_secs),
+                "biggest day",
+                biggest_date.as_deref(),
+            ));
+            let pages_date = records.most_pages_date.map(short_date);
+            imp.record_tiles.append(&tile(
+                &records.most_pages.to_string(),
+                "most pages in a day",
+                pages_date.as_deref(),
+            ));
         }
 
         imp.heatmap.set_data(&overview.daily, today);
@@ -363,6 +400,30 @@ impl OverviewPage {
                 .build();
             row.add_suffix(&time);
             imp.author_rows.append(&row);
+        }
+
+        // Forgotten books (spec.md "Forgotten books"): unfinished and
+        // untouched for a while, a gentle nudge. Hidden when none qualify.
+        imp.forgotten_rows.remove_all();
+        let has_forgotten = !overview.forgotten.is_empty();
+        imp.forgotten_title.set_visible(has_forgotten);
+        imp.forgotten_rows.set_visible(has_forgotten);
+        for f in overview.forgotten.iter().take(10) {
+            let subtitle = if f.author.trim().is_empty() {
+                format!("last read {}", short_date(f.last_read))
+            } else {
+                format!("{} \u{b7} last read {}", f.author, short_date(f.last_read))
+            };
+            let row = adw::ActionRow::builder()
+                .title(&f.title)
+                .subtitle(&subtitle)
+                .build();
+            let days = gtk::Label::builder()
+                .label(format!("{}d ago", f.days_since))
+                .css_classes(["dim-label"])
+                .build();
+            row.add_suffix(&days);
+            imp.forgotten_rows.append(&row);
         }
     }
 }

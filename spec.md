@@ -134,6 +134,16 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
   when `>= 0.72` (spread widely), otherwise varied; suppressed below three
   distinct authors. The three window traits require a minimum of reading to
   be meaningful; below it the whole profile is suppressed.
+- **Records (all-time)**: whole-history bests, independent of the time
+  window: longest single session (per the session definition above), biggest
+  reading day by time, and most distinct pages read in a day. Each carries
+  the date it happened. Shown only once there is any reading.
+- **Forgotten books**: books with logged reading that are not finished
+  (furthest position < 0.98) and whose most recent reading day is more than
+  30 days before today, ordered most-neglected first. Files of one work
+  collapse to one entry: the work is excluded if any file reached the end,
+  and dated by its most recently read file (so reading one copy recently
+  keeps the work off the list).
 
 ## Widget catalogue (v1 commitment)
 
@@ -187,6 +197,10 @@ Nothing below exists in KOReader or any of the four tools.
 12. **Rollups.** Series composition and author affinity as whole-library
     lists (books, finished count, total time), ranked; each hidden when the
     library carries none of that metadata.
+13. **Records and set-aside.** All-time bests (longest session, biggest day,
+    most pages in a day, each dated) and a list of unfinished books untouched
+    for over a month, most-neglected first. Both whole-history, from data
+    already loaded.
 
 ### Tier C — deferred until the data or a dependency justifies it
 
