@@ -113,3 +113,11 @@ GNOME 49 runtime with a read-only host sandbox.
 ## License
 
 MIT. See `LICENSE`.
+
+## Support
+
+If Colophon's useful to you and you'd like to chip in:
+
+```
+bc1qkge6zr45tzqfwfmvma2ylumt6mg7wlwmhr05yv
+```
