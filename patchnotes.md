@@ -1,5 +1,22 @@
 # Patchnotes
 
+## v0.13.0 — 2026-07-05
+
+A recap, and a sense of trend.
+
+The overview gains a **Recap** card: a whole-history snapshot of your
+reading, books finished, total time, longest streak, sessions, and your
+most-active month. It is always all-time, so it holds still and stays
+meaningful even when you narrow the window above it.
+
+The **total time** tile now carries a trend: with a 30, 90, or 365-day
+window selected it shows the change against the equal-length window just
+before it (up, down, or flat). All-time shows no arrow, and neither does a
+window whose previous period had no reading, so it never claims an infinite
+jump from nothing.
+
+Both come from data already loaded, no new dependencies. 88 tests.
+
 ## v0.12.0 — 2026-07-05
 
 Bests, and books you set down.

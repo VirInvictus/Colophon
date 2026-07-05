@@ -49,6 +49,11 @@ pub struct Overview {
     pub records: Records,
     /// Unfinished books left untouched for a while (whole-history).
     pub forgotten: Vec<ForgottenBook>,
+    /// Whole-history composite recap (window-independent).
+    pub recap: Recap,
+    /// This window against the previous equal-length window; `None` for
+    /// all-time or when the previous window had no reading.
+    pub period_delta: Option<PeriodDelta>,
 }
 
 /// One series' library-wide aggregate (spec.md "Series"). Files of one
@@ -229,15 +234,14 @@ impl Records {
     }
 }
 
-/// The all-time records from whole-history events and the whole-history daily
-/// map. Longest session reuses [`session_summary`]'s clustering; biggest day
-/// and most-pages come straight off the daily totals.
-pub fn personal_records<Tz: TimeZone>(
-    events: &[PageEvent],
+/// The all-time records from the whole-history [`SessionSummary`] (already
+/// computed once by the caller and shared with the recap) and the
+/// whole-history daily map. Biggest day and most-pages come straight off the
+/// daily totals.
+pub fn personal_records(
+    sessions: &SessionSummary,
     daily: &BTreeMap<NaiveDate, DayTotal>,
-    tz: &Tz,
 ) -> Records {
-    let sessions = session_summary(events, tz);
     let biggest_day = daily.iter().max_by_key(|(_, t)| t.seconds);
     let most_pages_day = daily.iter().max_by_key(|(_, t)| t.pages);
     Records {
@@ -248,6 +252,35 @@ pub fn personal_records<Tz: TimeZone>(
         most_pages: most_pages_day.map(|(_, t)| i64::from(t.pages)).unwrap_or(0),
         most_pages_date: most_pages_day.map(|(d, _)| *d),
     }
+}
+
+/// A whole-history reading recap (spec.md "Recap"): the composite highlights,
+/// window-independent.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct Recap {
+    pub books_finished: usize,
+    pub total_secs: i64,
+    pub longest_streak_days: u32,
+    pub sessions: usize,
+    pub most_active_month: Option<(NaiveDate, i64)>,
+}
+
+impl Recap {
+    /// Nothing read yet; the card is hidden.
+    pub fn is_empty(&self) -> bool {
+        self.total_secs == 0
+    }
+}
+
+/// The current-window total against the immediately preceding equal-length
+/// window (spec.md "Period-over-period"). `None` unless a finite window is
+/// selected and the prior window had reading (so no fake infinite % jump).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PeriodDelta {
+    pub current_secs: i64,
+    pub prev_secs: i64,
+    /// `(current - prev) / prev`.
+    pub pct: f64,
 }
 
 /// A book with logged reading that was left unfinished and untouched for a
@@ -364,6 +397,7 @@ pub struct OverviewBase {
     authors: Vec<AuthorStat>,
     records: Records,
     forgotten: Vec<ForgottenBook>,
+    recap: Recap,
 }
 
 /// Builds the window-independent aggregates once for a filtered entry set.
@@ -380,13 +414,33 @@ pub fn overview_base<Tz: TimeZone>(
     let days = daily.keys().copied().collect();
     let streaks = metrics::streaks(&days, today);
     let monthly = monthly_totals(&daily, today);
-    let records = personal_records(&all_events, &daily, tz);
+    // One whole-history session pass, shared by the records card and the
+    // recap's session count.
+    let all_sessions = session_summary(&all_events, tz);
+    let records = personal_records(&all_sessions, &daily);
+    let finished_works: std::collections::HashSet<String> = entries
+        .iter()
+        .filter(|e| metrics::furthest_position(&e.events) >= FINISHED_THRESHOLD)
+        .map(|e| e.book.title.trim().to_string())
+        .collect();
+    let recap = Recap {
+        books_finished: finished_works.len(),
+        total_secs: daily.values().map(|t| t.seconds).sum(),
+        longest_streak_days: streaks.longest.map(|s| s.days).unwrap_or(0),
+        sessions: all_sessions.count,
+        most_active_month: monthly
+            .iter()
+            .copied()
+            .filter(|(_, s)| *s > 0)
+            .max_by_key(|(_, s)| *s),
+    };
     OverviewBase {
         all_events,
         daily,
         streaks,
         records,
         forgotten: forgotten_books(entries, tz, today),
+        recap,
         monthly,
         series: series_breakdown(entries),
         authors: author_breakdown(entries),
@@ -444,8 +498,30 @@ pub fn overview_windowed<Tz: TimeZone>(
         .into_iter()
         .collect();
 
+    let total_secs: i64 = windowed.iter().map(|e| e.duration).sum();
+    // This window vs the equal-length window immediately before it. Only for
+    // a finite window with a non-empty prior period (else a fake infinite %).
+    let period_delta = window_days.and_then(|n| {
+        let prev_start = today - Duration::days(2 * n - 1);
+        let prev_end = today - Duration::days(n); // the day before this window
+        let prev_secs: i64 = base
+            .all_events
+            .iter()
+            .filter(|e| {
+                let d = metrics::local_date(e.start_time, tz);
+                d >= prev_start && d <= prev_end
+            })
+            .map(|e| e.duration)
+            .sum();
+        (prev_secs > 0).then_some(PeriodDelta {
+            current_secs: total_secs,
+            prev_secs,
+            pct: (total_secs - prev_secs) as f64 / prev_secs as f64,
+        })
+    });
+
     Overview {
-        total_secs: windowed.iter().map(|e| e.duration).sum(),
+        total_secs,
         unique_pages,
         books,
         active_days: windowed_daily.len(),
@@ -465,6 +541,8 @@ pub fn overview_windowed<Tz: TimeZone>(
         authors: base.authors.clone(),
         records: base.records.clone(),
         forgotten: base.forgotten.clone(),
+        recap: base.recap.clone(),
+        period_delta,
     }
 }
 
@@ -1150,6 +1228,8 @@ mod tests {
             authors: Vec::new(),
             records: Records::default(),
             forgotten: Vec::new(),
+            recap: Recap::default(),
+            period_delta: None,
         }
     }
 
@@ -1261,7 +1341,8 @@ mod tests {
             events.push(ev(p, ts(2026, 6, 2, 8) + (p - 6) * 130, 120));
         }
         let daily = metrics::daily_totals(&events, &Utc);
-        let records = personal_records(&events, &daily, &Utc);
+        let sessions = session_summary(&events, &Utc);
+        let records = personal_records(&sessions, &daily);
         assert_eq!(records.biggest_day_date, Some(date("2026-06-02")));
         assert_eq!(records.biggest_day_secs, 1800);
         assert_eq!(records.most_pages, 15);
@@ -1298,6 +1379,63 @@ mod tests {
             ["Stale"]
         );
         assert_eq!(forgotten[0].days_since, 34);
+    }
+
+    #[test]
+    fn period_delta_compares_to_previous_window_or_none() {
+        let today = date("2026-07-30");
+        let mut events = Vec::new();
+        for p in 1..=10 {
+            events.push(ev(p, ts(2026, 6, 15, 8) + p, 60)); // previous 30d: 600s
+        }
+        for p in 1..=20 {
+            events.push(ev(p, ts(2026, 7, 15, 8) + p, 60)); // current 30d: 1200s
+        }
+        let mk = || entry(events.clone());
+        let d = overview(&[mk()], &Utc, today, Some(30))
+            .period_delta
+            .expect("finite window with prior data");
+        assert_eq!((d.current_secs, d.prev_secs), (1200, 600));
+        assert!((d.pct - 1.0).abs() < 1e-9); // +100%
+        // All-time has no previous period.
+        assert!(overview(&[mk()], &Utc, today, None).period_delta.is_none());
+    }
+
+    #[test]
+    fn period_delta_none_when_prior_window_empty() {
+        let today = date("2026-07-30");
+        let events: Vec<_> = (1..=5).map(|p| ev(p, ts(2026, 7, 15, 8) + p, 60)).collect();
+        assert!(
+            overview(&[entry(events)], &Utc, today, Some(30))
+                .period_delta
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn recap_composes_whole_history_highlights() {
+        let today = date("2026-07-30");
+        let mk = |title: &str, day: u32, last: i64| {
+            let events: Vec<_> = (1..=last)
+                .map(|p| ev(p, ts(2026, 7, day, 8) + p, 60))
+                .collect();
+            let mut e = entry(events);
+            Rc::get_mut(&mut e).unwrap().book.title = title.into();
+            e
+        };
+        let entries = vec![
+            mk("Done", 5, 100),     // reached the end
+            mk("AlsoDone", 6, 100), // reached the end
+            mk("WIP", 7, 40),       // unfinished
+        ];
+        let recap = overview(&entries, &Utc, today, None).recap;
+        assert_eq!(recap.books_finished, 2);
+        assert_eq!(recap.total_secs, (100 + 100 + 40) * 60);
+        assert_eq!(
+            recap.most_active_month,
+            Some((date("2026-07-01"), (100 + 100 + 40) * 60))
+        );
+        assert!(recap.sessions >= 1);
     }
 
     #[test]

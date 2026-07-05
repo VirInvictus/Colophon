@@ -144,6 +144,14 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
   collapse to one entry: the work is excluded if any file reached the end,
   and dated by its most recently read file (so reading one copy recently
   keeps the work off the list).
+- **Period-over-period**: for a finite selected window, the current window's
+  total time against the immediately preceding equal-length window, as a
+  signed percentage. Omitted for the all-time view and whenever the previous
+  window had no reading (so it never reports an infinite jump from zero).
+- **Recap**: a whole-history composite, independent of the window: books
+  finished (distinct finished works), total time, longest streak, session
+  count, and the most-active calendar month. Because it is always all-time,
+  it stays meaningful (and unchanged) when a shorter window is selected.
 
 ## Widget catalogue (v1 commitment)
 
@@ -201,6 +209,10 @@ Nothing below exists in KOReader or any of the four tools.
     most pages in a day, each dated) and a list of unfinished books untouched
     for over a month, most-neglected first. Both whole-history, from data
     already loaded.
+14. **Recap and trend.** A whole-history recap card (books finished, total
+    time, longest streak, sessions, most-active month) and, on the windowed
+    total time, a period-over-period change against the previous equal-length
+    window.
 
 ### Tier C — deferred until the data or a dependency justifies it
 

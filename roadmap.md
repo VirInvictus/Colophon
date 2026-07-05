@@ -312,14 +312,18 @@ third. Ordered cheapest-first.
       reading-day is > 30 days ago, most-neglected first. Files of one work
       collapse; reading either copy recently keeps the work off the list.
       `stats::forgotten_books`.
-- [ ] **Period-over-period delta.** On the windowed overview, show the
+- [x] **Period-over-period delta** (v0.13.0). The total-time tile shows the
       current window against the immediately preceding equal-length window
-      (% change), returning nothing rather than a fake ∞% when the prior
-      window is empty (Tome's null-safe handling).
-- [ ] **Year-in-review card.** A composite "your year" tile (books finished,
-      hours, longest streak, sessions, most-active month) assembled from
-      numbers the overview already computes. Presentation, not new math;
-      drop Tome's top-genre facet (needs catalogue metadata Colophon lacks).
+      (% change with an up/down/flat arrow), returning nothing rather than a
+      fake ∞% when the prior window is empty. `stats::PeriodDelta`.
+- [x] **Recap card** (v0.13.0). A whole-history composite (books finished,
+      total time, longest streak, sessions, most-active month) assembled from
+      numbers the overview already computes. Always all-time, so it stays put
+      when a shorter window is selected; Tome's top-genre facet dropped
+      (needs catalogue metadata Colophon lacks). `stats::Recap`. (Renamed
+      from "year-in-review": the data is single-year for now, so a whole-
+      history recap is the honest framing; a per-year variant can come with
+      the completions timeline once the data spans years.)
 - [ ] **Per-book finish estimate + reading momentum.** Extends the velocity
       work: seconds-to-finish from current pace with a high/medium/low
       confidence from evidence count, plus a momentum read (last 7

@@ -61,6 +61,10 @@ mod imp {
         #[template_child]
         pub record_tiles: TemplateChild<gtk::FlowBox>,
         #[template_child]
+        pub recap_title: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub recap_tiles: TemplateChild<gtk::FlowBox>,
+        #[template_child]
         pub forgotten_title: TemplateChild<gtk::Label>,
         #[template_child]
         pub forgotten_rows: TemplateChild<gtk::ListBox>,
@@ -155,7 +159,22 @@ impl OverviewPage {
         let add_tile = |value: String, caption: &str, detail: Option<String>| {
             imp.tiles.append(&tile(&value, caption, detail.as_deref()));
         };
-        add_tile(humanize_secs(overview.total_secs), "total time", None);
+        // Total time carries a comparison to the previous equal-length
+        // window when one is selected and had reading (spec.md).
+        let total_detail = overview.period_delta.map(|d| {
+            let pct = (d.pct * 100.0).round() as i64;
+            let arrow = match pct.cmp(&0) {
+                std::cmp::Ordering::Greater => '\u{2191}',
+                std::cmp::Ordering::Less => '\u{2193}',
+                std::cmp::Ordering::Equal => '\u{2192}',
+            };
+            format!("{arrow} {}% vs previous", pct.abs())
+        });
+        add_tile(
+            humanize_secs(overview.total_secs),
+            "total time",
+            total_detail,
+        );
         add_tile(overview.unique_pages.to_string(), "pages read", None);
         add_tile(overview.books.to_string(), "books", None);
         add_tile(overview.active_days.to_string(), "active days", None);
@@ -241,6 +260,38 @@ impl OverviewPage {
                 "most pages in a day",
                 pages_date.as_deref(),
             ));
+        }
+
+        // Recap (spec.md "Recap"): a whole-history composite, so it stays put
+        // (and stays meaningful) even when a shorter window is selected.
+        imp.recap_tiles.remove_all();
+        let recap = &overview.recap;
+        let has_recap = !recap.is_empty();
+        imp.recap_title.set_visible(has_recap);
+        imp.recap_tiles.set_visible(has_recap);
+        if has_recap {
+            imp.recap_tiles.append(&tile(
+                &recap.books_finished.to_string(),
+                "books finished",
+                None,
+            ));
+            imp.recap_tiles
+                .append(&tile(&humanize_secs(recap.total_secs), "total time", None));
+            imp.recap_tiles.append(&tile(
+                &format!("{}d", recap.longest_streak_days),
+                "longest streak",
+                None,
+            ));
+            imp.recap_tiles
+                .append(&tile(&recap.sessions.to_string(), "sessions", None));
+            if let Some((month, secs)) = recap.most_active_month {
+                let secs_label = humanize_secs(secs);
+                imp.recap_tiles.append(&tile(
+                    &month_label(month),
+                    "most active month",
+                    Some(&secs_label),
+                ));
+            }
         }
 
         imp.heatmap.set_data(&overview.daily, today);
