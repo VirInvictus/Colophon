@@ -11,9 +11,11 @@ findings so far.
       (`research/koreader-plugin-src/statistics.koplugin/main.lua`) — see
       `RESEARCH.md` §1 for the full schema, the `page_stat` rescaling view,
       and the font-size/pagination handling.
-- [x] Get a real sample database. Copied from `/mnt/Kindle` 2026-07-03:
-      `research/samples/statistics.sqlite3` (9 books, 695 page-stat rows)
-      and `research/samples/vocabulary_builder.sqlite3` (empty — feature
+- [x] Get a real sample database. Copied from `/mnt/Kindle` 2026-07-03,
+      refreshed 2026-07-05: `research/samples/statistics.sqlite3` (9 books,
+      750 page-stat rows as of the refresh, latest event 2026-07-05; Royal
+      Assassin now carries its 1 highlight) and
+      `research/samples/vocabulary_builder.sqlite3` (still empty — feature
       unused so far). Both gitignored.
 - [x] Clone existing third-party KOReader stats tools for reference into
       `~/.gitrepos/.studyrepos/`: `KoInsight`, `KoShelf`, `Kodashboard`,
@@ -23,11 +25,21 @@ findings so far.
       catalogues. Done 2026-07-03: KOReader's UI surveyed from the plugin
       source (`RESEARCH.md` §4), all four tools catalogued (§5), converged
       conventions extracted (§6), underexplored territory mapped (§8).
+- [x] Fifth tool researched 2026-07-05: Tome (`bndct-devops/tome`, a
+      self-hosted FastAPI+React server). Full dossier `RESEARCH.md` §5.5,
+      ranked steal-list §8.1. The original four re-swept for residual value
+      (§5.6). All five reference clones then deleted (re-clonable; upstreams
+      in §9). Key delta: a word-count axis and a handful of cheap
+      stats-DB-feasible cards (author affinity, personal records, finish
+      estimates) — now phased below.
 - [x] Track down per-book `.sdr` sidecar metadata. Structure, location,
       and the `partial_md5_checksum` ↔ `book.md5` linkage fully documented
-      from KoShelf/Kodashboard source (`RESEARCH.md` §7). One real sample
-      file still to be copied next time the Kindle is mounted (wasn't,
-      this pass); a nice-to-have, not blocking. Content stays Tier C.
+      from KoShelf/Kodashboard source (`RESEARCH.md` §7). **Real sample
+      copied 2026-07-05** from `/mnt/Kindle`: `research/samples/Royal
+      Assassin - Robin Hobb (1705).sdr/metadata.epub.lua` (a finished book
+      with a highlight: `summary.status="complete"`, `percent_finished=1`,
+      `partial_md5_checksum` present) plus the Jingo dup-title sidecar. Both
+      gitignored (real book data). Content stays Tier C.
 - [x] Update `spec.md`'s widget/chart list from a brainstorm to a
       commitment. Done 2026-07-03: normative derived-metric definitions
       plus a three-tier catalogue (differentiators / table stakes /
@@ -143,7 +155,13 @@ Tier A widgets (the differentiators; nobody ships these):
       cap (KoShelf's numbers), pixel binning for long books, per-range
       tooltips. This is also the "did it drag in the middle" velocity
       view (Tier A #4's page axis).
-      - [ ] Annotation count markers.
+      - [ ] Annotation count markers. **Unblocked 2026-07-05** (sidecar
+            sample in hand). Approach settled in `RESEARCH.md` §7.1:
+            annotations live in the `.sdr` sidecar and drift with pagination
+            exactly like page stats, so markers reuse the strip's existing
+            page-interval rescale (never the raw `pageno`); three-way
+            bookmark/highlight/note classification. Rides on the §7.2 /
+            Phase 4.5 sidecar-parsing work.
 - [x] Book velocity, remaining piece (v0.5.0): read-through cards now
       carry pages/day over the calendar span (the page axis was already
       covered by the activity strip).
@@ -151,8 +169,9 @@ Tier A widgets (the differentiators; nobody ships these):
       page (dates, time, sessions, pages/hour, coverage), hidden for
       books with none.
       - [ ] Overview completions timeline / books finished per
-            year/month (waiting on data that actually contains finished
-            books to design against).
+            year/month. **Data now exists** (2026-07-05: Royal Assassin
+            reads as complete). Still thin (one finished book); see Phase
+            4.5 for the sequenced build.
 
 Tier B widgets (expected furniture, done correctly):
 
@@ -252,28 +271,91 @@ in.
 - [ ] **`.sdr` finished-flag reconciliation.** Parse the sidecar's declared
       `summary.status` + `percent_finished` to make "finished" authoritative
       and cross-check inferred completions. Gated on an `mlua`-vs-stdlib
-      dependency decision.
-      - **⚠ BLOCKED — needs the Kindle.** Copy one real `.sdr` sidecar
-        (`<book>.sdr/metadata.epub.lua` for a highlighted book, e.g. Royal
-        Assassin) into `research/samples/` next time the Kindle is mounted
-        at `/mnt/Kindle`. Cannot design the parser against nothing. This is
-        the one outstanding hardware errand for the project.
+      dependency decision (the sidecar is a Lua chunk; stdlib can't eval it,
+      so this is a real dep ask — see `RESEARCH.md` §7.2 for KoShelf's
+      sandboxed `mlua` pattern, plus hidden-flows and the UTF-8-lossy guard
+      to replicate).
+      - **✓ UNBLOCKED 2026-07-05.** Real sidecar sample now at
+        `research/samples/Royal Assassin - Robin Hobb (1705).sdr/
+        metadata.epub.lua` (finished, one highlight) plus the Jingo
+        dup-title sidecar. The parser can be designed against real data;
+        Royal Assassin is the exact case this fixes (KOReader logged ~69 %
+        coverage but the sidecar says `status="complete"`, so the declared
+        flag overrides the coverage inference).
 
-**Data-provisioning errands (need the Kindle, not urgent):** the `.sdr`
-sidecar sample above, and re-importing `statistics.sqlite3` after finishing
-each book so the finished-books features (completions timeline, year
-rollups, estimate-accuracy) grow richer over time.
+**Data-provisioning errands:** the `.sdr` sidecar sample and a fresh
+`statistics.sqlite3` were pulled 2026-07-05 (750 events). Standing errand,
+not urgent: re-import `statistics.sqlite3` after finishing each book so the
+finished-books features (completions timeline, year rollups,
+estimate-accuracy) grow richer over time.
+
+## Phase 4.6 — Tome-sourced cards (research 2026-07-05, `RESEARCH.md` §8.1)
+
+The Tome dossier surfaced a cluster of cards that are **feasible from the
+`statistics.sqlite3` Colophon already reads**: no new deps, no library-file
+access, no sidecars. They fit the "make it a joy" reframing (more useful
+cards from data already in hand) and slot ahead of 1.0. Each metric's
+normative definition lands in `spec.md` first, per the standing rule; the
+pure aggregation goes in `colophon-core`/`stats.rs`, the widget renders
+third. Ordered cheapest-first.
+
+- [ ] **Author affinity.** Reading time and finished-book count rolled up
+      per author (top N), an overview card. A whole dimension the catalogue
+      omits; `book.authors` is already loaded and merged. Cheapest win.
+- [ ] **Personal records.** Longest single session, biggest reading day by
+      time, most pages in a day — a small records card. Max over structures
+      the overview already builds (sessions, the daily map).
+- [ ] **Forgotten books.** Books with logged reading whose furthest read is
+      not "finished" and whose last reading-day is > 30 days ago. A gentle
+      "pick these back up" rail. Cheap.
+- [ ] **Period-over-period delta.** On the windowed overview, show the
+      current window against the immediately preceding equal-length window
+      (% change), returning nothing rather than a fake ∞% when the prior
+      window is empty (Tome's null-safe handling).
+- [ ] **Year-in-review card.** A composite "your year" tile (books finished,
+      hours, longest streak, sessions, most-active month) assembled from
+      numbers the overview already computes. Presentation, not new math;
+      drop Tome's top-genre facet (needs catalogue metadata Colophon lacks).
+- [ ] **Per-book finish estimate + reading momentum.** Extends the velocity
+      work: seconds-to-finish from current pace with a high/medium/low
+      confidence from evidence count, plus a momentum read (last 7
+      reading-days vs the prior 7, direction + %). Furthest-position pace is
+      pagination-robust.
+- [ ] **Completion / abandonment rate.** Started → finished %, deriving
+      "started" from any dwell and "finished" from the existing 78 %/last-2 %
+      completion heuristic (labelled as inferred, not user-declared, until
+      §4.5 sidecar reconciliation lands).
+- [ ] **HHI Variety trait for the reading-personality card.** A fourth
+      synthesised trait (focused ↔ eclectic) from an author-diversity
+      Herfindahl index (`1 − HHI`). The author half is stats-DB-feasible
+      now; the book-type half stays blocked on catalogue metadata. Borrow
+      Tome's tone-calibrated axis naming (flatter both poles).
 
 ## Phase 5 — Post-1.0 candidates (each needs its own go/no-go)
 
 Ordered roughly by likelihood. None are commitments.
 
+- [ ] **Word-count axis (the big one; needs a scope decision).** Tome's
+      largest capability delta (`RESEARCH.md` §5.5): true words-per-minute
+      (pagination-independent, unlike Colophon's pages/hour), lifetime
+      words-read, and a book-length distribution — and it unlocks two more
+      reading-personality axes (Length, Pace). **Off Colophon's stats-DB-only
+      contract:** word counts come from the EPUB files, not KOReader, so this
+      means (a) reaching the library files at all, and (b) an EPUB word
+      counter — either a new dep (`ebooklib`) or a stdlib `zipfile` + regex
+      path (Tome falls back to exactly that). Both are deliberate go/no-go
+      calls, not slip-ins: it changes what Colophon reads. High value if the
+      answer is yes.
+- [ ] Reading goals ({books|minutes|pages} per {day|week|month|year}, with a
+      prorated on-pace line), stats-DB-feasible. **Deliberately declined at
+      research time** (Colophon is a stats *viewer*, not a tracker); listed
+      only so the decision is on the record. Re-raise on request.
 - [ ] `.sdr` highlight/note *content*: sandboxed-Lua parsing (KoShelf's
       `mlua` + `StdLib::NONE` pattern), joined via `partial_md5_checksum`
       = `book.md5`. Unlocks a highlight browser, annotation markers with
       text, and the sidecar `summary.status` user-declared finished flag
-      to cross-check inferred completions. Gated on: a real sidecar
-      sample from the Kindle, and the `mlua` dependency ask.
+      to cross-check inferred completions. Sidecar sample now in hand
+      (2026-07-05); remaining gate is just the `mlua` dependency ask.
 - [ ] Vocabulary-builder widgets ("words looked up per book", lookup
       timeline). Schema already documented (RESEARCH §2); Brandon's
       `vocabulary_builder.sqlite3` is empty, so parked until the feature

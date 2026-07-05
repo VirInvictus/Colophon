@@ -355,6 +355,233 @@ widget:
 - Also tracks week streaks (Monday-start, hand-rolled week numbering) and
   a binary month calendar (day read / not read).
 
+### 5.5 Tome (`bndct-devops/tome`, FastAPI + React self-hosted server, AGPL-3.0)
+
+Added 2026-07-05 (a fifth tool, read after the original four). The most
+feature-complete of the set, but it is a full self-hosted library *server*
+(Docker, web UI, OPDS, SSO, Hardcover sync, a custom KOReader plugin), i.e.
+exactly the category Colophon exists to avoid. It matters here only as a
+metric-idea source. The important finding first:
+
+**It does NOT read richer reading telemetry than Colophon.** Tome has two
+reading-data sources: live `ReadingSession` rows POSTed by its own TomeSync
+KOReader plugin, and imported `statistics.sqlite3` `page_stat_data` (byte
+for byte Colophon's source). Its reconciliation layer makes the imported
+page-stats **win** for any book that has them and **discards** the live
+device sessions for that book to avoid double-counting
+(`reconciled_reading.py:8-12,61-75`); the plugin history import is
+explicitly "reading time and pages only, never read/unread status"
+(`ko_stats_import.py:31-35`). The plugin adds annotation *content*
+(xPointer anchor, text, note, chapter, colour), a resume-position CFI, and
+a user star-rating synced both ways, but no time signal beyond
+`page_stat_data`. So for time and pages, Tome and Colophon see the same
+data. Its live sessions carry `progress_start`/`progress_end`/`pages_turned`/
+`device`, but Colophon reconstructs the equivalents by gap-clustering
+page-stat rows exactly as Tome itself does for imported books
+(`reconciled_reading._cluster_rows`, 1800 s gap, 10 s min).
+
+The genuinely-new *statistical axes* Tome has that are absent from
+`statistics.sqlite3` are three: **word counts** (parsed from the EPUB
+files, not from KOReader), **user ratings** (KOReader `.sdr` sidecars),
+and **library catalogue metadata** (book-type/"genre", language,
+`added_at`, whole-library TBR, from Tome's own DB). Everything Tome
+computes divides cleanly along that line, which is what makes the delta
+easy to state.
+
+**Re-implementations (nothing new for Colophon):** headline totals, streaks
+(identical walk-back-from-today logic, `streaks.py:17-39`), 365-day year
+heatmap, hour×weekday 168-cell heatmap, monthly bars, session histogram,
+pace in pages/min, series completion section, per-page reading-intensity
+curve (same fraction-bin + interval-union as Colophon), re-read detection.
+One reference detail worth keeping: Tome's re-read heuristic groups by
+`(book, total_pages, page)` so a re-pagination cannot fake a revisit, ranks
+books by revisited-page count, and drops books with `< 3` revisited pages
+as noise (`reading_stats.py:920-958`). Also a cheap correctness nicety: it
+buckets every day-identity metric with a **4 a.m. logical-day rollover** (a
+01:30 session counts to the prior day), the one exception being the
+hour-of-day heatmap which uses the raw offset (`reading_day.py:1-13`). This
+matches KoShelf's `--day-start-time` idea.
+
+**New, and feasible from `statistics.sqlite3` alone** (needs only KOReader's
+`book` + `page_stat`; no plugin, no word counts, no sidecars):
+
+- **Author affinity**: reading time and finished-book count rolled up per
+  author, top N (`stats.py:515-542`). A whole dimension (author) Colophon's
+  widget list omits; `book.authors` is right there. Near-zero cost.
+- **Personal records**: longest single session, biggest reading day by
+  time, most pages in a day (`stats.py:747-764`). Max over the structures
+  Colophon already builds.
+- **Per-book finish estimate + momentum**: seconds-remaining =
+  `total_seconds / progress * (1 - progress)` (`reading_stats.py:389-397`);
+  "momentum" = last 7 reading-days vs the prior 7, direction + % delta
+  (`:330-362`); a days-to-finish endpoint with high/medium/low confidence
+  from evidence count (`stats.py:1018-1158`), deliberately not subtracting
+  the first active day from the pace denominator (`:1113-1117`).
+- **Completion / abandonment rate**: started → finished % (`stats.py:544-558`).
+  Tome uses an explicit status; Colophon would derive "started" from any
+  dwell and "finished" from its own 78%/last-2% completion heuristic
+  (honest caveat: heuristic, not user-declared).
+- **Year-in-review card**: a Wrapped-style composite tile: books finished,
+  hours, longest streak, sessions, most-active month, top genre
+  (`stats.py:330-375`). Pure re-aggregation of numbers Colophon already has
+  (drop top-genre, which needs catalogue metadata). Presentation novelty.
+- **Period-over-period comparison**: current window vs the immediately
+  preceding equal-length window, % change, returning null (not a fake ∞%)
+  when the prior window is empty (`stats.py:309-328`).
+- **Forgotten / stale books**: books in "reading" state untouched 30+ days
+  (`home.py:264-294`). Cheap home-rail widget.
+- **Reading goals**: `{books|minutes|pages}_per_{day|week|month|year}`,
+  with a prorated "on-pace" line for month/year and `days_hit_this_week`
+  for daily goals (`goals.py`). Colophon *deliberately* declined goals, so
+  this is an available-but-declined idea, not a gap; re-raise only if wanted.
+
+**New, but requires word counts (the single biggest capability delta):**
+Tome parses the **EPUB file itself** for word counts, not KOReader.
+`count_words_epub` opens the EPUB via `ebooklib` and, on any parse failure,
+falls back to reading the zip directly with stdlib `zipfile`
+(`metadata.py:60-103`): strip `<script>`/`<style>`, strip tags, count a
+Unicode word regex over every spine document, summed and cached on the
+book; a cancellable background job backfills the library with a
+byte-weighted ETA (`word_count_job.py`). This unlocks
+(`stats.py:825-913`): **words read** (lifetime + by year), **true WPM**
+(`words × 60 / read-seconds`, with a 300 s floor below which pace is
+dismissed as noise; pagination-independent, unlike Colophon's pages/hour),
+and a **book-length distribution** (mean/median/longest + fixed buckets
+`<50k / 50-100k / 100-150k / 150-250k / 250k+`, and avg length by
+finish-year). **Feasibility: NOT from `statistics.sqlite3`.** It needs the
+actual book files plus an EPUB word counter, and Colophon's contract today
+is stats-DB-only with no library-file access in the pipeline. The stdlib
+zip fallback shows it is achievable without a heavy dep, but it is a
+deliberate scope decision (touch library files? add or replicate an EPUB
+parser? `ebooklib` is third-party) to make explicitly, not slip in.
+
+**New, but requires catalogue metadata Colophon cannot get** (all blocked
+by data, not choice; KOReader's DB only knows books you *opened*, so it has
+no book-type, language, `added_at`, or owned-but-unread): genre/book-type
+time and genre-over-time stacks (`stats.py:206-214,430-458`; note it is
+book-*type* manga/novel/comic, not literary genre, so the README's "genre
+trends" is narrower than it sounds), time by language (`:807-823`), TBR /
+library completion (`:766-805`), library-growth timeline (`:613-648`),
+pace by file format (`:584-611`).
+
+**New, but requires ratings** (KOReader stores the star rating/review in the
+per-book `.sdr` sidecar, not the stats DB): a full ratings block, i.e.
+half-star distribution, average, rating-over-time trend, per-series ratings
+(`stats.py:650-732`). Reachable only if Colophon starts ingesting `.sdr`
+sidecars (the sample §7 already wants to grab); the by-category facet stays
+blocked even then.
+
+**Reading DNA (5 traits) vs Colophon's 3-trait reading personality.**
+`reading_dna.py` scores five 0-100 axes and names an archetype (noun from
+the most-extreme axis + modifier from the second, forced to be different
+axes so it cannot self-contradict; an axis must sit ≥ 12 from neutral-50 to
+be "named", `:63,174-203`):
+
+| Trait | Computation | Feasible for Colophon |
+|---|---|---|
+| Time (early-bird↔night-owl) | circular mean of read-hour over 365 d, 4 a.m. boundary (`:89-100`) | YES (page-stat timestamps) |
+| Rhythm (sporadic↔consistent) | active-day density over last 120 d, gated to ≥ 14 days history (`:102-113`) | YES (active-day set) |
+| Variety (focused↔eclectic) | `1 − HHI` (Herfindahl index) across authors **and** book-types, averaged (`:152-172`) | PARTIAL (author half works; type half blocked) |
+| Length (short↔long) | median finished-book **word count**, 30k→150k calibration (`:128-133`) | NO (needs word counts) |
+| Pace (savorer↔speed-demon) | **WPM**, 140→360 calibration, ≥ 300 s books only (`:135-150`) | NO (needs word counts) |
+
+So vs Colophon's three traits, the new axes are Length and Pace (both
+word-count-gated) and an HHI-based Variety (author-feasible). Time and
+Rhythm are territory Colophon already occupies. The **HHI diversity index**
+and the tone-calibrated "flatter the low pole as much as the high pole"
+archetype naming are worth borrowing as *technique* even where the axes
+overlap.
+
+**Explicitly out of scope for Colophon** from Tome: release detection
+(polls Hardcover's GraphQL API for new series volumes; external network,
+against the local-first/offline rule) and `book_progress` write paths
+(Colophon is read-only; its one transferable idea, "completion is sticky,
+re-reads don't un-finish a book", already matches Colophon's completion
+detection).
+
+### 5.6 Residual sweep of the first four tools (2026-07-05)
+
+Before deleting the reference clones, each of the original four was re-read
+against its §5 summary to drain anything the first pass missed. Two of the
+findings are correctness checks that Colophon **already passes**, which is
+worth recording as validation:
+
+- **WAL snapshot must copy the `-wal` and `-shm` companions**, not just the
+  `.sqlite3`; copying only the main file while KOReader has uncheckpointed
+  pages in the WAL reads a stale snapshot and silently drops the newest
+  events (KoShelf `src/source/sqlite_snapshot.rs:22-46`). Colophon's
+  `snapshot()` does copy both sidecars then checkpoints
+  (`colophon-core/src/db.rs:242-282`). Confirmed correct.
+- **md5-merge must take `max()`, not `sum()`, for `notes`/`highlights`**:
+  those are absolute counts, so summing across md5-duplicate rows
+  double-counts (KoShelf only sums `total_read_time`/`total_read_pages`,
+  `database.rs:171-184`). Colophon already uses `.max()`
+  (`colophon-core/src/db.rs:231-232`). Confirmed correct. (The §5.2 line
+  "totals summed" was imprecise; the counts are maxed.)
+
+New reference material the first pass missed:
+
+- **Junk / noise filters at the row level.** KoInsight drops any `page_stat`
+  row with `duration <= 0`, `total_pages <= 0`, or non-finite values
+  (`upload-service.ts:51-59`) — a data-quality guard independent of
+  Colophon's display-time min-read-time filter. KoShelf's noise filter is
+  coarser and per-`(book, logical_date)`: a day-bucket survives if it clears
+  `min_time_per_day` (default `30s`) or `min_pages_per_day` (unset), and a
+  failing bucket drops *all* its rows; "pages" there means row count, not
+  distinct pages (`calculator.rs:332-388`, `cli.rs:131`). KoShelf also
+  prefilters completion detection to `duration > 0` rows
+  (`completion_detection.rs:172`).
+- **`book.pages` is not authoritative for current pagination.** After a
+  reflow it goes stale and disagrees with the `total_pages` stamped on
+  recent `page_stat_data` rows; trust the freshest row's `total_pages`
+  (KoInsight `db_reader.lua:63-80`). Across devices, use `max(total_pages)`
+  when no user reference count is set (`books-service.ts:10-12`). A
+  `max(page - 1, 0)` clamp guards the page-0 off-by-one in interval mapping
+  (`books-service.ts:44`).
+- **Synthetic-pagination scaling: accumulate as float, round once per
+  bucket.** When a sidecar carries a pagemap, KoShelf scales by
+  `pagemap_doc_pages / book.pages` but returns the raw f64 so callers sum
+  scaled pages as floats and round only once per day/month bucket, avoiding
+  per-row rounding drift; non-finite/≤0 factors are rejected
+  (`scaling.rs:27-100`).
+- **Completion restart-split is a two-threshold rule, not one.** The §5.2
+  "backwards jump to first 5%" fires only when the current page ≤ 5%
+  **and** the previous page was > 20% **and** the progression already holds
+  an early page **and** the remainder would itself complete
+  (`completion_detection.rs:259-292`); defaults 0.78 / 0.20 / 0.02.
+- **Day-start offset math.** The logical-day start is *subtracted* from the
+  localized datetime before taking the date, so 02:00 with a 04:00 start
+  counts as the previous day (KoShelf `time_config.rs:64-75`; Tome's
+  `reading_day.py` does the same at 04:00). DST fall-back ambiguity resolves
+  to the earliest instant (`time_config.rs:111-120`). readingstreak, by
+  contrast, has **no** offset (bare local midnight, `main.lua:147-148`) — a
+  differentiator if Colophon wants the offset.
+- **DST-safe date arithmetic (reusable primitive).** readingstreak does all
+  streak day-diffs via the Fliegel–Van Flandern Julian-day formula on parsed
+  Y/M/D integers, never `os.time`, so it is immune to DST/timezone
+  (`main.lua:151-166`). Its *weekly* window, by contrast, uses
+  `days * 86400` second math on `os.time` and is DST-fragile
+  (`time_stats.lua:36,47`) — a cautionary inconsistency. Its week numbering
+  is hand-rolled and **diverges from ISO 8601** (no W53/W00 or year-boundary
+  handling, `main.lua:168-180`); do not copy it for week streaks.
+- **Milestone tiers, and how thin they are.** readingstreak's only
+  achievement ladder is 7 / 30 / 100 / 365 days plus a configurable
+  `streak_goal` (default 7) congratulated on exact equality
+  (`main.lua:238-251`, `streak_calculator.lua:216`). Kodashboard's
+  "milestones timeline" is just three fixed points (first open, first
+  annotation, last open; `app.js:2160-2230`) — thinner than the §5.3
+  summary implied, not a rich ladder.
+- **Idle cap.** readingstreak clamps inter-page-turn gaps to
+  `MAX_TRACKED_INTERVAL = 45 min` before summing its own live duration
+  (`daily_progress.lua:8,67`), mirroring KOReader's idle timeout. A
+  reference constant if Colophon ever computes duration from raw gaps rather
+  than trusting `page_stat.duration`.
+- **Same-title dedup tiebreak.** Kodashboard ranks duplicate display records
+  by `last_open`, then a quality score (`md5 +20, cover +12, known-author
+  +10, pages +8, percent +6, highlights +4`; `app.js:945-967`). Colophon's
+  same-title grouping (§6) could borrow this ordering to pick which file's
+  metadata to show.
+
 ## 6. Conventions Colophon adopts (converged across tools)
 
 | Concern | Convention | Source |
@@ -402,6 +629,62 @@ no live sample copied yet (Kindle wasn't mounted this pass; grab
 - `summary.status` is also the only source of a user-declared
   "finished" state anywhere in KOReader; the stats DB has none.
 
+### 7.1 Annotation placement — the parked "activity-strip markers" question, answered
+
+The Phase 3 item "annotation markers on the activity strip (needs
+sidecars)" has a clear answer, converged across three tools:
+
+- **Annotations suffer the same pagination drift as page stats, and take
+  the same fix.** An annotation's `pageno` becomes wrong after a reflow, so
+  KOReader (and KoInsight, mirroring it) stamps `total_pages` onto the
+  annotation at creation time; placing a marker means rescaling its page
+  onto the current axis exactly like the `page_stat` view rescales dwell,
+  **not** using the raw `pageno` (KoInsight
+  `plugins/koinsight.koplugin/annotation_reader.lua:93-105`; falls back to
+  `doc_pages` when absent). So Colophon's activity strip already has the
+  machinery — its per-page interval rescale — and annotation markers reuse
+  it; naive `pageno` positioning would misplace them on any reflowed book.
+- **Three-way type classification, agreed by all three sidecar readers.**
+  bookmark = no `drawer` field; highlight = has `drawer`/`text`; note = has
+  a `note` field. Render precedence: Note if `note` present, else Highlight
+  if `text` present, else Bookmark (KoShelf
+  `src/shelf/library/page_activity.rs:131-137`,
+  `models/koreader_metadata.rs:89-101`; KoInsight
+  `annotations-repository.ts:206-213`; Kodashboard `dataloader.lua:399-409`).
+- **`percent_finished` is an authoritative completion fraction** KOReader
+  writes to the sidecar directly, independent of Colophon's interval-union
+  detection — a cross-check, and a finished-state signal for books the
+  heuristic is unsure about.
+
+### 7.2 Sidecar parsing hardening (when Colophon takes the `mlua` dep)
+
+KoShelf's parser is the reference for doing this safely:
+
+- Sandbox: `Lua::new_with(StdLib::NONE, ...)` (no `os`/`io`/`require`, so a
+  malicious sidecar can't escape) plus `.set_mode(ChunkMode::Text)` to
+  refuse precompiled bytecode (`src/source/koreader/lua_parser.rs:25,50`).
+- **UTF-8-lossy fallback**: KOReader can truncate highlight text mid
+  multibyte character; on `from_utf8` failure fall back to
+  `from_utf8_lossy` rather than dropping the whole file
+  (`lua_parser.rs:36-45`).
+- Flags like hyphenation/font are stored inconsistently as bool-or-0/1-int;
+  coerce both (`lua_parser.rs:277-321`).
+- **Hidden flows** ("handmade flows": user-marked appendices/front matter
+  KOReader excludes from progress): compute the hidden page ranges from
+  `handmade_flow_points` and subtract them from the page count *before*
+  completion detection, or completion % is understated and the 78% gate is
+  unreachable (KoShelf `models/koreader_metadata.rs:34-66`,
+  `types.rs:167-187`). Sidecar-gated, but necessary for correct completion
+  on any book with a hidden appendix.
+- **Fuzzy sidecar↔DB matching**, when the md5 join fails: first sanitize
+  the KOReader title (normalize CJK full-width punctuation to ASCII, strip
+  z-library / `1lib.sk` noise tokens and `(…)`/`[…]` parentheticals, smart
+  quotes, dashes — Kodashboard `dataloader.lua:59-90`), then a weighted
+  scorer (title exact +100 / substring +60, author exact +30, pages +20;
+  md5 short-circuits to 999) with an **accept gate of score ≥ 40**
+  (`dataloader.lua:92-131,591`). The join key when md5 *is* present is the
+  sidecar's `partial_md5_checksum`.
+
 ## 8. What's genuinely underexplored (Colophon's opening)
 
 Across KOReader's UI and all four tools, nobody ships:
@@ -426,13 +709,52 @@ Also worth stealing but not novel: KoShelf's completion detection and
 per-page activity grid, KoInsight's interval-union progress, the standard
 streak/calendar-heatmap set.
 
+### 8.1 Tome-sourced steal-list (2026-07-05, full detail in §5.5)
+
+Ranked by value, tagged by data feasibility. The first bucket needs only
+`statistics.sqlite3`, which Colophon already reads, so it is directly
+actionable:
+
+1. **Author affinity** (time + finished per author) — a dimension the
+   widget list omits; `book.authors` is already loaded. Cheapest win.
+2. **Personal records** (longest session, biggest day, most pages/day) —
+   max over structures Colophon already builds. High delight per line.
+3. **Per-book finish estimate + reading momentum** (7d-vs-prior-7d
+   trend, days-to-finish with confidence) — extends the velocity work.
+4. **Completion / abandonment rate**: started→finished %, using
+   Colophon's existing completion heuristic for "finished".
+5. **Year-in-review card**, **period-over-period % delta**, **forgotten
+   books (reading, untouched 30+ days)**: all trivial re-aggregations.
+
+Bigger, off-contract: a **word-count axis** (words-read, true WPM,
+book-length distribution, and it unlocks two more Reading-DNA traits) is
+the single largest capability gap, but it needs the EPUB files and a word
+counter, which Colophon's stats-DB-only pipeline does not touch today. A
+deliberate scope call, not a slip-in (see §5.5). Borrow the **HHI
+diversity index** for a Variety trait regardless (author half is
+stats-DB-feasible). **Reading goals** are available from the stats DB but
+were deliberately declined; re-raise only on request. Genre/language/TBR
+metrics and the ratings block stay blocked on catalogue metadata and
+`.sdr` sidecars respectively.
+
 ## 9. Status for `spec.md` / `roadmap.md`
 
 - Schema (§1), granularity/font-size handling (§1), KOReader's own UI
-  (§4), the four tools' catalogues (§5), and the `.sdr` structure (§7) are
-  all answered. Phase 0's research goals are met.
+  (§4), the tools' catalogues (§5, now five tools including Tome in §5.5),
+  and the `.sdr` structure (§7) are all answered. Phase 0's research goals
+  are met.
 - `spec.md`'s widget list is now locked against §4.3/§6/§8 (done in the
   same pass as this update).
+- **2026-07-05 additions:** Tome (`bndct-devops/tome`) read and dossiered
+  (§5.5) with a ranked steal-list (§8.1); the original four re-swept for
+  residual value (§5.6); the parked Phase 3 "annotation markers on the
+  activity strip" question answered (§7.1 — reuse the existing page rescale,
+  three-way type classification). The five reference clones under
+  `~/.gitrepos/.studyrepos/` were **deleted after this pass**; everything of
+  value is captured here, and each is re-clonable from its upstream if
+  needed (KoInsight `GeorgeSG/KoInsight`, KoShelf `paviro/KoShelf`,
+  Kodashboard `Yuchen971/Kodashboard`, readingstreak `advokatb/…`, Tome
+  `bndct-devops/tome`).
 - Remaining loose ends, none blocking: copy one real `.sdr` sample when
   the Kindle is next mounted; multi-device merge stays out of scope until
   a second device exists (KoInsight's 4-tuple upsert is the reference if

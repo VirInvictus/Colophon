@@ -3,3 +3,8 @@
 *.sqlite3
 *.sqlite3-*
 gschemas.compiled
+
+# Real reading data copied off the device: never commit (real titles,
+# authors, highlight text). The .sqlite3 globs above already catch the DBs;
+# this also covers .sdr sidecar samples (metadata.*.lua).
+/research/samples/
