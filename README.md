@@ -10,10 +10,9 @@ statistics database and turns it into a wide set of attractive, varied
 graphs and widgets. No server, no account, no cloud, and it never touches
 the live file on your device.
 
-**Status:** v0.19.0, feature-complete and approaching 1.0. Ingestion, the
-app shell, the full widget catalogue, per-book sidecar reconciliation, eight
-themes, and Meson + Flatpak packaging are all shipped. See `roadmap.md` for
-what is deferred to post-1.0.
+**Status:** v1.0.0. Ingestion, the app shell, the full widget catalogue,
+per-book sidecar reconciliation, eight themes, and Meson + Flatpak packaging
+are all shipped. See `roadmap.md` for what is deferred to post-1.0.
 
 ## What you get
 

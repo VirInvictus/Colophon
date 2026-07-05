@@ -1,5 +1,39 @@
 # Patchnotes
 
+## v1.0.0 — 2026-07-05
+
+Colophon is 1.0.
+
+Nothing new ships in this release; everything already does. This is the
+version that says the app is complete against what it set out to be. KOReader
+quietly keeps a detailed record of how you read, and every existing way to
+look at it was a web dashboard or a self-hosted service. Colophon is a
+desktop app that reads a copy of that record, never touches your device, and
+as of 1.0 it does the whole job.
+
+What that job turned out to be:
+
+- **A library** you import from a copy of your statistics database, junk
+  reads filtered, two files of one book grouped without being merged.
+- **An overview dashboard**: windowed totals with a trend against the
+  previous equal window, streaks, a year heatmap and a when-do-I-read grid,
+  reading-speed trends, session analytics, weekday and monthly bars, series
+  and author rollups, a finished-books timeline, a reading-personality card,
+  records, a recap, and a set-aside rail.
+- **Per-book detail**: an honest positional progress bar, stat cards that
+  reproduce KOReader's own math so the numbers match your device, a finish
+  estimate with a confidence and a recent-pace momentum read, a per-page
+  activity strip, and inferred read-throughs.
+- **Sidecars you provide yourself**: hand Colophon a book's `.sdr` file and
+  it takes the device's finished verdict as authoritative and marks your
+  highlights where they fall in the book. It never reaches into your device
+  for them.
+- **Eight themes**, hand-drawn cairo charts, and a Meson plus Flatpak build.
+
+Everything past here is post-1.0 and optional. The big one is a word-count
+axis, which would mean reading your library files and is a deliberate scope
+decision rather than a slip-in; the rest is on the roadmap. 98 tests.
+
 ## v0.19.0 — 2026-07-05
 
 Your highlights, where they fall in the book.

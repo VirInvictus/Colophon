@@ -13,59 +13,46 @@ it exists: every KOReader stats tool Brandon has found is a web dashboard or
 a self-hosted Docker instance, and he doesn't want that. See `README.md` and
 `spec.md`.
 
-## Where this stands right now (2026-07-03, v0.5.0)
+## Where this stands right now (2026-07-05, v1.0.0)
 
-Phases 0, 1, and 2 are complete and Phase 3 is underway (all on
-2026-07-03; scaffolding was Sonnet's, everything since is Fable's).
+**Shipped 1.0.** Phases 0 through 4.6 are all complete; the spec is fully
+built. Scaffolding was Sonnet's, everything since is Fable's. Phase 5 is the
+post-1.0 candidate list, and each item needs its own go/no-go; the big open
+one is a word-count axis, which is off the stats-DB-only contract because it
+means reading the library EPUB files. Don't start any of it without a
+decision.
 
-- **Phase 0 (research) is done.** `RESEARCH.md` is the canonical record:
-  confirmed schema (§1), KOReader's own built-in stats UI surveyed from
-  the plugin source (§4), all four third-party tools read in depth (§5),
-  the converged conventions Colophon adopts (§6), the `.sdr` sidecar
-  format (§7), and the underexplored territory that justifies the project
-  (§8). `spec.md` is locked: normative derived-metric definitions plus a
-  three-tier widget catalogue.
-- **Phase 1 (ingestion core) is done.** `colophon-core` has the typed
-  read-only query layer (md5-merged books, raw events, the rescaled
-  `page_stat` view, WAL-safe `snapshot()`) and pure derived-metric
-  functions (sessions, daily totals, streaks, interval-union coverage,
-  capped/uncapped totals, speed series, completion detection). 42 tests;
-  fixtures are built programmatically from verbatim KOReader DDL, plus a
-  live-sample test that skips when the gitignored Kindle copy is absent.
-- **Phase 2 (app shell) is done.** `colophon` is a real
-  NavigationSplitView app (Viaduct-style composite templates, GSettings,
-  `gio::spawn_blocking` for db work, no tokio): staged always-snapshot
-  import flow, refresh from the remembered source, schema-version banner,
-  library list (interval-union unique pages, relative dates), persisted
-  junk filter, same-title grouping, Kanagawa Dragon theming with a live
-  dark/light provider swap. The Dragon palette is exported from
-  `colophon/src/theme.rs::palette` for Phase 3 chart ramps.
-- Real sample databases from Brandon's own Kindle live at
-  `research/samples/` (**gitignored, never commit them**); the on-device
-  plugin Lua source is checked into `research/koreader-plugin-src/`.
+Architecture worth knowing before you touch code:
 
-- **Phase 3 (widget variety) is underway.** The charting decision is
-  settled: custom cairo on `GtkDrawingArea` (`colophon/src/charts/`:
-  year heatmap, 7×24 hour heatmap, bar chart, line chart, page-activity
-  strip on shared ramp/quantizer/tooltip scaffolding), no charting
-  crate. The sidebar has an "All Books" entry (tiles, streaks, year
-  heatmap, when-do-I-read, speed trend, session histogram, weekday and
-  monthly bars) and clicking a book shows device-parity stat cards, the
-  per-page activity strip, and read-through cards. Aggregates live in
-  `colophon/src/stats.rs` (pure, tested); both surfaces respect the junk
-  filter, and the overview has a 30/90/365/all-time window selector
-  (behaviour charts windowed; streaks/year-heatmap/monthly stay
-  whole-history on purpose). The book page overlays its speed trend on
-  the muted library baseline. Still open in Phase 3: annotation markers
-  on the activity strip (needs sidecars) and the overview completions
-  timeline (parked until the data contains finished books). Ask before
-  adding any dependency. Every widget's metric must be defined in
-  `spec.md` first.
+- **`colophon-core`** is the read-only ingestion + pure derived-metric layer:
+  the typed query layer over the confirmed KOReader schema (md5-merged books,
+  raw events, the rescaled `page_stat` view consumed as a per-page `GROUP BY`
+  reduction rather than fanned-out rows), WAL-safe `snapshot()` (the source
+  db is never opened in place), the metric functions (sessions, daily totals,
+  streaks, interval-union coverage, capped/uncapped totals, speed series,
+  completion detection), and `sidecar` (sandboxed `mlua`, `StdLib::NONE`,
+  joining `partial_md5_checksum` → `book.md5`).
+- **`colophon`** is the GTK4/libadwaita app: a NavigationSplitView
+  (Viaduct-style composite templates, GSettings, `gio::spawn_blocking` for db
+  work, no tokio). Sidebar "All Books" overview + per-book detail, both
+  respecting the junk filter. Overview aggregates live in `src/stats.rs`
+  (pure, tested), split into `OverviewBase` (window-independent, cached) and
+  the windowed charts so a window toggle stays cheap. Charts are custom cairo
+  on `GtkDrawingArea` (`src/charts/`), no charting crate. Eight themes drive
+  both the generated adwaita CSS and the chart colours from one `Theme`.
+- **Packaging**: Meson wrapper + `.desktop` + AppStream metainfo + Flatpak
+  (`org.virinvictus.Colophon.json`, GNOME 49, `--filesystem=host:ro`).
 
-Small outstanding research nicety (not blocking): copy one real `.sdr`
-sidecar (`<book>.sdr/metadata.epub.lua` for a highlighted book) into
-`research/samples/` next time the Kindle is SSHFS-mounted at
-`/mnt/Kindle`.
+Standing rules that still bind post-1.0: every new widget's metric lands in
+`spec.md` first; ask before adding any dependency; Colophon never reads the
+device, so any stat needing a user-provided file stays hidden until they add
+it.
+
+Real sample databases and `.sdr` sidecars from Brandon's own Kindle live at
+`research/samples/` (**gitignored, never commit them**); the on-device plugin
+Lua source is checked into `research/koreader-plugin-src/`. Standing errand:
+re-import `statistics.sqlite3` after finishing each book so the completions
+timeline and estimate-accuracy data grow richer over time.
 
 ## Spec discipline
 

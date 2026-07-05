@@ -32,6 +32,11 @@
   </developer>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="1.0.0" date="2026-07-05">
+      <description>
+        <p>First stable release. The full widget catalogue, per-book sidecar reconciliation, eight themes, and Meson and Flatpak packaging are all shipped.</p>
+      </description>
+    </release>
     <release version="0.10.0" date="2026-07-05" />
     <release version="0.9.0" date="2026-07-05" />
     <release version="0.8.0" date="2026-07-05" />

@@ -233,7 +233,8 @@ Tier B widgets (expected furniture, done correctly):
       install` to a temp prefix lays the tree out correctly, and
       `desktop-file-validate` + `appstreamcli validate` pass. The installed
       icon is still the placeholder `logo.svg` pending the icon pass.
-- [ ] `VERSION` → `1.0.0` (deferred behind the expansion below).
+- [x] `VERSION` → `1.0.0` (2026-07-05). Phases 4.5 and 4.6 all shipped, so
+      the milestone is earned; the spec is fully built.
 
 ## Phase 4.5 — Make it a joy (Brandon's expansion, 2026-07-05)
 
