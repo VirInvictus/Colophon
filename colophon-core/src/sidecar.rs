@@ -41,6 +41,26 @@ impl ReadStatus {
     }
 }
 
+/// KOReader's three annotation kinds, from `getBookmarkType`: a bookmark has
+/// no drawer, a note carries a `note`, otherwise it is a highlight
+/// (RESEARCH.md §7.1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnnotationKind {
+    Bookmark,
+    Highlight,
+    Note,
+}
+
+/// One annotation, reduced to what a position marker needs: its kind and its
+/// fractional position through the book (rescaled off the sidecar's own page
+/// count, so it lands correctly on whatever the current pagination is).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Annotation {
+    pub kind: AnnotationKind,
+    /// Position in `[0, 1]` through the book.
+    pub position: f64,
+}
+
 /// The fields Colophon reads from a sidecar. All optional: sidecars vary by
 /// KOReader version and document type.
 #[derive(Debug, Clone, PartialEq)]
@@ -51,6 +71,8 @@ pub struct SidecarMeta {
     pub percent_finished: Option<f64>,
     /// The user-declared status, if any.
     pub status: Option<ReadStatus>,
+    /// Highlights, notes, and bookmarks as position markers.
+    pub annotations: Vec<Annotation>,
 }
 
 /// Parses a sidecar from raw bytes (a Lua `return { ... }` chunk).
@@ -74,11 +96,43 @@ fn eval_sidecar(text: &str) -> mlua::Result<SidecarMeta> {
             .map(|s| ReadStatus::parse(&s)),
         None => None,
     };
+    // Annotations carry a per-book page count that may differ from the
+    // current pagination, so rescale each to a fraction of the book.
+    let doc_pages = table.get::<Option<i64>>("doc_pages")?.filter(|&p| p > 0);
+    let annotations = match (doc_pages, table.get::<Option<Table>>("annotations")?) {
+        (Some(pages), Some(arr)) => parse_annotations(arr, pages)?,
+        _ => Vec::new(),
+    };
     Ok(SidecarMeta {
         partial_md5,
         percent_finished,
         status,
+        annotations,
     })
+}
+
+fn parse_annotations(arr: Table, doc_pages: i64) -> mlua::Result<Vec<Annotation>> {
+    let mut out = Vec::new();
+    for item in arr.sequence_values::<Table>() {
+        let a = item?;
+        let Some(pageno) = a.get::<Option<i64>>("pageno")? else {
+            continue;
+        };
+        let note = a.get::<Option<String>>("note")?;
+        let text = a.get::<Option<String>>("text")?;
+        let drawer = a.get::<Option<String>>("drawer")?;
+        // getBookmarkType precedence: note wins, then highlight, else bookmark.
+        let kind = if note.is_some_and(|n| !n.is_empty()) {
+            AnnotationKind::Note
+        } else if drawer.is_some() || text.is_some_and(|t| !t.is_empty()) {
+            AnnotationKind::Highlight
+        } else {
+            AnnotationKind::Bookmark
+        };
+        let position = (pageno as f64 / doc_pages as f64).clamp(0.0, 1.0);
+        out.push(Annotation { kind, position });
+    }
+    Ok(out)
 }
 
 /// Parses a single `<book>.sdr/metadata.*.lua` file.
@@ -147,6 +201,27 @@ mod tests {
         assert_eq!(meta.percent_finished, Some(1.0));
         assert_eq!(meta.status, Some(ReadStatus::Complete));
         assert!(meta.status.unwrap().is_finished());
+    }
+
+    #[test]
+    fn parses_and_classifies_annotations() {
+        let chunk = br#"
+            return {
+                ["doc_pages"] = 100,
+                ["annotations"] = {
+                    { ["pageno"] = 50, ["drawer"] = "lighten", ["text"] = "a line" },
+                    { ["pageno"] = 80, ["text"] = "another", ["note"] = "my note" },
+                    { ["pageno"] = 10 },
+                },
+            }
+        "#;
+        let meta = parse_sidecar_bytes(chunk).unwrap();
+        assert_eq!(meta.annotations.len(), 3);
+        // Highlight at 50%, note at 80%, bookmark at 10%.
+        assert_eq!(meta.annotations[0].kind, AnnotationKind::Highlight);
+        assert!((meta.annotations[0].position - 0.5).abs() < 1e-9);
+        assert_eq!(meta.annotations[1].kind, AnnotationKind::Note);
+        assert_eq!(meta.annotations[2].kind, AnnotationKind::Bookmark);
     }
 
     #[test]

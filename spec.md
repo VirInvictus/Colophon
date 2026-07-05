@@ -119,6 +119,13 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
   a book finished off the device and known only from its sidecar still gets
   placed. Files of one work collapse to the most recent finish; ordered
   most-recent first. Whole-history.
+- **Annotation markers**: highlights, notes, and bookmarks from a provided
+  `.sdr` sidecar, placed on the per-book activity strip at each annotation's
+  fractional position through the book (its `pageno` over the sidecar's own
+  page count, so a marker lands correctly under any current pagination, the
+  same rescale idea as `page_stat`). Kind by KOReader's rule: a bookmark has
+  no drawer, a note carries a `note`, otherwise a highlight. Absent a
+  sidecar for the book, no markers.
 - **Book identity**: `book.md5`. Rows sharing an md5 (metadata edits) are
   merged at ingest. Same-title/author books with different md5s (two
   files of the same work, confirmed in the sample data) are *grouped for
@@ -213,7 +220,7 @@ Nothing below exists in KOReader or any of the four tools.
    read. Answers "did it drag in the middle".
 5. **Per-page activity strip.** KoShelf's per-page grid done natively:
    per-page total duration (sqrt scale, 90th-percentile cap) and read
-   count; annotation *count* markers when sidecar data is absent.
+   count, with annotation position markers drawn from a provided sidecar.
 6. **Completions timeline.** Inferred read-throughs plotted on a timeline;
    books-finished-per-year/month rollups; per-completion cards (dates,
    calendar span, time, sessions, pages/hour).

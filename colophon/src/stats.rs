@@ -1156,6 +1156,7 @@ mod tests {
             view_pages: 50,
             last_page: 50,
             declared_status: None,
+            annotations: Vec::new(),
         })
     }
 
@@ -1752,6 +1753,7 @@ mod tests {
             unique_pages: 0,
             book: entry(Vec::new()).book.clone(),
             declared_status: None,
+            annotations: Vec::new(),
         });
         let d = book_detail(&e, &Utc, date("2026-07-03"));
         assert_eq!(d.days_reading, 0);

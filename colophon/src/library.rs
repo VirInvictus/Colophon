@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use colophon_core::sidecar::ReadStatus;
+use colophon_core::sidecar::{Annotation, ReadStatus};
 use colophon_core::{Book, PageEvent, PageTotal, metrics};
 
 use crate::stats::FINISHED_THRESHOLD;
@@ -32,9 +32,11 @@ pub struct LibraryEntry {
     pub capped_secs: i64,
     pub view_pages: i64,
     pub last_page: i64,
-    /// User-declared status from the book's `.sdr` sidecar, when a library
-    /// folder is configured and the sidecar was found; `None` otherwise.
+    /// User-declared status from the book's `.sdr` sidecar, when the user has
+    /// provided one for this book; `None` otherwise.
     pub declared_status: Option<ReadStatus>,
+    /// Annotation position markers from the same sidecar (empty without one).
+    pub annotations: Vec<Annotation>,
 }
 
 impl LibraryEntry {
@@ -143,6 +145,7 @@ mod tests {
             view_pages: 0,
             last_page: 0,
             declared_status: None,
+            annotations: Vec::new(),
         })
     }
 

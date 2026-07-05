@@ -155,13 +155,14 @@ Tier A widgets (the differentiators; nobody ships these):
       cap (KoShelf's numbers), pixel binning for long books, per-range
       tooltips. This is also the "did it drag in the middle" velocity
       view (Tier A #4's page axis).
-      - [ ] Annotation count markers. **Unblocked 2026-07-05** (sidecar
-            sample in hand). Approach settled in `RESEARCH.md` §7.1:
-            annotations live in the `.sdr` sidecar and drift with pagination
-            exactly like page stats, so markers reuse the strip's existing
-            page-interval rescale (never the raw `pageno`); three-way
-            bookmark/highlight/note classification. Rides on the §7.2 /
-            Phase 4.5 sidecar-parsing work.
+      - [x] Annotation markers (v0.19.0). Highlights/notes/bookmarks from a
+            provided `.sdr` sidecar, drawn on the activity strip at each
+            annotation's fractional position through the book (its `pageno`
+            over the sidecar's own page count, rescaled onto the current
+            axis, never raw `pageno`; RESEARCH §7.1). Three-way
+            bookmark/highlight/note classification in the parser; highlights
+            and notes accent-coloured, bookmarks muted. Books without a
+            provided sidecar show none. `colophon-core::sidecar::Annotation`.
 - [x] Book velocity, remaining piece (v0.5.0): read-through cards now
       carry pages/day over the calendar span (the page axis was already
       covered by the activity strip).

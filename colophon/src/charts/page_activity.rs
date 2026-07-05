@@ -10,6 +10,8 @@ use adw::subclass::prelude::*;
 use gtk::glib;
 use gtk::prelude::*;
 
+use colophon_core::sidecar::AnnotationKind;
+
 use crate::fmt::humanize_secs;
 use crate::stats::PageActivity;
 
@@ -22,6 +24,8 @@ mod imp {
     #[derive(Default)]
     pub struct PageActivityStrip {
         pub data: RefCell<Option<PageActivity>>,
+        /// Annotation markers: fractional position through the book + kind.
+        pub markers: RefCell<Vec<(f64, AnnotationKind)>>,
     }
 
     #[glib::object_subclass]
@@ -87,6 +91,13 @@ impl PageActivityStrip {
         self.queue_draw();
     }
 
+    /// Annotation markers, as fractional positions through the book and their
+    /// kind. Empty for a book with no sidecar provided.
+    pub fn set_markers(&self, markers: Vec<(f64, AnnotationKind)>) {
+        self.imp().markers.replace(markers);
+        self.queue_draw();
+    }
+
     fn draw(&self, cr: &gtk::cairo::Context, w: i32, h: i32) {
         let data = self.imp().data.borrow();
         let Some(data) = data.as_ref() else { return };
@@ -129,6 +140,24 @@ impl PageActivityStrip {
             );
         }
         let _ = cr.fill();
+
+        // Annotation markers as small triangles below the baseline (so they
+        // never fight the bars): highlights and notes in accent, bookmarks
+        // muted. Positions are fractions of the book, already rescaled off the
+        // sidecar's own page count, so they land on the current axis.
+        for &(pos, kind) in self.imp().markers.borrow().iter() {
+            let x = pos.clamp(0.0, 1.0) * w;
+            let color = match kind {
+                AnnotationKind::Bookmark => super::muted(dark),
+                _ => super::accent(dark),
+            };
+            super::set_source(cr, color);
+            cr.move_to(x, baseline + 2.5);
+            cr.line_to(x - 3.0, baseline + 8.0);
+            cr.line_to(x + 3.0, baseline + 8.0);
+            cr.close_path();
+            let _ = cr.fill();
+        }
 
         super::draw_text(cr, 0.0, h - 3.0, 10.0, super::muted(dark), "p. 1");
         let label = format!("p. {}", data.pages);

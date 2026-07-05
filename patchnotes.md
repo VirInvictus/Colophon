@@ -1,5 +1,22 @@
 # Patchnotes
 
+## v0.19.0 — 2026-07-05
+
+Your highlights, where they fall in the book.
+
+When you provide a book's `.sdr` sidecar (the same file that carries its
+finished status), the book page's activity strip now marks where your
+annotations sit: highlights and notes in the accent colour, bookmarks
+muted, each placed at its true position through the book. KOReader records
+an annotation against the page count it had at the time, so Colophon
+rescales every marker onto the current pagination, the same trick it uses
+for reading position, and a marker lands in the right place even if you have
+since changed the font size.
+
+This completes the sidecar picture: hand Colophon a book's sidecar and it
+reads both the device's finished verdict and the shape of your reading in
+the margins. Books without a sidecar simply show no markers. 98 tests.
+
 ## v0.18.0 — 2026-07-05
 
 The books you have finished, on a timeline.

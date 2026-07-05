@@ -62,6 +62,7 @@ pub fn load_snapshot(path: &Path, sidecar_dir: Option<&Path>) -> Result<LibraryS
             last_page,
             book,
             declared_status: None,
+            annotations: Vec::new(),
         });
     }
     // Reconcile the inferred "finished" against the device's own declared
@@ -77,6 +78,7 @@ pub fn load_snapshot(path: &Path, sidecar_dir: Option<&Path>) -> Result<LibraryS
                     && let Ok(meta) = colophon_core::sidecar::parse_sidecar_file(&path)
                 {
                     entry.declared_status = meta.status;
+                    entry.annotations = meta.annotations;
                 }
             }
         }
@@ -207,16 +209,23 @@ mod tests {
         .unwrap();
 
         let snap = load_snapshot(&canonical, Some(&cache)).unwrap();
-        assert!(
-            snap.entries.iter().any(|e| e
-                .book
-                .md5
-                .as_deref()
-                .is_some_and(|m| m.eq_ignore_ascii_case(&md5))
-                && e.declared_status == Some(colophon_core::sidecar::ReadStatus::Complete)
-                && e.is_finished()),
-            "the book matching the sidecar md5 should read declared-complete"
+        let matched = snap
+            .entries
+            .iter()
+            .find(|e| {
+                e.book
+                    .md5
+                    .as_deref()
+                    .is_some_and(|m| m.eq_ignore_ascii_case(&md5))
+            })
+            .expect("a book matches the sidecar md5");
+        assert_eq!(
+            matched.declared_status,
+            Some(colophon_core::sidecar::ReadStatus::Complete)
         );
+        assert!(matched.is_finished());
+        // Royal Assassin's sidecar carries its highlight; markers flow too.
+        assert!(!matched.annotations.is_empty());
 
         std::fs::remove_dir_all(&root).ok();
     }

@@ -231,6 +231,13 @@ impl BookPage {
         }
 
         imp.activity_strip.set_data(stats::page_activity(entry));
+        imp.activity_strip.set_markers(
+            entry
+                .annotations
+                .iter()
+                .map(|a| (a.position, a.kind))
+                .collect(),
+        );
 
         let completions = stats::book_completions(entry);
         let has_completions = !completions.is_empty();
