@@ -212,7 +212,39 @@ Tier B widgets (expected furniture, done correctly):
       install` to a temp prefix lays the tree out correctly, and
       `desktop-file-validate` + `appstreamcli validate` pass. The installed
       icon is still the placeholder `logo.svg` pending the icon pass.
-- [ ] `VERSION` → `1.0.0`.
+- [ ] `VERSION` → `1.0.0` (deferred behind the expansion below).
+
+## Phase 4.5 — Make it a joy (Brandon's expansion, 2026-07-05)
+
+Colophon reframed from "ship the spec" to "a cool, useful, evolving
+reading-stats companion." Four features greenlit, sequenced; every new
+widget's metric still lands in `spec.md` first. 1.0 waits until these are
+in.
+
+- [x] **Honest per-book progress** (v0.7.0). The progress bar was
+      interval-union coverage shown as a left-anchored fraction, so a book
+      read partly outside KOReader (Brandon's own case: jailbroke a Kindle
+      mid-read, KOReader logged only ~29 %→100 %) looked half-done though
+      it was finished. Now a positional span bar (`charts/span_bar.rs`,
+      `stats::progress`, core `coverage_spans` + `furthest_position`) draws
+      where reading was logged with a furthest-position marker, plus a
+      Finished marker at furthest ≥ 0.98. The `.sdr` declared-finished flag
+      will override the inference once sidecars are in scope.
+- [x] **Themes** (v0.8.0). Eight palettes (Kanagawa Dragon/Wave/Lotus,
+      Gruvbox Dark/Light, Nord, Rosé Pine, Solarized Light) plus a
+      Follow-system mode. One `Theme` drives both the generated adwaita CSS
+      and the chart colours; a Preferences dialog (Ctrl+comma) switches
+      live. The two static CSS sheets are gone; new GSettings `theme` key.
+- [ ] **Mine today's data for new cards.** Series aggregation (the `series`
+      field), language breakdown, re-read detection, and a reader-profile
+      (night-owl/binger from the hourly + session data). No new deps.
+- [ ] **Completions / year timeline.** Books-per-month/year and a
+      completions timeline, unblocked now the data contains a finished book;
+      grows as Brandon re-imports after finishing each book.
+- [ ] **`.sdr` finished-flag reconciliation.** Parse the sidecar's declared
+      `summary.status` + `percent_finished` to make "finished" authoritative
+      and cross-check inferred completions. Gated on a real sidecar sample
+      (next Kindle mount) and an `mlua`-vs-stdlib dependency decision.
 
 ## Phase 5 — Post-1.0 candidates (each needs its own go/no-go)
 

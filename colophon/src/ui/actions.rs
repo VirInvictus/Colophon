@@ -25,6 +25,9 @@ where
 pub fn install_window_actions(window: &ColophonWindow) {
     register(window, "import", ColophonWindow::act_import);
     register(window, "refresh", ColophonWindow::act_refresh);
+    register(window, "preferences", |window| {
+        crate::ui::preferences::present(window)
+    });
 
     // Junk filter: GSettings-backed when the schema is installed (persists
     // and stays in sync), a plain stateful action otherwise (defaults on,
@@ -87,5 +90,6 @@ pub fn install_app_actions(app: &adw::Application) {
 
     app.set_accels_for_action("win.import", &["<Ctrl>o"]);
     app.set_accels_for_action("win.refresh", &["<Ctrl>r", "F5"]);
+    app.set_accels_for_action("win.preferences", &["<Ctrl>comma"]);
     app.set_accels_for_action("app.quit", &["<Ctrl>q"]);
 }

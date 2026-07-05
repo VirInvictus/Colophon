@@ -1,5 +1,24 @@
 # Patchnotes
 
+## v0.8.0 — 2026-07-05
+
+Themes.
+
+Colophon was Kanagawa Dragon only (with a plain accent-on-Adwaita light
+mode). It now ships eight palettes: Kanagawa Dragon, Kanagawa Wave,
+Kanagawa Lotus, Gruvbox Dark, Gruvbox Light, Nord, Rosé Pine, and
+Solarized Light, plus a Follow-system mode that tracks the desktop
+light/dark preference (Dragon when dark, Lotus when light).
+
+Pick one in the new Preferences dialog (Ctrl+comma). A single theme
+definition drives both the libadwaita colours and the chart palette, so
+the whole window and every graph reflow together, live, the moment you
+switch.
+
+Under the hood the two static CSS sheets are gone: the stylesheet is
+generated from the active theme, and the cairo charts read it at draw
+time. New GSettings key `theme`. 77 tests.
+
 ## v0.7.0 — 2026-07-05
 
 Honest per-book progress.

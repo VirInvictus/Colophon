@@ -9,6 +9,12 @@
     </section>
     <section>
       <item>
+        <attribute name="label">Preferences</attribute>
+        <attribute name="action">win.preferences</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
         <attribute name="label">About Colophon</attribute>
         <attribute name="action">app.about</attribute>
       </item>

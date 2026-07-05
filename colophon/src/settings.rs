@@ -10,6 +10,7 @@ use gtk::prelude::*;
 
 pub const KEY_JUNK_FILTER: &str = "junk-filter";
 pub const KEY_SOURCE_PATH: &str = "source-path";
+pub const KEY_THEME: &str = "theme";
 pub const KEY_WINDOW_WIDTH: &str = "window-width";
 pub const KEY_WINDOW_HEIGHT: &str = "window-height";
 pub const KEY_WINDOW_MAXIMIZED: &str = "window-maximized";
@@ -39,4 +40,12 @@ pub fn settings() -> Option<gio::Settings> {
 pub fn source_path() -> Option<std::path::PathBuf> {
     let raw = settings()?.string(KEY_SOURCE_PATH);
     (!raw.is_empty()).then(|| std::path::PathBuf::from(raw.as_str()))
+}
+
+/// The saved theme selection, or "system" when unset or schema-less.
+pub fn theme() -> String {
+    settings()
+        .map(|s| s.string(KEY_THEME).to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| crate::theme::SYSTEM_ID.to_string())
 }

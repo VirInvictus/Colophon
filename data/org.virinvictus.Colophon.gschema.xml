@@ -11,6 +11,11 @@
       <summary>Last import source</summary>
       <description>The file the current statistics snapshot was imported from; used by Refresh.</description>
     </key>
+    <key name="theme" type="s">
+      <default>'system'</default>
+      <summary>Colour theme</summary>
+      <description>The selected palette id, or 'system' to follow the desktop light/dark preference.</description>
+    </key>
     <key name="window-width" type="i">
       <default>1000</default>
     </key>

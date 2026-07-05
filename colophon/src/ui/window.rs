@@ -283,6 +283,17 @@ impl ColophonWindow {
             .set_visible_child_name(if has_books { "list" } else { "empty" });
     }
 
+    /// Persist and apply a theme selection, then redraw the visible page
+    /// so the cairo charts pick up the new palette (CSS-styled widgets
+    /// restyle themselves when the provider swaps).
+    pub fn apply_theme(&self, selection: &str) {
+        if let Some(s) = settings::settings() {
+            let _ = s.set_string(settings::KEY_THEME, selection);
+        }
+        crate::theme::set(selection);
+        self.refresh_content();
+    }
+
     fn junk_filter_on(&self) -> bool {
         self.lookup_action("junk-filter")
             .and_then(|a| a.state())

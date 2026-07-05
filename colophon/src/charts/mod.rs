@@ -21,48 +21,37 @@ pub use span_bar::SpanBar;
 use gtk::cairo;
 use gtk::gdk;
 
-use crate::theme::palette;
+use crate::theme;
 
-pub fn rgba(hex: &str) -> gdk::RGBA {
-    let parse = |i: usize| u8::from_str_radix(&hex[i..i + 2], 16).unwrap_or(0) as f32 / 255.0;
-    gdk::RGBA::new(parse(1), parse(3), parse(5), 1.0)
-}
+pub use theme::rgba;
 
 pub fn is_dark() -> bool {
     adw::StyleManager::default().is_dark()
 }
 
-pub fn accent(dark: bool) -> gdk::RGBA {
-    rgba(if dark { palette::BLUE2 } else { palette::BLUE })
+// The chart colours read the active theme (`theme::active`), so they
+// follow the selected palette. The `dark` argument is kept for call-site
+// symmetry with the older API but no longer branches; the active theme
+// already carries the right values for its polarity.
+pub fn accent(_dark: bool) -> gdk::RGBA {
+    rgba(theme::active().accent)
 }
 
-pub fn highlight(dark: bool) -> gdk::RGBA {
-    rgba(if dark {
-        palette::ORANGE
-    } else {
-        palette::ORANGE2
-    })
+pub fn highlight(_dark: bool) -> gdk::RGBA {
+    rgba(theme::active().secondary)
 }
 
-pub fn text(dark: bool) -> gdk::RGBA {
-    if dark {
-        rgba(palette::WHITE)
-    } else {
-        gdk::RGBA::new(0.2, 0.2, 0.2, 1.0)
-    }
+pub fn text(_dark: bool) -> gdk::RGBA {
+    rgba(theme::active().fg)
 }
 
-pub fn muted(dark: bool) -> gdk::RGBA {
-    rgba(if dark { palette::GRAY } else { palette::GRAY3 })
+pub fn muted(_dark: bool) -> gdk::RGBA {
+    rgba(theme::active().fg_dim)
 }
 
 /// Empty-cell color for heat grids.
-pub fn cell_bg(dark: bool) -> gdk::RGBA {
-    if dark {
-        rgba(palette::BLACK4)
-    } else {
-        gdk::RGBA::new(0.906, 0.906, 0.89, 1.0)
-    }
+pub fn cell_bg(_dark: bool) -> gdk::RGBA {
+    rgba(theme::active().grid)
 }
 
 /// Quantized heat ramp: level 0 is the empty cell, 1..=4 interpolate
