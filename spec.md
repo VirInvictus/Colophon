@@ -112,8 +112,13 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
   page in the first 20 % and one in the last 2 %; a jump back to the
   first 5 % starts a new progression only if the remainder would itself
   qualify. Yields start/end dates, time, sessions, pages/hour per
-  completion. (The `.sdr` `summary.status` field is the only user-declared
-  "finished" flag and is out of scope until sidecars are.)
+  completion.
+- **Finished-books timeline**: each finished work (per the reconciled
+  finished rule above) paired with a finish date: the end of its most recent
+  detected read-through when there is one, otherwise its last reading day, so
+  a book finished off the device and known only from its sidecar still gets
+  placed. Files of one work collapse to the most recent finish; ordered
+  most-recent first. Whole-history.
 - **Book identity**: `book.md5`. Rows sharing an md5 (metadata edits) are
   merged at ingest. Same-title/author books with different md5s (two
   files of the same work, confirmed in the sample data) are *grouped for

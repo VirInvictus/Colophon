@@ -1,5 +1,19 @@
 # Patchnotes
 
+## v0.18.0 — 2026-07-05
+
+The books you have finished, on a timeline.
+
+The overview gains a **Finished books** section: every book you have
+completed, most recent first, with the date you finished it and the time it
+took. The finish date is the end of the detected read-through when Colophon
+can see one; for a book you finished off the device (known only from its
+sidecar) it falls back to the last day you read it, so it still takes its
+place. Two files of one work count once, dated by the later finish.
+
+It stays hidden until you have finished something, and grows into a real
+year-over-year record as you read. 97 tests.
+
 ## v0.17.0 — 2026-07-05
 
 You hand Colophon the files. It never reaches into your device.

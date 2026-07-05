@@ -117,6 +117,23 @@
                   </object>
                 </child>
                 <child>
+                  <object class="GtkLabel" id="finished_title">
+                    <property name="label">Finished books</property>
+                    <property name="xalign">0</property>
+                    <style>
+                      <class name="title-4"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkListBox" id="finished_rows">
+                    <property name="selection-mode">none</property>
+                    <style>
+                      <class name="boxed-list"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
                   <object class="GtkLabel">
                     <property name="label">Reading activity</property>
                     <property name="xalign">0</property>

@@ -65,6 +65,10 @@ mod imp {
         #[template_child]
         pub recap_tiles: TemplateChild<gtk::FlowBox>,
         #[template_child]
+        pub finished_title: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub finished_rows: TemplateChild<gtk::ListBox>,
+        #[template_child]
         pub forgotten_title: TemplateChild<gtk::Label>,
         #[template_child]
         pub forgotten_rows: TemplateChild<gtk::ListBox>,
@@ -303,6 +307,35 @@ impl OverviewPage {
                     Some(&secs_label),
                 ));
             }
+        }
+
+        // Finished books (spec.md "Completions timeline"): completed works by
+        // finish date, most recent first. Hidden until something is finished.
+        imp.finished_rows.remove_all();
+        let has_finished = !overview.finished_books.is_empty();
+        imp.finished_title.set_visible(has_finished);
+        imp.finished_rows.set_visible(has_finished);
+        for f in overview.finished_books.iter().take(20) {
+            let when = if f.from_completion {
+                format!("finished {}", short_date(f.finish_date))
+            } else {
+                format!("last read {}", short_date(f.finish_date))
+            };
+            let subtitle = if f.author.trim().is_empty() {
+                when
+            } else {
+                format!("{} \u{b7} {when}", f.author)
+            };
+            let row = adw::ActionRow::builder()
+                .title(&f.title)
+                .subtitle(&subtitle)
+                .build();
+            let time = gtk::Label::builder()
+                .label(humanize_secs(f.total_secs))
+                .css_classes(["dim-label"])
+                .build();
+            row.add_suffix(&time);
+            imp.finished_rows.append(&row);
         }
 
         imp.heatmap.set_data(&overview.daily, today);

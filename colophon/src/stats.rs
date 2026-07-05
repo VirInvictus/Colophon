@@ -51,6 +51,8 @@ pub struct Overview {
     pub forgotten: Vec<ForgottenBook>,
     /// Whole-history composite recap (window-independent).
     pub recap: Recap,
+    /// Finished works with finish dates, most-recent first (whole-history).
+    pub finished_books: Vec<FinishedBook>,
     /// This window against the previous equal-length window; `None` for
     /// all-time or when the previous window had no reading.
     pub period_delta: Option<PeriodDelta>,
@@ -364,6 +366,66 @@ pub fn forgotten_books<Tz: TimeZone>(
     out
 }
 
+/// A finished work and the date it was finished (spec.md "Completions
+/// timeline"). Finish date is a detected read-through's end when there is
+/// one, otherwise the last reading day (e.g. a book declared finished via its
+/// sidecar without KOReader logging a full read-through).
+#[derive(Debug, Clone, PartialEq)]
+pub struct FinishedBook {
+    pub title: String,
+    pub author: String,
+    pub finish_date: NaiveDate,
+    pub total_secs: i64,
+    /// The finish date came from a detected read-through, not the fallback.
+    pub from_completion: bool,
+}
+
+/// Finished works with their finish dates, most-recent first (spec.md
+/// "Completions timeline"). Whole-history. Files of one work collapse to the
+/// most recent finish.
+pub fn finished_timeline<Tz: TimeZone>(entries: &[Rc<LibraryEntry>], tz: &Tz) -> Vec<FinishedBook> {
+    let mut by_title: HashMap<String, FinishedBook> = HashMap::new();
+    for entry in entries {
+        if !entry.is_finished() {
+            continue;
+        }
+        let completion_end = book_completions(entry)
+            .last()
+            .map(|c| local_date(c.end_time, tz));
+        let last_read = entry
+            .events
+            .iter()
+            .map(|e| local_date(e.start_time, tz))
+            .max();
+        let Some(finish_date) = completion_end.or(last_read) else {
+            continue;
+        };
+        let title = entry.book.title.trim().to_string();
+        let candidate = FinishedBook {
+            title: title.clone(),
+            author: entry.book.authors.clone(),
+            finish_date,
+            total_secs: entry.book.total_read_time,
+            from_completion: completion_end.is_some(),
+        };
+        by_title
+            .entry(title)
+            .and_modify(|f| {
+                if finish_date > f.finish_date {
+                    *f = candidate.clone();
+                }
+            })
+            .or_insert(candidate);
+    }
+    let mut out: Vec<FinishedBook> = by_title.into_values().collect();
+    out.sort_by(|a, b| {
+        b.finish_date
+            .cmp(&a.finish_date)
+            .then_with(|| a.title.cmp(&b.title))
+    });
+    out
+}
+
 #[derive(Debug, Default, PartialEq)]
 pub struct SessionSummary {
     pub count: usize,
@@ -412,6 +474,7 @@ pub struct OverviewBase {
     records: Records,
     forgotten: Vec<ForgottenBook>,
     recap: Recap,
+    finished_books: Vec<FinishedBook>,
 }
 
 /// Builds the window-independent aggregates once for a filtered entry set.
@@ -461,6 +524,7 @@ pub fn overview_base<Tz: TimeZone>(
         records,
         forgotten: forgotten_books(entries, tz, today),
         recap,
+        finished_books: finished_timeline(entries, tz),
         monthly,
         series: series_breakdown(entries),
         authors: author_breakdown(entries),
@@ -562,6 +626,7 @@ pub fn overview_windowed<Tz: TimeZone>(
         records: base.records.clone(),
         forgotten: base.forgotten.clone(),
         recap: base.recap.clone(),
+        finished_books: base.finished_books.clone(),
         period_delta,
     }
 }
@@ -1361,6 +1426,7 @@ mod tests {
             records: Records::default(),
             forgotten: Vec::new(),
             recap: Recap::default(),
+            finished_books: Vec::new(),
             period_delta: None,
         }
     }
@@ -1570,6 +1636,30 @@ mod tests {
             Some((date("2026-07-01"), (100 + 100 + 40) * 60))
         );
         assert!(recap.sessions >= 1);
+    }
+
+    #[test]
+    fn finished_timeline_dates_and_orders_finished_works() {
+        let mk = |title: &str, day: u32, last: i64| {
+            let events: Vec<_> = (1..=last)
+                .map(|p| ev(p, ts(2026, 7, day, 8) + p, 60))
+                .collect();
+            let mut e = entry(events);
+            Rc::get_mut(&mut e).unwrap().book.title = title.into();
+            e
+        };
+        let entries = vec![
+            mk("Early", 5, 100), // read to the end on Jul 5 -> finished
+            mk("Late", 20, 100), // read to the end on Jul 20 -> finished
+            mk("WIP", 10, 40),   // unfinished -> excluded
+        ];
+        let tl = finished_timeline(&entries, &Utc);
+        assert_eq!(
+            tl.iter().map(|f| f.title.as_str()).collect::<Vec<_>>(),
+            ["Late", "Early"] // most-recent finish first
+        );
+        assert_eq!(tl[0].finish_date, date("2026-07-20"));
+        assert!(tl[0].from_completion); // a full sequential read is detected
     }
 
     #[test]

@@ -168,10 +168,11 @@ Tier A widgets (the differentiators; nobody ships these):
 - [x] Per-completion cards (v0.4.0): inferred read-throughs on the book
       page (dates, time, sessions, pages/hour, coverage), hidden for
       books with none.
-      - [ ] Overview completions timeline / books finished per
-            year/month. **Data now exists** (2026-07-05: Royal Assassin
-            reads as complete). Still thin (one finished book); see Phase
-            4.5 for the sequenced build.
+      - [x] Overview completions timeline / books finished per
+            year/month (v0.18.0). A "Finished books" section listing each
+            finished work by finish date (detected read-through end, else
+            last reading day so a sidecar-only finish still places), time
+            per book, most recent first. `stats::finished_timeline`.
 
 Tier B widgets (expected furniture, done correctly):
 
@@ -268,9 +269,12 @@ in.
             from `page_totals` (reads > 1).
       - [ ] Language breakdown deferred: Brandon's library is single-language
             ("en"), so it would render dull; revisit if that changes.
-- [ ] **Completions / year timeline.** Books-per-month/year and a
-      completions timeline, unblocked now the data contains a finished book;
-      grows as Brandon re-imports after finishing each book.
+- [x] **Completions / year timeline** (v0.18.0). A "Finished books" section
+      on the overview: each finished work by finish date, most recent first,
+      with per-book time. Finish date is a detected read-through's end, else
+      the last reading day (so a sidecar-only finish still places). Grows
+      into a year-over-year record as Brandon finishes more.
+      `stats::finished_timeline`.
 - [x] **`.sdr` finished-flag reconciliation** (v0.15.0). Brandon chose the
       sandboxed `mlua` route over a stdlib parser. `colophon-core::sidecar`
       parses each `metadata.*.lua` in a locked-down Lua VM (`StdLib::NONE`,
