@@ -84,6 +84,18 @@ pub struct RescaledEvent {
     pub duration: i64,
 }
 
+/// One current-axis page's aggregate from the rescaled `page_stat` view:
+/// the `GROUP BY page` reduction that replaces materializing the fanned-out
+/// view row by row. `secs` sums every view row for the page (including
+/// zero-duration ones, so distinct-page counts match KOReader's capped
+/// query); `reads` counts only the positive-duration rows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PageTotal {
+    pub page: i64,
+    pub secs: i64,
+    pub reads: u32,
+}
+
 /// A reading session: a per-book cluster of events (see `metrics::sessions`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Session {

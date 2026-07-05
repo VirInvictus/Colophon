@@ -49,6 +49,12 @@ mod imp {
         pub book_page: TemplateChild<BookPage>,
         /// Unfiltered master copy; refilter() derives the visible groups.
         pub entries: RefCell<Vec<Rc<LibraryEntry>>>,
+        /// Cached window-independent overview aggregates for the current
+        /// filtered entry set, tagged with the date they were built for.
+        /// Invalidated whenever the filtered set changes (junk toggle,
+        /// re-import) so window toggles never recompute the expensive
+        /// whole-history math. See `stats::OverviewBase`.
+        pub overview_base: RefCell<Option<(chrono::NaiveDate, stats::OverviewBase)>>,
         pub selection: RefCell<Selection>,
         /// Reentrancy guard for import/refresh.
         pub loading: Cell<bool>,
@@ -306,6 +312,11 @@ impl ColophonWindow {
     /// the junk-filter action state, then refreshes the content pane.
     /// Pure recompute; no db round-trip.
     pub fn refilter(&self) {
+        // The filtered entry set is about to change (junk toggle or a fresh
+        // import), so the cached whole-history overview aggregates no longer
+        // apply. Drop them; refresh_content rebuilds on demand.
+        self.imp().overview_base.replace(None);
+
         let entries = self.imp().entries.borrow();
         let groups = library::grouped(
             &entries,
@@ -356,8 +367,22 @@ impl ColophonWindow {
 
         match *imp.selection.borrow() {
             Selection::Overview => {
-                let overview =
-                    stats::overview(&entries, &Local, today, imp.overview_page.window_days());
+                // Reuse the cached whole-history aggregates if they were
+                // built for today's date and the current filtered set;
+                // otherwise build them once. Window toggles hit the cache.
+                let mut cache = imp.overview_base.borrow_mut();
+                if cache.as_ref().is_none_or(|(day, _)| *day != today) {
+                    *cache = Some((today, stats::overview_base(&entries, &Local, today)));
+                }
+                let (_, base) = cache.as_ref().expect("just populated");
+                let overview = stats::overview_windowed(
+                    base,
+                    &entries,
+                    &Local,
+                    today,
+                    imp.overview_page.window_days(),
+                );
+                drop(cache);
                 imp.overview_page.set_data(&overview, today);
                 imp.content_stack.set_visible_child_name("overview");
                 imp.content_page.set_title("All Books");

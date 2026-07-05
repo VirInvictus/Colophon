@@ -57,6 +57,21 @@ pub fn unique_pages_read(coverage: f64, pages: i64) -> i64 {
     (coverage * pages as f64).round() as i64
 }
 
+/// A recorded page (out of `total_pages` at record time) mapped onto the
+/// book's `current_pages` axis, matching the `page_stat` view's own
+/// arithmetic (RESEARCH.md §1): the view fans a stored row across
+/// `first_page..=last_page`, and this returns that `last_page`, the highest
+/// current-axis page the event touches. Used to recover the most recently
+/// read page from the latest raw event without scanning the fanned-out
+/// view a second time.
+pub fn rescaled_last_page(page: i64, total_pages: i64, current_pages: i64) -> i64 {
+    if total_pages <= 0 {
+        return page;
+    }
+    let first = (page - 1) * current_pages / total_pages + 1;
+    first.max(page * current_pages / total_pages)
+}
+
 /// Plain `sum(duration)`: the default "time read" everywhere.
 pub fn uncapped_seconds(events: &[PageEvent]) -> i64 {
     events.iter().map(|e| e.duration).sum()
@@ -136,6 +151,19 @@ mod tests {
     fn unique_pages_rounds() {
         assert_eq!(unique_pages_read(0.5, 867), 434);
         assert_eq!(unique_pages_read(0.0, 867), 0);
+    }
+
+    #[test]
+    fn rescaled_last_page_matches_the_view_formula() {
+        // No repagination: the page maps to itself.
+        assert_eq!(rescaled_last_page(20, 100, 100), 20);
+        // Recorded at 100 pages, now rendered at 200: page 20 spans the
+        // current-axis pages 39..=40, so its last page is 40.
+        assert_eq!(rescaled_last_page(20, 100, 200), 40);
+        // Recorded at 200, now 100: page 40 collapses onto page 20.
+        assert_eq!(rescaled_last_page(40, 200, 100), 20);
+        // Degenerate rows pass the page through unchanged.
+        assert_eq!(rescaled_last_page(7, 0, 100), 7);
     }
 
     #[test]

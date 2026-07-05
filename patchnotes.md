@@ -1,5 +1,35 @@
 # Patchnotes
 
+## v0.6.0 — 2026-07-04
+
+A performance pass for large libraries (Phase 4), measured against a
+synthetic multi-year database rather than the tiny real sample.
+
+Colophon no longer holds KOReader's fanned-out `page_stat` view in memory.
+That view rescales every stored row across the current page axis (up to
+about 1000x), and the old load pulled all of it into memory for every
+book. Now a per-page `GROUP BY` reduction (one row per current-axis page)
+feeds the capped totals and the activity strip, and the last-read page is
+recovered from the most recent raw event instead of a second scan of the
+view. The numbers are identical, locked by a parity test against the old
+path; on a synthetic 200-book, four-year, 222k-event database the resident
+set drops from 27 MB to 19 MB (103k rows held instead of 367k), and the
+saving grows with the library.
+
+The All Books overview now caches its whole-history aggregates: the daily
+map behind streaks, the year heatmap, and the monthly bars. They are
+rebuilt only when the filtered set changes (a junk-filter toggle or a
+re-import), not on every time-window switch. Switching windows recomputes
+just the windowed behaviour charts, so narrowing to a recent window went
+from about 20 ms to 3 ms and the all-time view from 44 ms to 23 ms on that
+same database. First render and junk-filter toggles are unchanged by
+design.
+
+Under the hood: a new ignored measurement harness
+(`colophon-core/tests/perf.rs`) generates a deterministic multi-year
+fixture and reports load, render, and memory numbers, so future changes
+are measured rather than guessed. 70 tests.
+
 ## v0.5.0 — 2026-07-03
 
 Time windows, the per-book speed overlay, and session patterns.

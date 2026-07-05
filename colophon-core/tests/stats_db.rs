@@ -3,7 +3,7 @@
 
 mod common;
 
-use colophon_core::{StatsDb, snapshot};
+use colophon_core::{StatsDb, metrics, snapshot};
 use common::FixtureBook;
 use rusqlite::Connection;
 
@@ -184,6 +184,59 @@ fn rescaled_view_matches_koreader_semantics() {
     assert_eq!(raw.len(), 1);
     assert_eq!(raw[0].page, 10);
     assert_eq!(raw[0].total_pages, 100);
+}
+
+#[test]
+fn page_totals_and_last_page_agree_with_the_materialized_view() {
+    // The aggregated path (page_totals + rescaled_last_page) must yield
+    // exactly what pulling the whole fanned-out view yielded before.
+    let dir = common::TempDir::new();
+    let path = common::create_db(dir.path());
+    // 200-page book; three events, one recorded at the old 100-page layout
+    // (so it fans out 1->2 pages) and page 40 read twice (a re-read).
+    let id = common::insert_book(
+        &path,
+        &FixtureBook {
+            pages: 200,
+            ..Default::default()
+        },
+    );
+    common::insert_event(&path, id, 10, 1_000, 60, 100); // -> pages 19,20 (30s each)
+    common::insert_event(&path, id, 40, 2_000, 50, 200); // -> page 40, 50s
+    common::insert_event(&path, id, 40, 3_000, 20, 200); // -> page 40 again, +20s
+
+    let db = StatsDb::open(&path).unwrap();
+    let book = &db.books().unwrap()[0];
+
+    // Reference: derive the same numbers straight from the view rows.
+    let rescaled = db.rescaled_events(book).unwrap();
+    let (ref_capped, ref_pages) = metrics::capped_seconds(
+        rescaled.iter().map(|e| (e.page, e.duration)),
+        colophon_core::model::KOREADER_DEFAULT_MAX_SEC,
+    );
+    let ref_last = rescaled
+        .iter()
+        .max_by_key(|e| e.start_time)
+        .map(|e| e.page)
+        .unwrap_or(0);
+
+    // New path: page_totals GROUP BY + rescaled_last_page from raw events.
+    let totals = db.page_totals(book).unwrap();
+    let (capped, pages) = metrics::capped_seconds(
+        totals.iter().map(|p| (p.page, p.secs)),
+        colophon_core::model::KOREADER_DEFAULT_MAX_SEC,
+    );
+    let raw = db.events(book).unwrap();
+    let last = raw
+        .last()
+        .map(|e| metrics::rescaled_last_page(e.page, e.total_pages, book.pages))
+        .unwrap_or(0);
+
+    assert_eq!((capped, pages), (ref_capped, ref_pages));
+    assert_eq!(last, ref_last);
+    // Page 40's re-read is one page with the two durations summed.
+    let p40 = totals.iter().find(|p| p.page == 40).unwrap();
+    assert_eq!((p40.secs, p40.reads), (70, 2));
 }
 
 #[test]

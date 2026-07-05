@@ -36,21 +36,27 @@ pub fn load_snapshot(path: &Path) -> Result<LibrarySnapshot> {
         let events = db.events(&book)?;
         let coverage = metrics::coverage(&events);
 
-        let rescaled = db.rescaled_events(&book)?;
+        // Capped totals and the activity strip come from the rescaled
+        // `page_stat` view, but as a per-page `GROUP BY` (one row per page)
+        // rather than the fanned-out rows: same numbers, a fraction of the
+        // memory (RESEARCH §1, the view expands each row up to ~1000x).
+        let page_totals = db.page_totals(&book)?;
         let (capped_secs, view_pages) = metrics::capped_seconds(
-            rescaled.iter().map(|e| (e.page, e.duration)),
+            page_totals.iter().map(|p| (p.page, p.secs)),
             colophon_core::model::KOREADER_DEFAULT_MAX_SEC,
         );
-        let last_page = rescaled
-            .iter()
-            .max_by_key(|e| e.start_time)
-            .map(|e| e.page)
+        // Last read page on the current axis: the latest raw event rescaled
+        // like the view would, avoiding a second scan of the fanned-out
+        // view just for this one number.
+        let last_page = events
+            .last()
+            .map(|e| metrics::rescaled_last_page(e.page, e.total_pages, book.pages))
             .unwrap_or(0);
 
         entries.push(LibraryEntry {
             unique_pages: metrics::unique_pages_read(coverage, book.pages),
             events,
-            rescaled,
+            page_totals,
             capped_secs,
             view_pages,
             last_page,

@@ -20,5 +20,6 @@ pub mod model;
 
 pub use db::{EXPECTED_SCHEMA_VERSION, StatsDb, snapshot};
 pub use model::{
-    Book, Completion, DayTotal, PageEvent, RescaledEvent, Session, SpeedPoint, Streak, Streaks,
+    Book, Completion, DayTotal, PageEvent, PageTotal, RescaledEvent, Session, SpeedPoint, Streak,
+    Streaks,
 };

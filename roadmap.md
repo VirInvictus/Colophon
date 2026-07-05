@@ -179,12 +179,23 @@ Tier B widgets (expected furniture, done correctly):
 ## Phase 4 — Polish & packaging
 
 - [ ] Icon pass (replace the placeholder `logo.svg`).
-- [ ] Performance pass on a realistic future db: the current sample is
-      695 rows, but years of reading produce hundreds of thousands of
-      `page_stat_data` rows and the `page_stat` view fans rows out up to
-      1000× via the `numbers` join. Widgets must aggregate in SQL against
-      the indexed `start_time`, not slurp the view into memory per
-      render. Generate a synthetic multi-year fixture to measure.
+- [x] Performance pass on a realistic future db (v0.6.0). A deterministic
+      synthetic fixture (200 books, four years, 222k `page_stat_data`
+      rows) and an ignored measurement harness (`colophon-core/tests/
+      perf.rs`) gave the baseline. Two findings drove the work: the
+      `page_stat` view was materialized whole (367k fanned-out rows held
+      in memory), and the overview re-ran its whole-history aggregation on
+      every window toggle. Fixes: (a) the view is consumed as a per-page
+      `GROUP BY` reduction (`StatsDb::page_totals`) plus a Rust rescale
+      for the last page (`metrics::rescaled_last_page`), never the
+      fanned-out rows, parity-locked against the old path — resident set
+      27 MB → 19 MB; (b) the overview caches its window-independent
+      aggregates (`stats::OverviewBase`) and recomputes only the windowed
+      charts on a window toggle — narrowing a window 20 ms → 3 ms,
+      all-time 44 ms → 23 ms. Timezone/DST math stayed in chrono (no SQL
+      `localtime`), so the metric functions and their tests are untouched.
+      Load time is unchanged (both paths compute the view once); the win
+      is memory and per-interaction render cost.
 - [ ] Meson wrapper + desktop entry + AppStream metainfo + Flatpak
       manifest, matching the Atrium/Conservatory/Viaduct pattern.
 - [ ] `VERSION` → `1.0.0`.

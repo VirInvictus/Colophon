@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, bail};
 use rusqlite::{Connection, OpenFlags};
 
-use crate::model::{Book, PageEvent, RescaledEvent};
+use crate::model::{Book, PageEvent, PageTotal, RescaledEvent};
 
 /// The `PRAGMA user_version` this crate was written against (the schema on
 /// Brandon's device). Older databases exist in the wild; `open` surfaces
@@ -129,6 +129,36 @@ impl StatsDb {
         Ok(rows)
     }
 
+    /// Per current-axis page aggregates from the `page_stat` view, ordered
+    /// by page: the `GROUP BY page` reduction that replaces pulling the
+    /// fanned-out view into memory (the view expands each stored row across
+    /// the `numbers` join, up to ~1000x). One row per page instead, at most
+    /// `book.pages` of them. Feeds the capped totals, the distinct-page
+    /// count, and the per-page activity strip.
+    ///
+    /// `secs` sums *all* view rows for the page (0-duration rows included,
+    /// so the page still counts toward KOReader's capped distinct-page
+    /// total); `reads` counts only positive-duration rows (the activity
+    /// strip's read count).
+    pub fn page_totals(&self, book: &Book) -> Result<Vec<PageTotal>> {
+        let sql = format!(
+            "SELECT page, SUM(duration) AS secs, SUM(duration > 0) AS reads
+             FROM page_stat WHERE id_book IN ({}) GROUP BY page ORDER BY page",
+            id_list(book)
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(PageTotal {
+                    page: row.get(0)?,
+                    secs: row.get::<_, Option<i64>>(1)?.unwrap_or(0),
+                    reads: row.get::<_, Option<i64>>(2)?.unwrap_or(0) as u32,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
     /// Events for one (merged) book from the `page_stat` view: rescaled by
     /// KOReader onto the book's current page count, so the page axis is
     /// stable across font-size changes. Ordered by time.
@@ -154,6 +184,17 @@ impl StatsDb {
         out.sort_by_key(|e| e.start_time);
         Ok(out)
     }
+}
+
+/// A comma-separated SQL `IN` list of a merged book's row ids. The ids are
+/// our own integer primary keys (never user input), so inlining them is
+/// safe and avoids a variable-length bound-parameter dance.
+fn id_list(book: &Book) -> String {
+    book.all_ids
+        .iter()
+        .map(|id| id.to_string())
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn event_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PageEvent> {

@@ -66,18 +66,27 @@ pub const SESSION_BUCKETS: [(&str, i64); 6] = [
     (">2h", i64::MAX),
 ];
 
-/// Computes the overview. `window_days = None` means all-time;
-/// `Some(n)` scopes the totals tiles and the behaviour charts (hourly,
-/// speed, sessions, weekday) to the last `n` *calendar* days ending
-/// today (not "last n days with data", Kodashboard's KPI bug). The
-/// whole-history sections (streaks, year heatmap, monthly) always show
-/// everything: windowing a streak or a year grid would just lie.
-pub fn overview<Tz: TimeZone>(
+/// The window-independent part of the overview: the whole-history
+/// aggregates that a time-window selection never touches (streaks, the
+/// year heatmap's daily map, monthly bars) plus the flattened event list
+/// they were built from. Computing these is the expensive half of the
+/// overview (`daily_totals` alone is the single biggest render cost), so
+/// the window caches an `OverviewBase` and only recomputes it when the
+/// filtered entry set changes (junk toggle, re-import), not on every
+/// window toggle.
+pub struct OverviewBase {
+    all_events: Vec<PageEvent>,
+    daily: BTreeMap<NaiveDate, DayTotal>,
+    streaks: Streaks,
+    monthly: Vec<(NaiveDate, i64)>,
+}
+
+/// Builds the window-independent aggregates once for a filtered entry set.
+pub fn overview_base<Tz: TimeZone>(
     entries: &[Rc<LibraryEntry>],
     tz: &Tz,
     today: NaiveDate,
-    window_days: Option<i64>,
-) -> Overview {
+) -> OverviewBase {
     let all_events: Vec<PageEvent> = entries
         .iter()
         .flat_map(|e| e.events.iter().copied())
@@ -85,18 +94,41 @@ pub fn overview<Tz: TimeZone>(
     let daily = metrics::daily_totals(&all_events, tz);
     let days = daily.keys().copied().collect();
     let streaks = metrics::streaks(&days, today);
+    let monthly = monthly_totals(&daily, today);
+    OverviewBase {
+        all_events,
+        daily,
+        streaks,
+        monthly,
+    }
+}
 
+/// Computes the overview from a cached [`OverviewBase`]. `window_days =
+/// None` means all-time; `Some(n)` scopes the totals tiles and the
+/// behaviour charts (hourly, speed, sessions, weekday) to the last `n`
+/// *calendar* days ending today (not "last n days with data",
+/// Kodashboard's KPI bug). The whole-history sections (streaks, year
+/// heatmap, monthly) come straight from the base: windowing a streak or a
+/// year grid would just lie.
+pub fn overview_windowed<Tz: TimeZone>(
+    base: &OverviewBase,
+    entries: &[Rc<LibraryEntry>],
+    tz: &Tz,
+    today: NaiveDate,
+    window_days: Option<i64>,
+) -> Overview {
     let cutoff = window_days.map(|n| today - Duration::days(n - 1));
     let in_window =
         |e: &PageEvent| cutoff.is_none_or(|c| metrics::local_date(e.start_time, tz) >= c);
-    let windowed: Vec<PageEvent> = all_events
+    let windowed: Vec<PageEvent> = base
+        .all_events
         .iter()
         .copied()
         .filter(|e| in_window(e))
         .collect();
     let windowed_daily = match cutoff {
-        Some(c) => daily.range(c..).map(|(d, t)| (*d, *t)).collect(),
-        None => daily.clone(),
+        Some(c) => base.daily.range(c..).map(|(d, t)| (*d, *t)).collect(),
+        None => base.daily.clone(),
     };
 
     // Windowed totals: event sums, not the cached book counters (those
@@ -133,12 +165,12 @@ pub fn overview<Tz: TimeZone>(
             .map(|(d, t)| (*d, t.seconds)),
         weekday_avg_secs: weekday_averages(&windowed_daily, today),
         hourly: metrics::hourly_profile(&windowed, tz),
-        monthly: monthly_totals(&daily, today),
+        monthly: base.monthly.clone(),
         speed,
         speed_bucket,
         sessions: session_summary(&windowed, tz),
-        daily,
-        streaks,
+        daily: base.daily.clone(),
+        streaks: base.streaks,
     }
 }
 
@@ -277,18 +309,13 @@ pub struct PageActivity {
 }
 
 pub fn page_activity(entry: &LibraryEntry) -> PageActivity {
-    let mut acc: BTreeMap<i64, (i64, u32)> = BTreeMap::new();
-    for event in &entry.rescaled {
-        if event.duration <= 0 {
-            continue;
-        }
-        let slot = acc.entry(event.page).or_default();
-        slot.0 += event.duration;
-        slot.1 += 1;
-    }
-    let per_page: Vec<(i64, i64, u32)> = acc
-        .into_iter()
-        .map(|(page, (secs, count))| (page, secs, count))
+    // Already reduced to one row per page by the `page_totals` query, in
+    // page order; keep only pages with real (positive-duration) reads.
+    let per_page: Vec<(i64, i64, u32)> = entry
+        .page_totals
+        .iter()
+        .filter(|pt| pt.reads > 0)
+        .map(|pt| (pt.page, pt.secs, pt.reads))
         .collect();
 
     let mut durations: Vec<i64> = per_page.iter().map(|&(_, secs, _)| secs).collect();
@@ -403,6 +430,18 @@ mod tests {
         }
     }
 
+    /// One-shot overview (base + windowed), exercising the real two-step
+    /// path the window drives via its cache.
+    fn overview<Tz: TimeZone>(
+        entries: &[Rc<LibraryEntry>],
+        tz: &Tz,
+        today: NaiveDate,
+        window_days: Option<i64>,
+    ) -> Overview {
+        let base = overview_base(entries, tz, today);
+        overview_windowed(&base, entries, tz, today, window_days)
+    }
+
     fn entry(events: Vec<PageEvent>) -> Rc<LibraryEntry> {
         let total: i64 = events.iter().map(|e| e.duration).sum();
         Rc::new(LibraryEntry {
@@ -423,7 +462,7 @@ mod tests {
             },
             unique_pages: 0,
             events,
-            rescaled: Vec::new(),
+            page_totals: Vec::new(),
             capped_secs: total,
             view_pages: 50,
             last_page: 50,
@@ -617,39 +656,31 @@ mod tests {
 
     #[test]
     fn page_activity_aggregates_on_the_stable_axis() {
-        use colophon_core::RescaledEvent;
+        use colophon_core::PageTotal;
         let mut e = entry(Vec::new());
-        // Page 5 read twice (60 + 40 s), page 6 once; ten light pages to
+        // page_totals arrive pre-grouped, one row per page, ordered by page.
+        // Page 5 read twice (100 s), page 6 once (30 s); ten light pages to
         // give the percentile something to cap against.
-        let mut rescaled = vec![
-            RescaledEvent {
-                book_id: 1,
+        let mut page_totals = vec![
+            PageTotal {
                 page: 5,
-                start_time: 0,
-                duration: 60,
+                secs: 100,
+                reads: 2,
             },
-            RescaledEvent {
-                book_id: 1,
-                page: 5,
-                start_time: 100,
-                duration: 40,
-            },
-            RescaledEvent {
-                book_id: 1,
+            PageTotal {
                 page: 6,
-                start_time: 200,
-                duration: 30,
+                secs: 30,
+                reads: 1,
             },
         ];
         for p in 10..20 {
-            rescaled.push(RescaledEvent {
-                book_id: 1,
+            page_totals.push(PageTotal {
                 page: p,
-                start_time: 300 + p,
-                duration: 10,
+                secs: 10,
+                reads: 1,
             });
         }
-        Rc::get_mut(&mut e).unwrap().rescaled = rescaled;
+        Rc::get_mut(&mut e).unwrap().page_totals = page_totals;
 
         let activity = page_activity(&e);
         assert_eq!(activity.pages, 100);
@@ -679,7 +710,7 @@ mod tests {
             view_pages: 0,
             last_page: 0,
             events: Vec::new(),
-            rescaled: Vec::new(),
+            page_totals: Vec::new(),
             unique_pages: 0,
             book: entry(Vec::new()).book.clone(),
         });

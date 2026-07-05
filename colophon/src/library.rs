@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use colophon_core::{Book, PageEvent, RescaledEvent};
+use colophon_core::{Book, PageEvent, PageTotal};
 
 #[derive(Debug, Clone)]
 pub struct LibraryEntry {
@@ -18,13 +18,14 @@ pub struct LibraryEntry {
     pub unique_pages: i64,
     /// Raw page-turn events (time axis), chronological.
     pub events: Vec<PageEvent>,
-    /// The `page_stat` view rows (stable page axis), chronological;
-    /// feeds anything page-positional (activity strip, velocity).
-    pub rescaled: Vec<RescaledEvent>,
-    /// KOReader-parity numbers computed from the rescaled `page_stat`
-    /// view at load time (the device's own math runs on the view):
-    /// capped total seconds, distinct pages on the current page axis,
-    /// and the most recently read page.
+    /// Per current-axis page aggregates from the `page_stat` view (one row
+    /// per page, not the fanned-out rows); feeds the activity strip. The
+    /// view itself is never materialized in memory.
+    pub page_totals: Vec<PageTotal>,
+    /// KOReader-parity numbers derived from the `page_stat` view at load
+    /// time (the device's own math runs on the view): capped total
+    /// seconds, distinct pages on the current page axis, and the most
+    /// recently read page.
     pub capped_secs: i64,
     pub view_pages: i64,
     pub last_page: i64,
@@ -118,7 +119,7 @@ mod tests {
             },
             unique_pages: 0,
             events: Vec::new(),
-            rescaled: Vec::new(),
+            page_totals: Vec::new(),
             capped_secs: 0,
             view_pages: 0,
             last_page: 0,
