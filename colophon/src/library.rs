@@ -1,7 +1,7 @@
 //! Display-side library model: junk filtering and same-title grouping.
 //! Pure and GTK-free. Grouping is display-only (spec.md "Book identity"):
-//! two files of the same work (the Jingo case, same title/authors,
-//! different md5s) sit together in the list but stay separate entries.
+//! two files of the same work (same title/authors, different md5s) sit
+//! together in the list but stay separate entries.
 //!
 //! Entries are shared as `Rc`: the loader builds them once per import and
 //! every refilter/regroup just clones pointers, not event vectors.
@@ -127,10 +127,10 @@ mod tests {
     }
 
     #[test]
-    fn jingo_case_groups_two_files_without_merging() {
+    fn same_title_two_files_group_without_merging() {
         let entries = vec![
-            book("Jingo", "Terry Pratchett", "aaaa", 632, 200),
-            book("Jingo", "Terry Pratchett", "bbbb", 400, 300),
+            book("Novel Two", "Author Two", "aaaa", 632, 200),
+            book("Novel Two", "Author Two", "bbbb", 400, 300),
         ];
         let groups = grouped(&entries, true, DEFAULT_JUNK_THRESHOLD_SECS);
         assert_eq!(groups.len(), 1);
@@ -144,8 +144,8 @@ mod tests {
     #[test]
     fn different_titles_stay_separate() {
         let entries = vec![
-            book("Jingo", "Terry Pratchett", "aaaa", 632, 200),
-            book("Royal Assassin", "Robin Hobb", "cccc", 36_047, 100),
+            book("Novel Two", "Author Two", "aaaa", 632, 200),
+            book("Novel One", "Author One", "cccc", 36_047, 100),
         ];
         let groups = grouped(&entries, true, DEFAULT_JUNK_THRESHOLD_SECS);
         assert_eq!(groups.len(), 2);
@@ -155,12 +155,12 @@ mod tests {
     #[test]
     fn junk_filter_drops_short_reads() {
         let entries = vec![
-            book("Royal Assassin", "Robin Hobb", "cccc", 36_047, 100),
+            book("Novel One", "Author One", "cccc", 36_047, 100),
             book("Some Plugin README", "N/A", "dddd", 40, 400),
         ];
         let on = grouped(&entries, true, DEFAULT_JUNK_THRESHOLD_SECS);
         assert_eq!(on.len(), 1);
-        assert_eq!(on[0].title, "Royal Assassin");
+        assert_eq!(on[0].title, "Novel One");
 
         let off = grouped(&entries, false, DEFAULT_JUNK_THRESHOLD_SECS);
         assert_eq!(off.len(), 2);
@@ -171,8 +171,8 @@ mod tests {
         // One copy read seriously, one barely touched: with the filter on
         // the group collapses to a singleton.
         let entries = vec![
-            book("Jingo", "Terry Pratchett", "aaaa", 632, 200),
-            book("Jingo", "Terry Pratchett", "bbbb", 10, 300),
+            book("Novel Two", "Author Two", "aaaa", 632, 200),
+            book("Novel Two", "Author Two", "bbbb", 10, 300),
         ];
         let groups = grouped(&entries, true, DEFAULT_JUNK_THRESHOLD_SECS);
         assert_eq!(groups.len(), 1);
@@ -194,8 +194,8 @@ mod tests {
     #[test]
     fn whitespace_variants_group_together() {
         let entries = vec![
-            book("Jingo ", "Terry Pratchett", "aaaa", 1000, 100),
-            book("Jingo", "Terry Pratchett ", "bbbb", 1000, 200),
+            book("Novel Two ", "Author Two", "aaaa", 1000, 100),
+            book("Novel Two", "Author Two ", "bbbb", 1000, 200),
         ];
         let groups = grouped(&entries, true, DEFAULT_JUNK_THRESHOLD_SECS);
         assert_eq!(groups.len(), 1);

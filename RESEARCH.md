@@ -373,7 +373,7 @@ Junk filtering is Colophon's own addition: the live sample contains plugin
 READMEs and the quickstart guide as "books" (§1); a minimum-total-read-time
 display filter (KOReader's own purge uses < N minutes) handles it.
 
-Note the *Jingo* case in the sample: two `book` rows with the same
+Note the duplicate-title case in the sample: two `book` rows with the same
 title/authors but different md5s and page counts. That is two different
 *files* (e.g. a re-download), not the metadata-edit duplication KoShelf's
 md5-dedup solves. Grouping same-title/author books for display is a

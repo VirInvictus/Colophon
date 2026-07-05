@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn furthest_ignores_a_leading_gap() {
-        // The Royal Assassin shape: nothing until ~29%, then read to the
+        // A mid-book-install shape: nothing until ~29%, then read to the
         // end. Coverage is partial, but furthest reaches the last page.
         let events: Vec<_> = (30..=100).map(|p| ev(p, 100)).collect();
         assert!((coverage(&events) - 0.71).abs() < 1e-9);

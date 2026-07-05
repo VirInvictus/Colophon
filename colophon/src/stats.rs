@@ -948,22 +948,19 @@ mod tests {
             e
         };
         let entries = vec![
-            mk("Royal Assassin", Some("The Farseer Trilogy #2"), 100), // finished
-            mk("Jingo", Some("Discworld #21"), 50),                    // two files,
-            mk("Jingo", Some("Discworld #21"), 40),                    // one work
-            mk("A README", Some("N/A"), 30),                           // skipped
-            mk("Loose", None, 20),                                     // skipped
+            mk("Novel One", Some("Series One #2"), 100), // finished
+            mk("Novel Two", Some("Series Two #21"), 50), // two files,
+            mk("Novel Two", Some("Series Two #21"), 40), // one work
+            mk("A README", Some("N/A"), 30),             // skipped
+            mk("Loose", None, 20),                       // skipped
         ];
         let series = series_breakdown(&entries);
         assert_eq!(series.len(), 2);
-        let farseer = series
-            .iter()
-            .find(|s| s.name == "The Farseer Trilogy")
-            .unwrap();
-        assert_eq!((farseer.books, farseer.finished), (1, 1));
-        let discworld = series.iter().find(|s| s.name == "Discworld").unwrap();
-        assert_eq!((discworld.books, discworld.finished), (1, 0)); // Jingo deduped
-        assert_eq!(discworld.total_secs, (50 + 40) * 60); // both files' time
+        let series_one = series.iter().find(|s| s.name == "Series One").unwrap();
+        assert_eq!((series_one.books, series_one.finished), (1, 1));
+        let series_two = series.iter().find(|s| s.name == "Series Two").unwrap();
+        assert_eq!((series_two.books, series_two.finished), (1, 0)); // two files, one work
+        assert_eq!(series_two.total_secs, (50 + 40) * 60); // both files' time
     }
 
     #[test]
@@ -975,7 +972,7 @@ mod tests {
 
     #[test]
     fn progress_marks_finished_despite_a_leading_gap() {
-        // The Royal Assassin case: KOReader logged pages 60..=100 of a
+        // A mid-book-install case: KOReader logged pages 60..=100 of a
         // 100-page book (read from ~59% to the end); the first ~59% was
         // read before KOReader. Furthest reaches the end -> finished, even
         // though coverage (unique pages) is only ~41%.

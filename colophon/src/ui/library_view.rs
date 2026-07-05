@@ -1,7 +1,7 @@
 //! The library list: an "All Books" entry, then a boxed-list of books
-//! with header rows for groups of same-title/author copies (the Jingo
-//! case). Full rebuild on change; the list is small and rebuilds are far
-//! less fiddly than incremental header invalidation.
+//! with header rows for groups of same-title/author copies (two files of
+//! one work). Full rebuild on change; the list is small and rebuilds are
+//! far less fiddly than incremental header invalidation.
 
 use std::cell::{Cell, RefCell};
 

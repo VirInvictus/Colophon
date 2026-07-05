@@ -75,7 +75,7 @@ findings so far.
 - [x] Junk filter as a stateful window action in the primary menu
       (default on, 5-minute threshold), GSettings-persisted, live
       refilter on change.
-- [x] Same-title/author grouping (the *Jingo* case): header row + inset
+- [x] Same-title/author grouping (two files of one work): header row + inset
       member rows disambiguated by page count and short md5; display-only,
       data never merged.
 - [x] Kanagawa Dragon theming: full Dragon sheet on dark via adw 1.6+ CSS

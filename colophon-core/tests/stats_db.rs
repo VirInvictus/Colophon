@@ -48,8 +48,8 @@ fn books_reads_rows_and_defaults_nulls() {
     common::insert_book(
         &path,
         &FixtureBook {
-            title: "Royal Assassin",
-            authors: "Robin Hobb",
+            title: "Novel One",
+            authors: "Author One",
             pages: 866,
             md5: Some("aaaa0000aaaa0000aaaa0000aaaa0000"),
             last_open: 1_000,
@@ -70,7 +70,7 @@ fn books_reads_rows_and_defaults_nulls() {
     let db = StatsDb::open(&path).unwrap();
     let books = db.books().unwrap();
     assert_eq!(books.len(), 2);
-    assert_eq!(books[0].title, "Royal Assassin");
+    assert_eq!(books[0].title, "Novel One");
     assert_eq!(books[0].total_read_time, 36_047);
     assert_eq!(books[1].total_read_time, 0);
     assert_eq!(books[1].last_open, 0);
@@ -88,8 +88,8 @@ fn books_merge_rows_sharing_an_md5() {
     let old_id = common::insert_book(
         &path,
         &FixtureBook {
-            title: "jingo",
-            md5: Some("9c2a1358a38ca0dfc9d1c50e4f6c7b7c"),
+            title: "novel two",
+            md5: Some("bbbb1111bbbb1111bbbb1111bbbb1111"),
             last_open: 100,
             total_read_time: 500,
             total_read_pages: 10,
@@ -99,8 +99,8 @@ fn books_merge_rows_sharing_an_md5() {
     let new_id = common::insert_book(
         &path,
         &FixtureBook {
-            title: "Jingo",
-            md5: Some("9C2A1358A38CA0DFC9D1C50E4F6C7B7C"), // case-insensitive
+            title: "Novel Two",
+            md5: Some("BBBB1111BBBB1111BBBB1111BBBB1111"), // case-insensitive
             last_open: 200,
             total_read_time: 132,
             total_read_pages: 5,
@@ -116,7 +116,7 @@ fn books_merge_rows_sharing_an_md5() {
     let book = &books[0];
     // Canonical row is the most recently opened one.
     assert_eq!(book.id, new_id);
-    assert_eq!(book.title, "Jingo");
+    assert_eq!(book.title, "Novel Two");
     assert_eq!(book.total_read_time, 632);
     assert_eq!(book.total_read_pages, 15);
     assert_eq!(book.all_ids.len(), 2);
@@ -129,15 +129,15 @@ fn books_merge_rows_sharing_an_md5() {
 
 #[test]
 fn different_md5s_stay_separate_books() {
-    // The real sample has Jingo twice with different md5s: two files of
-    // the same work. Those must NOT merge.
+    // The real sample has one title twice with different md5s: two files
+    // of the same work. Those must NOT merge.
     let dir = common::TempDir::new();
     let path = common::create_db(dir.path());
     common::insert_book(
         &path,
         &FixtureBook {
-            title: "Jingo",
-            md5: Some("34cd3353757c9be74fbc89661a4f810a"),
+            title: "Novel Two",
+            md5: Some("cccc2222cccc2222cccc2222cccc2222"),
             pages: 567,
             ..Default::default()
         },
@@ -145,8 +145,8 @@ fn different_md5s_stay_separate_books() {
     common::insert_book(
         &path,
         &FixtureBook {
-            title: "Jingo",
-            md5: Some("9c2a1358a38ca0dfc9d1c50e4f6c7b7c"),
+            title: "Novel Two",
+            md5: Some("bbbb1111bbbb1111bbbb1111bbbb1111"),
             pages: 644,
             ..Default::default()
         },
