@@ -178,7 +178,10 @@ Tier B widgets (expected furniture, done correctly):
 
 ## Phase 4 — Polish & packaging
 
-- [ ] Icon pass (replace the placeholder `logo.svg`).
+- [x] Icon pass. A colophon press-mark: a Kanagawa-Dragon gold "C" with a
+      copper fleuron (the end-of-book flourish a colophon is) in its mouth,
+      pure vector paths so it depends on no font. Ships as the scalable app
+      icon, a monochrome symbolic variant, and `logo.svg`.
 - [x] Performance pass on a realistic future db (v0.6.0). A deterministic
       synthetic fixture (200 books, four years, 222k `page_stat_data`
       rows) and an ignored measurement harness (`colophon-core/tests/

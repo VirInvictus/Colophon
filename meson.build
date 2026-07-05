@@ -80,11 +80,16 @@ install_data(
 )
 
 # Application icon. The scalable SVG covers every desktop-environment size;
+# the symbolic SVG is for the monochrome contexts GTK draws (sidebars, menus).
 # hicolor is the freedesktop fallback theme every real icon theme inherits
 # from, so the icon is available regardless of the user's active theme.
 install_data(
   'data/icons/hicolor/scalable/apps/' + application_id + '.svg',
   install_dir: datadir / 'icons' / 'hicolor' / 'scalable' / 'apps',
+)
+install_data(
+  'data/icons/hicolor/symbolic/apps/' + application_id + '-symbolic.svg',
+  install_dir: datadir / 'icons' / 'hicolor' / 'symbolic' / 'apps',
 )
 
 summary({
