@@ -275,6 +275,17 @@ impl OverviewPage {
                 "books finished",
                 None,
             ));
+            if let Some(rate) = recap.completion_rate() {
+                let started = format!(
+                    "{} of {} started",
+                    recap.books_finished, recap.books_started
+                );
+                imp.recap_tiles.append(&tile(
+                    &format!("{}%", (rate * 100.0).round() as i64),
+                    "completion",
+                    Some(&started),
+                ));
+            }
             imp.recap_tiles
                 .append(&tile(&humanize_secs(recap.total_secs), "total time", None));
             imp.recap_tiles.append(&tile(

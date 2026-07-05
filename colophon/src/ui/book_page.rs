@@ -138,10 +138,17 @@ impl BookPage {
                 Some(left) if detail.est_finish.is_some() => humanize_secs(left),
                 _ => "no data".into(),
             },
-            detail
-                .est_finish
-                .map(|d| format!("finish around {}", short_date(d))),
+            detail.est_finish.map(|d| {
+                let conf = detail
+                    .est_confidence
+                    .map(|c| format!(" \u{b7} {c} confidence"))
+                    .unwrap_or_default();
+                format!("finish around {}{conf}", short_date(d))
+            }),
         );
+        if let Some(m) = &detail.momentum {
+            add("Momentum", m.label.to_string(), Some(m.detail.clone()));
+        }
         add(
             "Highlights \u{b7} notes",
             format!("{} \u{b7} {}", book.highlights, book.notes),

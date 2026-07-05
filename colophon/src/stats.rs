@@ -258,11 +258,20 @@ pub fn personal_records(
 /// window-independent.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Recap {
+    pub books_started: usize,
     pub books_finished: usize,
     pub total_secs: i64,
     pub longest_streak_days: u32,
     pub sessions: usize,
     pub most_active_month: Option<(NaiveDate, i64)>,
+}
+
+impl Recap {
+    /// Finished share of started works in `[0, 1]`, or `None` before any
+    /// book has been started (spec.md "Completion rate").
+    pub fn completion_rate(&self) -> Option<f64> {
+        (self.books_started > 0).then(|| self.books_finished as f64 / self.books_started as f64)
+    }
 }
 
 impl Recap {
@@ -423,7 +432,13 @@ pub fn overview_base<Tz: TimeZone>(
         .filter(|e| metrics::furthest_position(&e.events) >= FINISHED_THRESHOLD)
         .map(|e| e.book.title.trim().to_string())
         .collect();
+    let started_works: std::collections::HashSet<String> = entries
+        .iter()
+        .filter(|e| !e.events.is_empty())
+        .map(|e| e.book.title.trim().to_string())
+        .collect();
     let recap = Recap {
+        books_started: started_works.len(),
         books_finished: finished_works.len(),
         total_secs: daily.values().map(|t| t.seconds).sum(),
         longest_streak_days: streaks.longest.map(|s| s.days).unwrap_or(0),
@@ -869,8 +884,21 @@ pub struct BookDetail {
     pub est_secs_left: Option<i64>,
     /// KOReader's estimate: today + time_left / (capped secs per day).
     pub est_finish: Option<NaiveDate>,
+    /// How much to trust the estimate, from the evidence behind it
+    /// ("high"/"medium"/"low"); `None` when there is no estimate.
+    pub est_confidence: Option<&'static str>,
+    /// Recent-pace read: this book's last 7 days vs the 7 before, when it
+    /// has been read recently.
+    pub momentum: Option<Momentum>,
     /// Current-axis pages visited more than once (re-read detection).
     pub revisited_pages: usize,
+}
+
+/// A per-book recent-pace read (spec.md "Reading momentum").
+#[derive(Debug, Clone, PartialEq)]
+pub struct Momentum {
+    pub label: &'static str,
+    pub detail: String,
 }
 
 pub fn book_detail<Tz: TimeZone>(entry: &LibraryEntry, tz: &Tz, today: NaiveDate) -> BookDetail {
@@ -899,6 +927,14 @@ pub fn book_detail<Tz: TimeZone>(entry: &LibraryEntry, tz: &Tz, today: NaiveDate
         let days = (left as f64 / per_day).ceil() as i64;
         today.checked_add_signed(Duration::days(days))
     });
+    // How trustworthy that estimate is, from how many days feed the pace.
+    let est_confidence = est_finish.map(|_| match days_reading {
+        d if d >= 7 => "high",
+        d if d >= 3 => "medium",
+        _ => "low",
+    });
+
+    let momentum = reading_momentum(events, tz, today);
 
     BookDetail {
         total_secs: book.total_read_time,
@@ -916,8 +952,58 @@ pub fn book_detail<Tz: TimeZone>(entry: &LibraryEntry, tz: &Tz, today: NaiveDate
         longest_session_secs: sessions.iter().map(|s| s.seconds).max().unwrap_or(0),
         est_secs_left,
         est_finish,
+        est_confidence,
+        momentum,
         revisited_pages: entry.page_totals.iter().filter(|p| p.reads > 1).count(),
     }
+}
+
+/// This book's last 7 days against the 7 before them (spec.md "Reading
+/// momentum"). `None` when it has not been read in the last 7 days (there is
+/// no current pace to describe). Going from nothing to something reads as
+/// picking up.
+fn reading_momentum<Tz: TimeZone>(
+    events: &[PageEvent],
+    tz: &Tz,
+    today: NaiveDate,
+) -> Option<Momentum> {
+    let last_start = today - Duration::days(6);
+    let prev_start = today - Duration::days(13);
+    let prev_end = today - Duration::days(7);
+    let sum_between = |lo: NaiveDate, hi: NaiveDate| -> i64 {
+        events
+            .iter()
+            .filter(|e| {
+                let d = local_date(e.start_time, tz);
+                d >= lo && d <= hi
+            })
+            .map(|e| e.duration)
+            .sum()
+    };
+    let last = sum_between(last_start, today);
+    if last == 0 {
+        return None;
+    }
+    let prev = sum_between(prev_start, prev_end);
+    let (label, detail) = if prev == 0 {
+        (
+            "Picking up",
+            format!("{} this week", crate::fmt::humanize_secs(last)),
+        )
+    } else {
+        let ratio = last as f64 / prev as f64;
+        if ratio >= 1.15 {
+            ("Picking up", format!("{ratio:.1}x last week"))
+        } else if ratio <= 0.85 {
+            (
+                "Slowing down",
+                format!("{:.1}x less than last week", 1.0 / ratio.max(0.01)),
+            )
+        } else {
+            ("Holding steady", "about the same as last week".into())
+        }
+    };
+    Some(Momentum { label, detail })
 }
 
 #[cfg(test)]
@@ -1429,13 +1515,43 @@ mod tests {
             mk("WIP", 7, 40),       // unfinished
         ];
         let recap = overview(&entries, &Utc, today, None).recap;
+        assert_eq!(recap.books_started, 3);
         assert_eq!(recap.books_finished, 2);
+        assert!((recap.completion_rate().unwrap() - 2.0 / 3.0).abs() < 1e-9);
         assert_eq!(recap.total_secs, (100 + 100 + 40) * 60);
         assert_eq!(
             recap.most_active_month,
             Some((date("2026-07-01"), (100 + 100 + 40) * 60))
         );
         assert!(recap.sessions >= 1);
+    }
+
+    #[test]
+    fn reading_momentum_reads_recent_pace() {
+        let today = date("2026-07-20");
+        // A page turn of `secs` on a given July day. Last 7d = Jul 14..20,
+        // previous 7d = Jul 7..13.
+        let day = |d: u32, secs: i64| ev(1, ts(2026, 7, d, 8), secs);
+        let label = |events: &[PageEvent]| reading_momentum(events, &Utc, today).map(|m| m.label);
+        assert_eq!(label(&[day(15, 200), day(9, 100)]), Some("Picking up"));
+        assert_eq!(label(&[day(15, 100), day(9, 300)]), Some("Slowing down"));
+        assert_eq!(label(&[day(15, 100), day(9, 100)]), Some("Holding steady"));
+        assert_eq!(label(&[day(15, 100)]), Some("Picking up")); // nothing before
+        assert_eq!(label(&[day(1, 100)]), None); // no reading in the last week
+    }
+
+    #[test]
+    fn estimate_confidence_scales_with_days_of_evidence() {
+        // n distinct reading days, unfinished (last_page 50 of 100).
+        let conf = |n: i64| {
+            let events: Vec<_> = (1..=n)
+                .map(|d| ev(d, ts(2026, 7, d as u32, 8), 60))
+                .collect();
+            book_detail(&entry(events), &Utc, date("2026-07-20")).est_confidence
+        };
+        assert_eq!(conf(2), Some("low"));
+        assert_eq!(conf(3), Some("medium"));
+        assert_eq!(conf(7), Some("high"));
     }
 
     #[test]

@@ -152,6 +152,18 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
   finished (distinct finished works), total time, longest streak, session
   count, and the most-active calendar month. Because it is always all-time,
   it stays meaningful (and unchanged) when a shorter window is selected.
+- **Completion rate**: finished works over started works, both counted
+  distinct by title (files of one work count once), whole-history. A started
+  work is any with logged reading.
+- **Reading momentum (per book)**: a book's total time over the last 7 days
+  against the 7 days before it, shown only when the book was read in the last
+  7. Picking up at >= 1.15x (or from no prior reading), slowing down at
+  <= 0.85x, otherwise holding steady. It describes current pace, so a book
+  set aside simply shows nothing.
+- **Estimate confidence**: how far to trust the time-left and finish-date
+  estimate, from the number of distinct reading days behind the pace: high
+  from 7 days, medium from 3, low below. Only present when there is an
+  estimate.
 
 ## Widget catalogue (v1 commitment)
 
@@ -198,7 +210,8 @@ Nothing below exists in KOReader or any of the four tools.
     when the end was reached), total time (both capped and uncapped,
     labelled), days reading, avg time/day, avg time/page, est. time left
     and finish date using KOReader's own math (capped avg_time) so the
-    numbers match the device.
+    numbers match the device, the estimate's confidence, and a reading-
+    momentum read when the book is currently active.
 11. **Weekday and monthly distribution bars.** Weekday averages normalized
     by weekdays elapsed (not raw sums; KoInsight's mistake), monthly
     totals.
@@ -209,10 +222,10 @@ Nothing below exists in KOReader or any of the four tools.
     most pages in a day, each dated) and a list of unfinished books untouched
     for over a month, most-neglected first. Both whole-history, from data
     already loaded.
-14. **Recap and trend.** A whole-history recap card (books finished, total
-    time, longest streak, sessions, most-active month) and, on the windowed
-    total time, a period-over-period change against the previous equal-length
-    window.
+14. **Recap and trend.** A whole-history recap card (books finished,
+    completion rate, total time, longest streak, sessions, most-active
+    month) and, on the windowed total time, a period-over-period change
+    against the previous equal-length window.
 
 ### Tier C — deferred until the data or a dependency justifies it
 

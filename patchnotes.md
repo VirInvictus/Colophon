@@ -1,5 +1,22 @@
 # Patchnotes
 
+## v0.14.0 — 2026-07-05
+
+Trajectory: where each book is heading, and how many you finish.
+
+The book page gains two reads on a book in progress. **Momentum** compares
+its last 7 days to the 7 before (picking up, slowing down, or holding
+steady), shown only while the book is currently being read. And the
+time-left estimate now carries a **confidence**, high, medium, or low,
+from how many days of reading stand behind the pace, so a guess from two
+sittings is not dressed up as certainty.
+
+The **Recap** card gains a **completion** figure: the share of the books
+you have started that you actually finished, counting two files of one work
+once.
+
+All from data already loaded, no new dependencies. 90 tests.
+
 ## v0.13.0 — 2026-07-05
 
 A recap, and a sense of trend.

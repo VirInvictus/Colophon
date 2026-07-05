@@ -324,15 +324,17 @@ third. Ordered cheapest-first.
       from "year-in-review": the data is single-year for now, so a whole-
       history recap is the honest framing; a per-year variant can come with
       the completions timeline once the data spans years.)
-- [ ] **Per-book finish estimate + reading momentum.** Extends the velocity
-      work: seconds-to-finish from current pace with a high/medium/low
-      confidence from evidence count, plus a momentum read (last 7
-      reading-days vs the prior 7, direction + %). Furthest-position pace is
-      pagination-robust.
-- [ ] **Completion / abandonment rate.** Started → finished %, deriving
-      "started" from any dwell and "finished" from the existing 78 %/last-2 %
-      completion heuristic (labelled as inferred, not user-declared, until
-      §4.5 sidecar reconciliation lands).
+- [x] **Per-book finish estimate + reading momentum** (v0.14.0). The
+      existing KOReader-parity time-left/finish estimate now carries a
+      high/medium/low confidence from the number of reading days behind it,
+      and the book page gains a momentum read (last 7 days vs the prior 7:
+      picking up / slowing down / holding steady), shown only while the book
+      is currently active. `stats::reading_momentum`, `BookDetail`.
+- [x] **Completion / abandonment rate** (v0.14.0). A completion figure on
+      the Recap card: finished works over started works (both distinct by
+      title). "Finished" is the inferred furthest-position heuristic, not
+      user-declared, until §4.5 sidecar reconciliation lands.
+      `stats::Recap::completion_rate`.
 - [x] **HHI Variety trait for the reading-personality card** (v0.11.0). A
       fourth synthesised trait (focused ↔ eclectic) from an author-diversity
       Herfindahl index (`1 − HHI` over read time), shown once the library
