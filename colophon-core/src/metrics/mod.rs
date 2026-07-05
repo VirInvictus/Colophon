@@ -15,8 +15,8 @@ pub mod speed;
 pub use completion::{CompletionConfig, completions};
 pub use days::{daily_totals, hourly_profile, local_date, streaks};
 pub use progress::{
-    avg_seconds_per_page, capped_seconds, coverage, rescaled_last_page, uncapped_seconds,
-    unique_pages_read,
+    avg_seconds_per_page, capped_seconds, coverage, coverage_spans, furthest_position,
+    rescaled_last_page, uncapped_seconds, unique_pages_read,
 };
 pub use sessions::sessions;
 pub use speed::{Bucket, speed_series};

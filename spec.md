@@ -66,11 +66,33 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
 - **Streak**: a day counts if it has any reading. Current streak is alive
   if the last read day is today or yesterday; a gap of two or more days
   zeroes it. Longest streak is the max consecutive-day run.
-- **Progress / unique pages read**: interval union on the page axis. Each
-  event's page (out of its own recorded `total_pages`) maps to the
-  fractional span `[(page-1)/total, page/total]`; merged span length x
-  current page count = unique pages read. Immune to re-reads and
-  pagination drift.
+- **Read-span coverage (positional)**: interval union on the page axis.
+  Each event's page (out of its own recorded `total_pages`) maps to the
+  fractional span `[(page-1)/total, page/total]`; the merged set of spans
+  is the *positional* record of which parts of the book were read in
+  KOReader. Immune to re-reads and pagination drift.
+- **Unique pages read**: total merged span length x current page count.
+  This is a *coverage* measure ("how much of the book KOReader logged"),
+  not a progress measure. It under-counts any book partly read outside
+  KOReader (e.g. before a mid-book KOReader install), where a leading
+  span is simply absent.
+- **Furthest position reached**: the maximum span upper bound, i.e. the
+  deepest fractional position any event reached. This is the *progress*
+  measure ("how far through the book you got"), and unlike coverage it is
+  unaffected by an unlogged leading gap. For a book read to its final
+  page it is 1.0 even when coverage is well below that.
+- **Reached the end / finished (inferred)**: furthest position `>= 0.98`
+  (the last-2 % endpoint the completion detector also uses). Drives the
+  per-book "Finished" marker today. The `.sdr` `summary.status` field is
+  the only *user-declared* finished flag and, once sidecars are in scope,
+  overrides the inference (a book can be declared finished without the
+  device having logged the end, and vice versa).
+- **Per-book progress display**: a positional span bar drawing the
+  read-span coverage on the `[0, 1]` page axis (read regions filled,
+  unlogged gaps empty) with a marker at the furthest position, plus the
+  Finished marker when the end was reached. It shows *where* reading was
+  logged, not a single left-anchored fraction, so a book read from the
+  middle onward reads honestly rather than as "partly done".
 - **Completion (inferred read-through)**: KoShelf's detection, adopted
   as-is: a progression of events visiting >= 78 % of pages including a
   page in the first 20 % and one in the last 2 %; a jump back to the
@@ -122,10 +144,12 @@ Nothing below exists in KOReader or any of the four tools.
 8. **Streaks.** Current/longest day streak with date ranges.
 9. **Library totals.** Total time, unique pages, books touched, active
    days, busiest day/month records. Windowed (30/90/365/all).
-10. **Per-book stat cards.** Progress (interval union), total time (both
-    capped and uncapped, labelled), days reading, avg time/day, avg
-    time/page, est. time left and finish date using KOReader's own math
-    (capped avg_time) so the numbers match the device.
+10. **Per-book stat cards.** A positional progress span bar (read regions
+    filled, unlogged gaps empty, furthest-position marker, Finished marker
+    when the end was reached), total time (both capped and uncapped,
+    labelled), days reading, avg time/day, avg time/page, est. time left
+    and finish date using KOReader's own math (capped avg_time) so the
+    numbers match the device.
 11. **Weekday and monthly distribution bars.** Weekday averages normalized
     by weekdays elapsed (not raw sums; KoInsight's mistake), monthly
     totals.

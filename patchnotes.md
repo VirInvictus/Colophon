@@ -1,5 +1,31 @@
 # Patchnotes
 
+## v0.7.0 — 2026-07-05
+
+Honest per-book progress.
+
+The per-book progress bar was showing interval-union coverage (unique
+pages logged, as a fraction of the whole book) as a single left-anchored
+fill. For a book read partly outside KOReader (say, started on a stock
+Kindle and resumed in KOReader after a mid-book jailbreak), that reads as
+"partly done" when the book was actually finished: KOReader only logged
+the pages it saw.
+
+It is now a positional span bar. It draws *where* in the book reading was
+logged (read regions filled, unlogged gaps empty) on the page axis, with a
+marker at the furthest position reached, so a book read from the middle
+onward reads honestly instead of looking half-finished. When the furthest
+position reaches the end (within the last 2 %, the endpoint the completion
+detector already uses), the book gets a Finished marker. The caption names
+the gap: "600 of 866 pages logged (69%), ~31% read before KOReader."
+
+Two new pure, tested core metrics back it: `coverage_spans` (the merged
+read intervals) and `furthest_position` (the progress measure, unaffected
+by an unlogged leading gap). The `.sdr` sidecar's user-declared finished
+flag will override the inference once sidecars are in scope.
+
+74 tests.
+
 ## v0.6.0 — 2026-07-04
 
 A performance pass for large libraries (Phase 4), measured against a

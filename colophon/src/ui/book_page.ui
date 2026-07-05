@@ -36,10 +36,36 @@
                   </object>
                 </child>
                 <child>
-                  <object class="GtkProgressBar" id="progress">
-                    <property name="show-text">true</property>
+                  <object class="GtkBox">
+                    <property name="orientation">horizontal</property>
+                    <property name="spacing">8</property>
                     <property name="margin-top">6</property>
+                    <child>
+                      <object class="GtkLabel" id="progress_caption">
+                        <property name="xalign">0</property>
+                        <property name="hexpand">true</property>
+                        <property name="wrap">true</property>
+                        <style>
+                          <class name="dim-label"/>
+                          <class name="caption"/>
+                        </style>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="finished_badge">
+                        <property name="label">✓ Finished</property>
+                        <property name="visible">false</property>
+                        <property name="valign">start</property>
+                        <style>
+                          <class name="success"/>
+                          <class name="caption-heading"/>
+                        </style>
+                      </object>
+                    </child>
                   </object>
+                </child>
+                <child>
+                  <object class="SpanBar" id="progress"/>
                 </child>
                 <child>
                   <object class="GtkListBox" id="rows">

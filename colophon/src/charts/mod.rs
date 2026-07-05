@@ -9,12 +9,14 @@ pub mod heatmap;
 pub mod hour_heatmap;
 pub mod line;
 pub mod page_activity;
+pub mod span_bar;
 
 pub use bar::BarChart;
 pub use heatmap::YearHeatmap;
 pub use hour_heatmap::HourHeatmap;
 pub use line::LineChart;
 pub use page_activity::PageActivityStrip;
+pub use span_bar::SpanBar;
 
 use gtk::cairo;
 use gtk::gdk;

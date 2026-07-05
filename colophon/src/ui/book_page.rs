@@ -14,7 +14,7 @@ use crate::stats::{self, BookDetail};
 
 mod imp {
     use super::*;
-    use crate::charts::{LineChart, PageActivityStrip};
+    use crate::charts::{LineChart, PageActivityStrip, SpanBar};
     use gtk::CompositeTemplate;
 
     #[derive(CompositeTemplate, Default)]
@@ -25,7 +25,11 @@ mod imp {
         #[template_child]
         pub authors_label: TemplateChild<gtk::Label>,
         #[template_child]
-        pub progress: TemplateChild<gtk::ProgressBar>,
+        pub progress_caption: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub finished_badge: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub progress: TemplateChild<SpanBar>,
         #[template_child]
         pub rows: TemplateChild<gtk::ListBox>,
         #[template_child]
@@ -51,6 +55,7 @@ mod imp {
         fn class_init(klass: &mut Self::Class) {
             PageActivityStrip::ensure_type();
             LineChart::ensure_type();
+            SpanBar::ensure_type();
             klass.bind_template();
         }
 
@@ -84,18 +89,10 @@ impl BookPage {
         imp.authors_label.set_visible(!authors.is_empty());
         imp.authors_label.set_text(authors);
 
-        let fraction = if book.pages > 0 {
-            (entry.unique_pages as f64 / book.pages as f64).clamp(0.0, 1.0)
-        } else {
-            0.0
-        };
-        imp.progress.set_fraction(fraction);
-        imp.progress.set_text(Some(&format!(
-            "{} / {} pages ({:.0}%)",
-            entry.unique_pages,
-            book.pages,
-            fraction * 100.0
-        )));
+        let p = stats::progress(entry);
+        imp.progress.set_data(p.spans.clone(), p.furthest);
+        imp.finished_badge.set_visible(p.finished);
+        imp.progress_caption.set_text(&progress_caption(&p));
 
         imp.rows.remove_all();
         let add = |title: &str, value: String, subtitle: Option<String>| {
@@ -220,6 +217,34 @@ impl BookPage {
                 muted: false,
             },
         ]);
+    }
+}
+
+/// The line under the progress bar. Leads with how far through the book
+/// you got (the honest "progress"), then the pages KOReader logged. When
+/// coverage trails the furthest position, some of the book was read before
+/// KOReader was tracking; the bar shows that gap and this names it.
+fn progress_caption(p: &stats::Progress) -> String {
+    let logged = format!("{} of {} pages logged", p.unique_pages, p.pages);
+    let cov_pct = if p.pages > 0 {
+        (p.unique_pages as f64 / p.pages as f64 * 100.0).round()
+    } else {
+        0.0
+    };
+    if p.finished {
+        // The gap between reaching the end and logged coverage is reading
+        // done outside KOReader.
+        let gap = ((p.furthest - cov_pct / 100.0) * 100.0).round();
+        if gap >= 5.0 {
+            format!("{logged} ({cov_pct:.0}%) \u{b7} ~{gap:.0}% read before KOReader")
+        } else {
+            format!("{logged} ({cov_pct:.0}%)")
+        }
+    } else {
+        format!(
+            "{:.0}% through \u{b7} {logged}",
+            (p.furthest * 100.0).round()
+        )
     }
 }
 

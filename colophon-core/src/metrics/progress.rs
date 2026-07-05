@@ -16,13 +16,15 @@ use std::collections::BTreeMap;
 
 use crate::model::PageEvent;
 
-/// Fraction (0..=1) of a book's page axis covered by `events`.
+/// The merged read intervals on the `[0, 1]` page axis (spec.md
+/// "Read-span coverage (positional)"): sorted, non-overlapping spans of
+/// which parts of the book `events` actually visited.
 ///
 /// Each event contributes the span `[(page-1)/total, page/total]` using
 /// its *own* recorded `total_pages`. Events with a nonpositive
 /// `total_pages` or a page outside `1..=total_pages` are skipped
-/// defensively; both would be corrupt rows.
-pub fn coverage(events: &[PageEvent]) -> f64 {
+/// defensively; both would be corrupt rows. Empty when nothing valid.
+pub fn coverage_spans(events: &[PageEvent]) -> Vec<(f64, f64)> {
     let mut spans: Vec<(f64, f64)> = events
         .iter()
         .filter(|e| e.total_pages > 0 && e.page >= 1 && e.page <= e.total_pages)
@@ -32,24 +34,47 @@ pub fn coverage(events: &[PageEvent]) -> f64 {
         })
         .collect();
     if spans.is_empty() {
-        return 0.0;
+        return Vec::new();
     }
 
     spans.sort_by(|a, b| a.partial_cmp(b).expect("spans are finite"));
 
-    let mut covered = 0.0;
+    let mut merged = Vec::new();
     let (mut lo, mut hi) = spans[0];
     for &(next_lo, next_hi) in &spans[1..] {
         // Tolerance for float error at shared page boundaries.
         if next_lo <= hi + 1e-9 {
             hi = hi.max(next_hi);
         } else {
-            covered += hi - lo;
+            merged.push((lo, hi.min(1.0)));
             (lo, hi) = (next_lo, next_hi);
         }
     }
-    covered += hi - lo;
-    covered.min(1.0)
+    merged.push((lo, hi.min(1.0)));
+    merged
+}
+
+/// Fraction (0..=1) of a book's page axis covered by `events`: the total
+/// length of the merged read spans. A coverage measure, not progress; see
+/// [`furthest_position`].
+pub fn coverage(events: &[PageEvent]) -> f64 {
+    coverage_spans(events)
+        .iter()
+        .map(|(lo, hi)| hi - lo)
+        .sum::<f64>()
+        .min(1.0)
+}
+
+/// The deepest fractional position (0..=1) any event reached: the largest
+/// merged-span upper bound (spec.md "Furthest position reached"). This is
+/// the *progress* measure, unaffected by an unlogged leading gap, so a
+/// book read to its final page reports 1.0 even when [`coverage`] is far
+/// below that. 0 when no valid events.
+pub fn furthest_position(events: &[PageEvent]) -> f64 {
+    coverage_spans(events)
+        .last()
+        .map(|&(_, hi)| hi)
+        .unwrap_or(0.0)
 }
 
 /// `coverage` scaled to a concrete page count, rounded.
@@ -145,6 +170,28 @@ mod tests {
     #[test]
     fn corrupt_rows_are_skipped() {
         assert_eq!(coverage(&[ev(5, 0), ev(0, 100), ev(101, 100)]), 0.0);
+        assert!(coverage_spans(&[ev(5, 0)]).is_empty());
+        assert_eq!(furthest_position(&[ev(5, 0)]), 0.0);
+    }
+
+    #[test]
+    fn coverage_spans_merge_and_leave_gaps() {
+        // Read pages 1..=10 and 91..=100 of 100: two spans with a gap.
+        let mut events: Vec<_> = (1..=10).map(|p| ev(p, 100)).collect();
+        events.extend((91..=100).map(|p| ev(p, 100)));
+        let spans = coverage_spans(&events);
+        assert_eq!(spans.len(), 2);
+        assert!((spans[0].0 - 0.0).abs() < 1e-9 && (spans[0].1 - 0.10).abs() < 1e-9);
+        assert!((spans[1].0 - 0.90).abs() < 1e-9 && (spans[1].1 - 1.00).abs() < 1e-9);
+    }
+
+    #[test]
+    fn furthest_ignores_a_leading_gap() {
+        // The Royal Assassin shape: nothing until ~29%, then read to the
+        // end. Coverage is partial, but furthest reaches the last page.
+        let events: Vec<_> = (30..=100).map(|p| ev(p, 100)).collect();
+        assert!((coverage(&events) - 0.71).abs() < 1e-9);
+        assert!((furthest_position(&events) - 1.0).abs() < 1e-9);
     }
 
     #[test]

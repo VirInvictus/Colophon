@@ -333,6 +333,36 @@ pub fn page_activity(entry: &LibraryEntry) -> PageActivity {
     }
 }
 
+/// Furthest position at/after which a book counts as reached-the-end
+/// (spec.md): the last-2 % endpoint the completion detector also uses.
+pub const FINISHED_THRESHOLD: f64 = 0.98;
+
+/// Per-book reading progress for the positional span bar (spec.md
+/// "Per-book progress display"): the merged read spans, the furthest
+/// position reached, and whether that reached the end. `finished` here is
+/// *inferred*; the `.sdr` declared-finished flag will override it once
+/// sidecars are in scope.
+pub struct Progress {
+    pub spans: Vec<(f64, f64)>,
+    pub furthest: f64,
+    pub finished: bool,
+    /// Interval-union unique pages logged, out of `pages`.
+    pub unique_pages: i64,
+    pub pages: i64,
+}
+
+pub fn progress(entry: &LibraryEntry) -> Progress {
+    let spans = metrics::coverage_spans(&entry.events);
+    let furthest = metrics::furthest_position(&entry.events);
+    Progress {
+        spans,
+        furthest,
+        finished: furthest >= FINISHED_THRESHOLD,
+        unique_pages: entry.unique_pages,
+        pages: entry.book.pages,
+    }
+}
+
 /// Inferred read-throughs for one book (spec.md "Completion").
 pub fn book_completions(entry: &LibraryEntry) -> Vec<colophon_core::Completion> {
     metrics::completions(
@@ -689,6 +719,38 @@ mod tests {
         assert_eq!(activity.per_page.len(), 12);
         // p90 of [10x10, 30, 100]: index (12-1)*9/10 = 9 -> 30.
         assert_eq!(activity.cap_secs, 30);
+    }
+
+    #[test]
+    fn progress_marks_finished_despite_a_leading_gap() {
+        // The Royal Assassin case: KOReader logged pages 60..=100 of a
+        // 100-page book (read from ~59% to the end); the first ~59% was
+        // read before KOReader. Furthest reaches the end -> finished, even
+        // though coverage (unique pages) is only ~41%.
+        let events: Vec<_> = (60..=100)
+            .map(|p| ev(p, ts(2026, 6, 1, 8) + p * 60, 60))
+            .collect();
+        let mut e = entry(events);
+        Rc::get_mut(&mut e).unwrap().unique_pages = 41;
+        let p = progress(&e);
+        assert!(p.finished);
+        assert!((p.furthest - 1.0).abs() < 1e-9);
+        // One contiguous span starting at ~59%, not anchored at 0.
+        assert_eq!(p.spans.len(), 1);
+        assert!(p.spans[0].0 > 0.5);
+    }
+
+    #[test]
+    fn progress_not_finished_when_the_end_is_unreached() {
+        // Read only the first 40%: not finished, furthest ~0.40.
+        let events: Vec<_> = (1..=40)
+            .map(|p| ev(p, ts(2026, 6, 1, 8) + p * 60, 60))
+            .collect();
+        let p = progress(&entry(events));
+        assert!(!p.finished);
+        assert!((p.furthest - 0.40).abs() < 1e-9);
+        assert_eq!(p.spans.len(), 1);
+        assert!((p.spans[0].0).abs() < 1e-9); // anchored at the start
     }
 
     #[test]
