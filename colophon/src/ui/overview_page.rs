@@ -53,6 +53,10 @@ mod imp {
         #[template_child]
         pub series_rows: TemplateChild<gtk::ListBox>,
         #[template_child]
+        pub author_title: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub author_rows: TemplateChild<gtk::ListBox>,
+        #[template_child]
         pub win_30: TemplateChild<gtk::ToggleButton>,
         #[template_child]
         pub win_90: TemplateChild<gtk::ToggleButton>,
@@ -182,11 +186,17 @@ impl OverviewPage {
             Some(profile) => {
                 imp.profile_title.set_visible(true);
                 imp.profile_tiles.set_visible(true);
-                for t in [
+                let mut traits = vec![
                     &profile.chronotype,
                     &profile.session_style,
                     &profile.weekly_rhythm,
-                ] {
+                ];
+                // Variety is whole-library and only meaningful past a few
+                // authors, so it is present only sometimes (spec.md).
+                if let Some(variety) = &profile.variety {
+                    traits.push(variety);
+                }
+                for t in traits {
                     imp.profile_tiles.append(&tile(t.label, &t.detail, None));
                 }
             }
@@ -327,6 +337,32 @@ impl OverviewPage {
                 .build();
             row.add_suffix(&time);
             imp.series_rows.append(&row);
+        }
+
+        // Author affinity (spec.md "Rollups"): most-read authors, hidden
+        // when no book carries author metadata. Top 10 keeps the card from
+        // running long on a big library.
+        imp.author_rows.remove_all();
+        let has_authors = !overview.authors.is_empty();
+        imp.author_title.set_visible(has_authors);
+        imp.author_rows.set_visible(has_authors);
+        for a in overview.authors.iter().take(10) {
+            let plural = if a.books == 1 { "" } else { "s" };
+            let subtitle = if a.finished > 0 {
+                format!("{} book{plural} \u{b7} {} finished", a.books, a.finished)
+            } else {
+                format!("{} book{plural}", a.books)
+            };
+            let row = adw::ActionRow::builder()
+                .title(&a.name)
+                .subtitle(&subtitle)
+                .build();
+            let time = gtk::Label::builder()
+                .label(humanize_secs(a.total_secs))
+                .css_classes(["dim-label"])
+                .build();
+            row.add_suffix(&time);
+            imp.author_rows.append(&row);
         }
     }
 }

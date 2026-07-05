@@ -1,5 +1,24 @@
 # Patchnotes
 
+## v0.11.0 — 2026-07-05
+
+Two more ways to read the same data.
+
+The overview gains an **Authors** section: your most-read authors ranked
+by time, each row showing how many of their books your history covers,
+how many you have finished, and the total time. Like the Series section it
+is whole-library, so it does not move with the time-window selector; two
+files of one work count once, and books without author metadata are left
+out.
+
+The **Reading personality** card can now grow a fourth trait, **Variety**:
+whether you concentrate on a few authors (focused) or range widely
+(eclectic), measured as author diversity over your reading time. It shows
+once the library holds at least three distinct authors, below which the
+measure is too sensitive to the author count to mean anything.
+
+Both come from data already loaded, no new dependencies. 83 tests.
+
 ## v0.10.0 — 2026-07-05
 
 More from the data you already have.

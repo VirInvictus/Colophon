@@ -42,6 +42,9 @@ pub struct Overview {
     /// Series in the library, most-recently-read first (whole-library,
     /// window-independent).
     pub series: Vec<SeriesStat>,
+    /// Authors in the library, most-read first (whole-library,
+    /// window-independent).
+    pub authors: Vec<AuthorStat>,
 }
 
 /// One series' library-wide aggregate (spec.md "Series"). Files of one
@@ -108,6 +111,101 @@ pub fn series_breakdown(entries: &[Rc<LibraryEntry>]) -> Vec<SeriesStat> {
     out.into_iter().map(|(_, s)| s).collect()
 }
 
+/// One author's library-wide aggregate (spec.md "Rollups (series, author)").
+/// Files of one work (same title) count once toward `books`/`finished`;
+/// read time sums across all of the author's files. Ranked by time.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AuthorStat {
+    pub name: String,
+    pub books: usize,
+    pub finished: usize,
+    pub total_secs: i64,
+}
+
+/// The author string as KOReader stores it, or `None` for the empty / `"N/A"`
+/// placeholders. Not split into co-authors (KOReader keeps one field).
+fn author_name(raw: &str) -> Option<String> {
+    let s = raw.trim();
+    (!s.is_empty() && s != "N/A").then(|| s.to_string())
+}
+
+/// Groups the filtered entries by author (spec.md "Author affinity"), ranked
+/// by total read time. A work counts as finished if any of its files reached
+/// the end (furthest position); whole-library, like [`series_breakdown`].
+pub fn author_breakdown(entries: &[Rc<LibraryEntry>]) -> Vec<AuthorStat> {
+    struct Acc {
+        /// title -> finished-by-any-file
+        works: HashMap<String, bool>,
+        secs: i64,
+    }
+    let mut map: HashMap<String, Acc> = HashMap::new();
+    for entry in entries {
+        let Some(name) = author_name(&entry.book.authors) else {
+            continue;
+        };
+        let finished = metrics::furthest_position(&entry.events) >= FINISHED_THRESHOLD;
+        let acc = map.entry(name).or_insert(Acc {
+            works: HashMap::new(),
+            secs: 0,
+        });
+        let title = entry.book.title.trim().to_string();
+        let slot = acc.works.entry(title).or_insert(false);
+        *slot = *slot || finished;
+        acc.secs += entry.book.total_read_time;
+    }
+    let mut out: Vec<AuthorStat> = map
+        .into_iter()
+        .map(|(name, acc)| AuthorStat {
+            name,
+            books: acc.works.len(),
+            finished: acc.works.values().filter(|&&f| f).count(),
+            total_secs: acc.secs,
+        })
+        .collect();
+    out.sort_by(|a, b| {
+        b.total_secs
+            .cmp(&a.total_secs)
+            .then_with(|| a.name.cmp(&b.name))
+    });
+    out
+}
+
+/// The author-diversity Variety trait (spec.md "Reader profile"): `1 - HHI`
+/// over authors by read time, `None` below three distinct authors where the
+/// index is too sensitive to the count to mean anything. Whole-library, so
+/// unlike the three window traits it does not move with the time window.
+fn variety_trait(authors: &[AuthorStat]) -> Option<ProfileTrait> {
+    if authors.len() < 3 {
+        return None;
+    }
+    let total: i64 = authors.iter().map(|a| a.total_secs).sum();
+    if total <= 0 {
+        return None;
+    }
+    let hhi: f64 = authors
+        .iter()
+        .map(|a| {
+            let share = a.total_secs as f64 / total as f64;
+            share * share
+        })
+        .sum();
+    let variety = 1.0 - hhi;
+    let (label, detail) = if variety <= 0.45 {
+        (
+            "Focused reader",
+            format!("{} authors, one leads", authors.len()),
+        )
+    } else if variety >= 0.72 {
+        (
+            "Eclectic reader",
+            format!("spread across {} authors", authors.len()),
+        )
+    } else {
+        ("Varied reader", format!("{} authors", authors.len()))
+    };
+    Some(ProfileTrait { label, detail })
+}
+
 #[derive(Debug, Default, PartialEq)]
 pub struct SessionSummary {
     pub count: usize,
@@ -147,6 +245,7 @@ pub struct OverviewBase {
     streaks: Streaks,
     monthly: Vec<(NaiveDate, i64)>,
     series: Vec<SeriesStat>,
+    authors: Vec<AuthorStat>,
 }
 
 /// Builds the window-independent aggregates once for a filtered entry set.
@@ -169,6 +268,7 @@ pub fn overview_base<Tz: TimeZone>(
         streaks,
         monthly,
         series: series_breakdown(entries),
+        authors: author_breakdown(entries),
     }
 }
 
@@ -241,6 +341,7 @@ pub fn overview_windowed<Tz: TimeZone>(
         daily: base.daily.clone(),
         streaks: base.streaks,
         series: base.series.clone(),
+        authors: base.authors.clone(),
     }
 }
 
@@ -344,6 +445,8 @@ pub struct ReaderProfile {
     pub chronotype: ProfileTrait,
     pub session_style: ProfileTrait,
     pub weekly_rhythm: ProfileTrait,
+    /// Author-diversity trait; `None` below three distinct authors.
+    pub variety: Option<ProfileTrait>,
 }
 
 /// Below this much reading in the window the profile is suppressed rather
@@ -434,6 +537,7 @@ pub fn reader_profile(o: &Overview) -> Option<ReaderProfile> {
         chronotype,
         session_style,
         weekly_rhythm,
+        variety: variety_trait(&o.authors),
     })
 }
 
@@ -920,6 +1024,7 @@ mod tests {
                 ..Default::default()
             },
             series: Vec::new(),
+            authors: Vec::new(),
         }
     }
 
@@ -933,6 +1038,7 @@ mod tests {
         assert_eq!(p.chronotype.label, "Night owl");
         assert_eq!(p.session_style.label, "Marathoner");
         assert_eq!(p.weekly_rhythm.label, "Weekend reader");
+        assert!(p.variety.is_none()); // no authors in the base fixture
     }
 
     #[test]
@@ -961,6 +1067,61 @@ mod tests {
         let series_two = series.iter().find(|s| s.name == "Series Two").unwrap();
         assert_eq!((series_two.books, series_two.finished), (1, 0)); // two files, one work
         assert_eq!(series_two.total_secs, (50 + 40) * 60); // both files' time
+    }
+
+    #[test]
+    fn author_breakdown_ranks_by_time_dedupes_and_skips_placeholders() {
+        let mk = |title: &str, author: &str, last: i64| {
+            // Reading pages 1..=last of 100; last==100 reaches the end.
+            let events: Vec<_> = (1..=last).map(|p| ev(p, p * 60, 60)).collect();
+            let mut e = entry(events);
+            let b = Rc::get_mut(&mut e).unwrap();
+            b.book.title = title.into();
+            b.book.authors = author.into();
+            b.book.total_read_time = last * 60;
+            e
+        };
+        let entries = vec![
+            mk("Alpha", "Robin Hobb", 100),     // finished
+            mk("Beta", "Robin Hobb", 30),       // second work, same author
+            mk("Gamma", "Terry Pratchett", 50), // two files,
+            mk("Gamma", "Terry Pratchett", 40), // one work
+            mk("Loose", "", 40),                // skipped (no author)
+            mk("Placeholder", "N/A", 40),       // skipped
+        ];
+        let authors = author_breakdown(&entries);
+        assert_eq!(authors.len(), 2);
+        // Ranked by time: Hobb 130 min > Pratchett 90 min.
+        assert_eq!(authors[0].name, "Robin Hobb");
+        assert_eq!((authors[0].books, authors[0].finished), (2, 1));
+        assert_eq!(authors[0].total_secs, (100 + 30) * 60);
+        assert_eq!(authors[1].name, "Terry Pratchett");
+        assert_eq!((authors[1].books, authors[1].finished), (1, 0)); // two files, one work
+        assert_eq!(authors[1].total_secs, (50 + 40) * 60);
+    }
+
+    #[test]
+    fn variety_trait_thresholds_and_suppression() {
+        let mk = |name: &str, secs: i64| AuthorStat {
+            name: name.into(),
+            books: 1,
+            finished: 0,
+            total_secs: secs,
+        };
+        // Under three distinct authors: suppressed.
+        assert!(variety_trait(&[mk("A", 100), mk("B", 100)]).is_none());
+        // One author dominates among three: 1 - HHI = 0.185 -> focused.
+        let focused = variety_trait(&[mk("A", 900), mk("B", 50), mk("C", 50)]).unwrap();
+        assert_eq!(focused.label, "Focused reader");
+        // Five even authors: 1 - HHI = 0.8 -> eclectic.
+        let even5: Vec<_> = ["A", "B", "C", "D", "E"]
+            .iter()
+            .map(|n| mk(n, 100))
+            .collect();
+        assert_eq!(variety_trait(&even5).unwrap().label, "Eclectic reader");
+        // Three even authors: 1 - HHI = 0.667 -> varied (between the poles).
+        let even3: Vec<_> = ["A", "B", "C"].iter().map(|n| mk(n, 100)).collect();
+        assert_eq!(variety_trait(&even3).unwrap().label, "Varied reader");
     }
 
     #[test]

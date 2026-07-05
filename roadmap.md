@@ -299,9 +299,10 @@ normative definition lands in `spec.md` first, per the standing rule; the
 pure aggregation goes in `colophon-core`/`stats.rs`, the widget renders
 third. Ordered cheapest-first.
 
-- [ ] **Author affinity.** Reading time and finished-book count rolled up
-      per author (top N), an overview card. A whole dimension the catalogue
-      omits; `book.authors` is already loaded and merged. Cheapest win.
+- [x] **Author affinity** (v0.11.0). Reading time and finished-book count
+      rolled up per author (top 10), an overview "Authors" card ranked by
+      time. Whole-library like Series; files of one work count once.
+      `stats::author_breakdown`.
 - [ ] **Personal records.** Longest single session, biggest reading day by
       time, most pages in a day — a small records card. Max over structures
       the overview already builds (sessions, the daily map).
@@ -325,11 +326,12 @@ third. Ordered cheapest-first.
       "started" from any dwell and "finished" from the existing 78 %/last-2 %
       completion heuristic (labelled as inferred, not user-declared, until
       §4.5 sidecar reconciliation lands).
-- [ ] **HHI Variety trait for the reading-personality card.** A fourth
-      synthesised trait (focused ↔ eclectic) from an author-diversity
-      Herfindahl index (`1 − HHI`). The author half is stats-DB-feasible
-      now; the book-type half stays blocked on catalogue metadata. Borrow
-      Tome's tone-calibrated axis naming (flatter both poles).
+- [x] **HHI Variety trait for the reading-personality card** (v0.11.0). A
+      fourth synthesised trait (focused ↔ eclectic) from an author-diversity
+      Herfindahl index (`1 − HHI` over read time), shown once the library
+      holds three or more distinct authors. Whole-library (author identity
+      does not window). The book-type half stays blocked on catalogue
+      metadata. `stats::variety_trait`.
 
 ## Phase 5 — Post-1.0 candidates (each needs its own go/no-go)
 

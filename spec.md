@@ -107,15 +107,33 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
 - **Junk filter**: books below a minimum total read time (default 5
   minutes, configurable) are hidden from library-wide widgets by default;
   they remain queryable.
+- **Rollups (series, author)**: whole-library groupings, window-independent
+  (they use `book.total_read_time`, KOReader's cached all-time per-book
+  total, so a time-window selection never touches them). *Series* groups by
+  the Calibre-style `series` field (`"Name #index"` parsed to `"Name"`; the
+  empty and `"N/A"` placeholders are skipped). *Author affinity* groups by
+  the `authors` string as KOReader stores it (one field; not split into
+  co-authors). In both, files of one work (same title within a group) count
+  once toward the book and finished counts; "finished" is the inferred
+  furthest-position >= 0.98 (the declared `.sdr` flag once sidecars are in
+  scope). Each rollup sums read time and ranks its entries: series
+  most-recently-read first, author affinity by total time (top authors
+  first).
 - **Reader profile**: a synthesis of already-defined behaviour metrics into
-  three named traits (no new data; classification only, over the selected
-  window). *Chronotype* from the hour-of-day totals' peak hour: early bird
-  (05–10), daytime (11–16), evening (17–20), night owl (21–04). *Session
-  style* from the median session length: marathoner (>= 45 min), sipper
-  (<= 10 min), otherwise steady. *Weekly rhythm* from the mean weekday
-  seconds: weekend reader when the Sat/Sun mean is >= 1.3x the Mon–Fri
-  mean, weekday reader when <= 0.77x, otherwise all-week. Requires a
-  minimum of reading to be meaningful; below it the profile is suppressed.
+  named traits (no new data; classification only). Three are computed over
+  the selected window. *Chronotype* from the hour-of-day totals' peak hour:
+  early bird (05–10), daytime (11–16), evening (17–20), night owl (21–04).
+  *Session style* from the median session length: marathoner (>= 45 min),
+  sipper (<= 10 min), otherwise steady. *Weekly rhythm* from the mean
+  weekday seconds: weekend reader when the Sat/Sun mean is >= 1.3x the
+  Mon–Fri mean, weekday reader when <= 0.77x, otherwise all-week. A fourth
+  trait, *Variety*, is whole-library instead (author identity does not
+  window meaningfully): the author-diversity index `1 - HHI`, where HHI is
+  the sum over authors of each author's share of read time squared. Focused
+  reader when `1 - HHI <= 0.45` (a few authors dominate), eclectic reader
+  when `>= 0.72` (spread widely), otherwise varied; suppressed below three
+  distinct authors. The three window traits require a minimum of reading to
+  be meaningful; below it the whole profile is suppressed.
 
 ## Widget catalogue (v1 commitment)
 
@@ -166,6 +184,9 @@ Nothing below exists in KOReader or any of the four tools.
 11. **Weekday and monthly distribution bars.** Weekday averages normalized
     by weekdays elapsed (not raw sums; KoInsight's mistake), monthly
     totals.
+12. **Rollups.** Series composition and author affinity as whole-library
+    lists (books, finished count, total time), ranked; each hidden when the
+    library carries none of that metadata.
 
 ### Tier C — deferred until the data or a dependency justifies it
 
@@ -173,8 +194,10 @@ Nothing below exists in KOReader or any of the four tools.
   and a real sidecar sample; counts-only until then).
 - Vocabulary-builder widgets (Brandon's `vocabulary_builder.sqlite3` is
   empty; revisit if the feature gets used).
-- Series/language/author rollups (schema supports it; sample data too
-  thin to design against yet).
+- Language rollups (schema supports it; Brandon's library is
+  single-language, so it would render dull — revisit if that changes).
+  Series and author rollups have shipped (overview Series section and
+  Author affinity), promoted out of this tier.
 - Reference-pages normalization across layouts (KoInsight's manual
   canonical page count; only matters with multiple layouts of the same
   book being compared, which the interval-union progress already handles
