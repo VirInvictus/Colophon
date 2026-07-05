@@ -261,6 +261,112 @@ pub fn session_summary<Tz: TimeZone>(events: &[PageEvent], tz: &Tz) -> SessionSu
     }
 }
 
+/// A single reader-profile trait: a plain-language label and the number
+/// behind it (spec.md "Reader profile").
+pub struct ProfileTrait {
+    pub label: &'static str,
+    pub detail: String,
+}
+
+/// The three synthesised reader-profile traits, or `None` when there is too
+/// little reading in the window for them to mean anything.
+pub struct ReaderProfile {
+    pub chronotype: ProfileTrait,
+    pub session_style: ProfileTrait,
+    pub weekly_rhythm: ProfileTrait,
+}
+
+/// Below this much reading in the window the profile is suppressed rather
+/// than reporting noise (spec.md "Reader profile").
+const PROFILE_MIN_SECS: i64 = 3600;
+
+/// Synthesises the reader profile from an already-computed [`Overview`]
+/// (classification only, no new data). Respects the window through the
+/// Overview's windowed hourly/session/weekday fields.
+pub fn reader_profile(o: &Overview) -> Option<ReaderProfile> {
+    if o.total_secs < PROFILE_MIN_SECS || o.sessions.count == 0 {
+        return None;
+    }
+
+    // Chronotype: the peak hour of the whole-week hour-of-day totals.
+    let mut hours = [0i64; 24];
+    for row in &o.hourly {
+        for (h, secs) in row.iter().enumerate() {
+            hours[h] += secs;
+        }
+    }
+    let peak = (0..24).max_by_key(|&h| hours[h]).unwrap_or(0) as u32;
+    let chronotype = ProfileTrait {
+        label: match peak {
+            5..=10 => "Early bird",
+            11..=16 => "Daytime reader",
+            17..=20 => "Evening reader",
+            _ => "Night owl",
+        },
+        detail: format!("peak around {}", crate::fmt::hour_label(peak)),
+    };
+
+    // Session style: from the median session length.
+    let median = o.sessions.median_secs;
+    let session_style = if median >= 45 * 60 {
+        ProfileTrait {
+            label: "Marathoner",
+            detail: format!("median session {}", crate::fmt::humanize_secs(median)),
+        }
+    } else if median <= 10 * 60 {
+        ProfileTrait {
+            label: "Sipper",
+            detail: format!(
+                "short sittings, median {}",
+                crate::fmt::humanize_secs(median)
+            ),
+        }
+    } else {
+        ProfileTrait {
+            label: "Steady",
+            detail: format!("median session {}", crate::fmt::humanize_secs(median)),
+        }
+    };
+
+    // Weekly rhythm: Sat/Sun mean vs Mon-Fri mean.
+    let weekday_mean = o.weekday_avg_secs[0..5].iter().sum::<i64>() as f64 / 5.0;
+    let weekend_mean = o.weekday_avg_secs[5..7].iter().sum::<i64>() as f64 / 2.0;
+    let weekly_rhythm = if weekday_mean <= 0.0 {
+        ProfileTrait {
+            label: if weekend_mean > 0.0 {
+                "Weekend reader"
+            } else {
+                "All week"
+            },
+            detail: "weekends only".into(),
+        }
+    } else {
+        let ratio = weekend_mean / weekday_mean;
+        if ratio >= 1.3 {
+            ProfileTrait {
+                label: "Weekend reader",
+                detail: format!("{ratio:.1}x more on weekends"),
+            }
+        } else if ratio <= 0.77 {
+            ProfileTrait {
+                label: "Weekday reader",
+                detail: format!("{:.1}x more on weekdays", 1.0 / ratio.max(0.01)),
+            }
+        } else {
+            ProfileTrait {
+                label: "All week",
+                detail: "weekdays and weekends alike".into(),
+            }
+        }
+    };
+
+    Some(ReaderProfile {
+        chronotype,
+        session_style,
+        weekly_rhythm,
+    })
+}
+
 /// Mean seconds per weekday, denominator = occurrences of that weekday in
 /// [first reading day, today] inclusive. Empty history yields zeros.
 pub fn weekday_averages(daily: &BTreeMap<NaiveDate, DayTotal>, today: NaiveDate) -> [i64; 7] {
@@ -719,6 +825,47 @@ mod tests {
         assert_eq!(activity.per_page.len(), 12);
         // p90 of [10x10, 30, 100]: index (12-1)*9/10 = 9 -> 30.
         assert_eq!(activity.cap_secs, 30);
+    }
+
+    fn base_overview() -> Overview {
+        Overview {
+            total_secs: 7200,
+            unique_pages: 0,
+            books: 1,
+            active_days: 3,
+            busiest: None,
+            daily: BTreeMap::new(),
+            streaks: colophon_core::Streaks::default(),
+            weekday_avg_secs: [0; 7],
+            hourly: [[0i64; 24]; 7],
+            monthly: Vec::new(),
+            speed: Vec::new(),
+            speed_bucket: Bucket::Day,
+            sessions: SessionSummary {
+                count: 3,
+                median_secs: 1800,
+                ..Default::default()
+            },
+        }
+    }
+
+    #[test]
+    fn reader_profile_classifies_traits() {
+        let mut o = base_overview();
+        o.hourly[2][23] = 1000; // Wednesday 23:00 is the peak hour
+        o.sessions.median_secs = 50 * 60; // marathoner
+        o.weekday_avg_secs = [100, 100, 100, 100, 100, 400, 400]; // weekend-heavy
+        let p = reader_profile(&o).expect("enough data");
+        assert_eq!(p.chronotype.label, "Night owl");
+        assert_eq!(p.session_style.label, "Marathoner");
+        assert_eq!(p.weekly_rhythm.label, "Weekend reader");
+    }
+
+    #[test]
+    fn reader_profile_suppressed_without_enough_reading() {
+        let mut o = base_overview();
+        o.total_secs = 600; // under the hour threshold
+        assert!(reader_profile(&o).is_none());
     }
 
     #[test]

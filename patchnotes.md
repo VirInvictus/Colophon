@@ -1,5 +1,21 @@
 # Patchnotes
 
+## v0.9.0 — 2026-07-05
+
+Reading personality.
+
+The All Books overview gains a "Reading personality" section: three
+plain-language traits synthesised from the behaviour data the charts
+already show, no new data required. Chronotype (early bird, daytime,
+evening, night owl) from your peak reading hour; session style
+(marathoner, steady, sipper) from your median sitting; and weekly rhythm
+(weekday, weekend, all-week reader) from how your weekday and weekend
+averages compare. Each trait names the number behind it, the section
+respects the time-window selector, and it hides itself when there is too
+little reading in the window to say anything honest.
+
+80 tests.
+
 ## v0.8.0 — 2026-07-05
 
 Themes.

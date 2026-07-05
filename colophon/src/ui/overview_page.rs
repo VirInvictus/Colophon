@@ -27,6 +27,10 @@ mod imp {
         #[template_child]
         pub tiles: TemplateChild<gtk::FlowBox>,
         #[template_child]
+        pub profile_title: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub profile_tiles: TemplateChild<gtk::FlowBox>,
+        #[template_child]
         pub heatmap: TemplateChild<YearHeatmap>,
         #[template_child]
         pub hour_heatmap: TemplateChild<HourHeatmap>,
@@ -165,6 +169,27 @@ impl OverviewPage {
         );
         if let Some((date, secs)) = overview.busiest {
             add_tile(humanize_secs(secs), "busiest day", Some(short_date(date)));
+        }
+
+        // Reading personality (spec.md "Reader profile"): three synthesised
+        // traits, hidden when the window has too little reading to classify.
+        imp.profile_tiles.remove_all();
+        match crate::stats::reader_profile(overview) {
+            Some(profile) => {
+                imp.profile_title.set_visible(true);
+                imp.profile_tiles.set_visible(true);
+                for t in [
+                    &profile.chronotype,
+                    &profile.session_style,
+                    &profile.weekly_rhythm,
+                ] {
+                    imp.profile_tiles.append(&tile(t.label, &t.detail, None));
+                }
+            }
+            None => {
+                imp.profile_title.set_visible(false);
+                imp.profile_tiles.set_visible(false);
+            }
         }
 
         imp.heatmap.set_data(&overview.daily, today);

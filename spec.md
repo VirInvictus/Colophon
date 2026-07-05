@@ -107,6 +107,15 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
 - **Junk filter**: books below a minimum total read time (default 5
   minutes, configurable) are hidden from library-wide widgets by default;
   they remain queryable.
+- **Reader profile**: a synthesis of already-defined behaviour metrics into
+  three named traits (no new data; classification only, over the selected
+  window). *Chronotype* from the hour-of-day totals' peak hour: early bird
+  (05–10), daytime (11–16), evening (17–20), night owl (21–04). *Session
+  style* from the median session length: marathoner (>= 45 min), sipper
+  (<= 10 min), otherwise steady. *Weekly rhythm* from the mean weekday
+  seconds: weekend reader when the Sat/Sun mean is >= 1.3x the Mon–Fri
+  mean, weekday reader when <= 0.77x, otherwise all-week. Requires a
+  minimum of reading to be meaningful; below it the profile is suppressed.
 
 ## Widget catalogue (v1 commitment)
 
@@ -136,6 +145,10 @@ Nothing below exists in KOReader or any of the four tools.
 6. **Completions timeline.** Inferred read-throughs plotted on a timeline;
    books-finished-per-year/month rollups; per-completion cards (dates,
    calendar span, time, sessions, pages/hour).
+7. **Reader profile.** The three synthesised traits (chronotype, session
+   style, weekly rhythm) as a compact "reading personality" on the
+   overview, each a plain-language label plus the number behind it. A
+   narrative read of the same behaviour data the charts show.
 
 ### Tier B — expected furniture (table stakes, done well)
 

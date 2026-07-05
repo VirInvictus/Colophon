@@ -235,16 +235,33 @@ in.
       Follow-system mode. One `Theme` drives both the generated adwaita CSS
       and the chart colours; a Preferences dialog (Ctrl+comma) switches
       live. The two static CSS sheets are gone; new GSettings `theme` key.
-- [ ] **Mine today's data for new cards.** Series aggregation (the `series`
-      field), language breakdown, re-read detection, and a reader-profile
-      (night-owl/binger from the hourly + session data). No new deps.
+- [~] **Mine today's data for new cards.** No new deps.
+      - [x] Reader-profile (v0.9.0): "Reading personality" on the overview,
+            three synthesised traits (chronotype, session style, weekly
+            rhythm) classified from the existing hourly/session/weekday data.
+      - [ ] Series aggregation (the `series` field is populated: "The
+            Farseer Trilogy #2", "Discworld #21"; treat "N/A" as none).
+      - [ ] Re-read detection (pages visited more than once; 58 in Royal
+            Assassin) as a per-book stat.
+      - [ ] Language breakdown deferred: Brandon's library is single-language
+            ("en"), so it would render dull; revisit if that changes.
 - [ ] **Completions / year timeline.** Books-per-month/year and a
       completions timeline, unblocked now the data contains a finished book;
       grows as Brandon re-imports after finishing each book.
 - [ ] **`.sdr` finished-flag reconciliation.** Parse the sidecar's declared
       `summary.status` + `percent_finished` to make "finished" authoritative
-      and cross-check inferred completions. Gated on a real sidecar sample
-      (next Kindle mount) and an `mlua`-vs-stdlib dependency decision.
+      and cross-check inferred completions. Gated on an `mlua`-vs-stdlib
+      dependency decision.
+      - **⚠ BLOCKED — needs the Kindle.** Copy one real `.sdr` sidecar
+        (`<book>.sdr/metadata.epub.lua` for a highlighted book, e.g. Royal
+        Assassin) into `research/samples/` next time the Kindle is mounted
+        at `/mnt/Kindle`. Cannot design the parser against nothing. This is
+        the one outstanding hardware errand for the project.
+
+**Data-provisioning errands (need the Kindle, not urgent):** the `.sdr`
+sidecar sample above, and re-importing `statistics.sqlite3` after finishing
+each book so the finished-books features (completions timeline, year
+rollups, estimate-accuracy) grow richer over time.
 
 ## Phase 5 — Post-1.0 candidates (each needs its own go/no-go)
 

@@ -51,6 +51,17 @@ pub fn short_date(date: chrono::NaiveDate) -> String {
     )
 }
 
+/// Hour-of-day (0..=23) as a friendly clock label: "midnight", "noon",
+/// "7 AM", "10 PM".
+pub fn hour_label(hour: u32) -> String {
+    match hour % 24 {
+        0 => "midnight".into(),
+        12 => "noon".into(),
+        h if h < 12 => format!("{h} AM"),
+        h => format!("{} PM", h - 12),
+    }
+}
+
 fn month_abbr(month: u32) -> &'static str {
     [
         "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
@@ -81,6 +92,14 @@ mod tests {
         assert_eq!(humanize_secs(3600), "1h");
         assert_eq!(humanize_secs(3661), "1h 1m");
         assert_eq!(humanize_secs(36060), "10h 1m");
+    }
+
+    #[test]
+    fn hour_label_reads_like_a_clock() {
+        assert_eq!(hour_label(0), "midnight");
+        assert_eq!(hour_label(7), "7 AM");
+        assert_eq!(hour_label(12), "noon");
+        assert_eq!(hour_label(22), "10 PM");
     }
 
     #[test]
