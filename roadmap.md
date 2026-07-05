@@ -275,16 +275,21 @@ in.
       sandboxed `mlua` route over a stdlib parser. `colophon-core::sidecar`
       parses each `metadata.*.lua` in a locked-down Lua VM (`StdLib::NONE`,
       text-only, UTF-8-lossy) and joins `partial_md5_checksum` to
-      `book.md5`; an optional read-only "KOReader library folder" set in
-      Preferences (GSettings `library-dir`) is scanned on load, and the
-      declared `summary.status` becomes authoritative through the single
-      `LibraryEntry::is_finished` used by every finished count and marker.
-      The book page shows the device's status. Opportunistic: an unset or
-      unmounted folder falls back to inference. Verified by a round-trip
-      test that reconciles the real Royal Assassin sidecar
+      `book.md5`; the declared `summary.status` becomes authoritative through
+      the single `LibraryEntry::is_finished` used by every finished count and
+      marker. The book page shows the device's status. Verified by a
+      round-trip test that reconciles the real Royal Assassin sidecar
       (`status="complete"`) against the live stats DB. Reading the
       `annotations` array (highlight content, annotation markers) is the
       remaining sidecar work, now that the parser and dep are in place.
+      - **v0.17.0 rework:** discovery changed from a device-folder scan (the
+        original "KOReader library folder" setting, now removed) to
+        per-book, user-provided files, matching how the stats DB is imported.
+        Each book's page has an "Add file" action; the sidecar is verified
+        against the book's md5, copied into an app-owned cache
+        (`<data>/sidecars/<md5>.lua`), and looked up per book on load.
+        General principle: Colophon never reads the device; any stat needing
+        a file the user has not provided stays hidden until they add it.
 
 **Data-provisioning errands:** the `.sdr` sidecar sample and a fresh
 `statistics.sqlite3` were pulled 2026-07-05 (750 events). Standing errand,

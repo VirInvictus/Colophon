@@ -76,6 +76,43 @@ glib::wrapper! {
 }
 
 impl BookPage {
+    /// Opens a file picker for this book's `.sdr` sidecar and hands it to the
+    /// window to validate, cache, and reload. The user provides the file;
+    /// Colophon never reaches into the device.
+    fn pick_sidecar(&self, md5: &str) {
+        let Some(window) = self
+            .root()
+            .and_downcast::<crate::ui::window::ColophonWindow>()
+        else {
+            return;
+        };
+        let md5 = md5.to_string();
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some("KOReader sidecar (.lua)"));
+        filter.add_pattern("*.lua");
+        let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&filter);
+        let picker = gtk::FileDialog::builder()
+            .title("Choose this book's .sdr sidecar")
+            .filters(&filters)
+            .build();
+        picker.open(
+            Some(&window),
+            gtk::gio::Cancellable::NONE,
+            glib::clone!(
+                #[weak]
+                window,
+                move |result| {
+                    if let Ok(file) = result
+                        && let Some(path) = file.path()
+                    {
+                        window.add_sidecar_for(&md5, &path);
+                    }
+                }
+            ),
+        );
+    }
+
     pub fn set_book(&self, entry: &LibraryEntry, detail: &BookDetail) {
         let imp = self.imp();
         let book = &entry.book;
@@ -100,8 +137,9 @@ impl BookPage {
                 .append(&stat_row(title, &value, subtitle.as_deref()));
         };
 
-        // The device's own declared status, when a library folder is set and
-        // the sidecar was found. This is what makes "finished" authoritative.
+        // The device's own declared status once the user has provided this
+        // book's sidecar (which makes "finished" authoritative); otherwise an
+        // affordance to add it. Colophon never reads the device itself.
         if let Some(status) = &entry.declared_status {
             use colophon_core::sidecar::ReadStatus;
             let label = match status {
@@ -111,6 +149,23 @@ impl BookPage {
                 ReadStatus::Other(s) => s.as_str(),
             };
             add("Status", label.to_string(), Some("from your device".into()));
+        } else if let Some(md5) = book.md5.clone() {
+            let row = adw::ActionRow::builder()
+                .title("Add reading status")
+                .subtitle("Give Colophon this book's .sdr sidecar to use the device's own finished status")
+                .build();
+            let button = gtk::Button::builder()
+                .label("Add file\u{2026}")
+                .valign(gtk::Align::Center)
+                .css_classes(["flat"])
+                .build();
+            row.add_suffix(&button);
+            button.connect_clicked(glib::clone!(
+                #[weak(rename_to = page)]
+                self,
+                move |_| page.pick_sidecar(&md5)
+            ));
+            imp.rows.append(&row);
         }
 
         add(

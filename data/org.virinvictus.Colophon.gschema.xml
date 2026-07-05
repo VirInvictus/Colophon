@@ -11,11 +11,6 @@
       <summary>Last import source</summary>
       <description>The file the current statistics snapshot was imported from; used by Refresh.</description>
     </key>
-    <key name="library-dir" type="s">
-      <default>''</default>
-      <summary>KOReader library folder</summary>
-      <description>Folder holding the books and their .sdr sidecars, read only for the user-declared finished status the stats database does not carry. Empty means the finished state is inferred from reading position alone.</description>
-    </key>
     <key name="theme" type="s">
       <default>'system'</default>
       <summary>Colour theme</summary>

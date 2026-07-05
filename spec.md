@@ -82,20 +82,25 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
   unaffected by an unlogged leading gap. For a book read to its final
   page it is 1.0 even when coverage is well below that.
 - **Reached the end / finished**: the sidecar's user-declared
-  `summary.status` is authoritative when a library folder is configured and
-  the book's sidecar is found (implemented v0.15.0); otherwise the inferred
-  furthest position `>= 0.98` (the last-2 % endpoint the completion detector
+  `summary.status` is authoritative when the user has provided the book's
+  sidecar; otherwise the inferred furthest position `>= 0.98` (the last-2 % endpoint the completion detector
   also uses). A book can be declared finished without the device having
   logged the end, and vice versa. This single reconciled value
   (`LibraryEntry::is_finished`) drives the per-book "Finished" marker and
   every finished count (series, author, recap, completion rate).
-- **Library folder (optional, read-only)**: a configured path to the folder
-  holding the books and their `.sdr` sidecars. When set and reachable,
-  Colophon scans it read-only, parses each `metadata.*.lua` sidecar in a
-  sandboxed Lua VM (no stdlib, text chunks only, UTF-8 repaired lossily),
-  and joins `partial_md5_checksum` to `book.md5`. It is opportunistic: an
-  unset or unmounted folder simply leaves the finished state inferred. This
-  is the only path outside `statistics.sqlite3`, and it is never written.
+- **User-provided files (the app never reads the device)**: Colophon only
+  ever sees files the user hands it, exactly as it does the stats database
+  (which the user imports). It does not scan or read anything on the device.
+  Any statistic that needs a file the user has not provided simply does not
+  show until they add it. This is a deliberate boundary, not a limitation.
+- **`.sdr` sidecars, per book**: the user adds a book's `metadata.*.lua`
+  sidecar from that book's own page. Colophon checks its
+  `partial_md5_checksum` matches the book (rejecting another book's file),
+  copies it into its own cache (`<data>/sidecars/<book-md5>.lua`), and parses
+  it in a sandboxed Lua VM (no stdlib, text chunks only, UTF-8 repaired
+  lossily). On load each book looks up its own cached sidecar by md5; a book
+  with none keeps the inferred stats. The cache is app-owned and the sidecar
+  is only ever read.
 - **Per-book progress display**: a positional span bar drawing the
   read-span coverage on the `[0, 1]` page axis (read regions filled,
   unlogged gaps empty) with a marker at the furthest position, plus the

@@ -1,5 +1,26 @@
 # Patchnotes
 
+## v0.17.0 — 2026-07-05
+
+You hand Colophon the files. It never reaches into your device.
+
+The previous release read the declared finished status by pointing Colophon
+at a folder on your device and scanning it. That is the wrong shape: it
+means the app rummaging through your files. This release inverts it to match
+how the stats database already works, you give Colophon exactly the files
+you want it to see, nothing more.
+
+Each book's page now has an **Add file** button. Give it that book's `.sdr`
+sidecar and Colophon checks it really belongs to the book, keeps its own
+copy, and reads the device's finished/reading/abandoned status from it. A
+book you have not provided a sidecar for simply keeps the inferred status,
+and its page invites you to add one. The old library-folder setting is gone.
+
+The same principle now holds for anything Colophon might need beyond the
+stats database: if a stat needs a file you have not given it, that stat
+stays hidden until you do. 96 tests, including a per-book round-trip that
+reconciles a real finished book from its cached sidecar.
+
 ## v0.16.0 — 2026-07-05
 
 A fairer read on how you read.

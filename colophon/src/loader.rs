@@ -28,7 +28,7 @@ pub struct LibrarySnapshot {
 /// the KOReader-parity numbers that must come from the rescaled
 /// `page_stat` view (capped totals, distinct current-axis pages, last
 /// read page) because that is what the device's own queries run on.
-pub fn load_snapshot(path: &Path, library_dir: Option<&Path>) -> Result<LibrarySnapshot> {
+pub fn load_snapshot(path: &Path, sidecar_dir: Option<&Path>) -> Result<LibrarySnapshot> {
     let db = StatsDb::open(path)?;
     let schema_version = db.schema_version()?;
     let mut entries = Vec::new();
@@ -65,16 +65,19 @@ pub fn load_snapshot(path: &Path, library_dir: Option<&Path>) -> Result<LibraryS
         });
     }
     // Reconcile the inferred "finished" against the device's own declared
-    // status from the `.sdr` sidecars, when a library folder is configured
-    // and reachable. Opportunistic: an absent or unmounted folder just
-    // leaves the inference in place (spec.md).
-    if let Some(dir) = library_dir {
-        let sidecars = colophon_core::sidecar::scan_sidecars(dir);
+    // status, read from the user-provided `.sdr` sidecars: one file per book,
+    // named by the book's md5, that the user copied in themselves. Colophon
+    // never reads the device. A book with no sidecar here simply keeps the
+    // inference (spec.md).
+    if let Some(dir) = sidecar_dir {
         for entry in &mut entries {
-            if let Some(md5) = &entry.book.md5
-                && let Some(meta) = sidecars.get(&md5.to_lowercase())
-            {
-                entry.declared_status = meta.status.clone();
+            if let Some(md5) = &entry.book.md5 {
+                let path = dir.join(format!("{}.lua", md5.to_lowercase()));
+                if path.exists()
+                    && let Ok(meta) = colophon_core::sidecar::parse_sidecar_file(&path)
+                {
+                    entry.declared_status = meta.status;
+                }
             }
         }
     }
@@ -90,7 +93,7 @@ pub fn import(
     source: &Path,
     staging_dir: &Path,
     canonical: &Path,
-    library_dir: Option<&Path>,
+    sidecar_dir: Option<&Path>,
 ) -> Result<LibrarySnapshot> {
     let staged = colophon_core::snapshot(source, staging_dir)
         .context("copying the database (is the device still mounted?)")?;
@@ -116,7 +119,7 @@ pub fn import(
         .with_context(|| format!("installing snapshot at {}", canonical.display()))?;
     let _ = std::fs::remove_dir_all(staging_dir);
 
-    load_snapshot(canonical, library_dir)
+    load_snapshot(canonical, sidecar_dir)
 }
 
 #[cfg(test)]
@@ -172,32 +175,47 @@ mod tests {
 
     #[test]
     fn load_snapshot_reconciles_declared_status_from_sidecars() {
-        // Needs both the gitignored stats DB and the `.sdr` sidecar samples.
+        // Needs both the gitignored stats DB and a `.sdr` sidecar sample.
         let Some(source) = sample() else {
             eprintln!("live sample not present; skipping");
             return;
         };
-        let samples = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../research/samples");
-        if !samples.exists() {
-            eprintln!("sidecar samples not present; skipping");
+        let sample_sidecar = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../research/samples/Royal Assassin - Robin Hobb (1705).sdr/metadata.epub.lua");
+        if !sample_sidecar.exists() {
+            eprintln!("sidecar sample not present; skipping");
             return;
         }
         let root = temp_dir("sidecar-reconcile");
         let canonical = root.join("statistics.sqlite3");
         import(&source, &root.join("staging"), &canonical, None).unwrap();
 
-        // With no library dir, nothing is declared.
+        // With no sidecar dir, nothing is declared.
         let bare = load_snapshot(&canonical, None).unwrap();
         assert!(bare.entries.iter().all(|e| e.declared_status.is_none()));
 
-        // With the samples as the library dir, the md5 join lands and Royal
-        // Assassin comes back declared complete (finished on the device).
-        let snap = load_snapshot(&canonical, Some(&samples)).unwrap();
+        // Copy the real sidecar into a per-book cache named by its md5, the
+        // way the app stores what the user hands it.
+        let meta = colophon_core::sidecar::parse_sidecar_file(&sample_sidecar).unwrap();
+        let md5 = meta.partial_md5.expect("sidecar carries an md5");
+        let cache = root.join("sidecars");
+        std::fs::create_dir_all(&cache).unwrap();
+        std::fs::copy(
+            &sample_sidecar,
+            cache.join(format!("{}.lua", md5.to_lowercase())),
+        )
+        .unwrap();
+
+        let snap = load_snapshot(&canonical, Some(&cache)).unwrap();
         assert!(
-            snap.entries.iter().any(|e| e.declared_status
-                == Some(colophon_core::sidecar::ReadStatus::Complete)
+            snap.entries.iter().any(|e| e
+                .book
+                .md5
+                .as_deref()
+                .is_some_and(|m| m.eq_ignore_ascii_case(&md5))
+                && e.declared_status == Some(colophon_core::sidecar::ReadStatus::Complete)
                 && e.is_finished()),
-            "expected a sidecar-declared complete book"
+            "the book matching the sidecar md5 should read declared-complete"
         );
 
         std::fs::remove_dir_all(&root).ok();

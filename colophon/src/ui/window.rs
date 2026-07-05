@@ -136,13 +136,12 @@ impl ColophonWindow {
             return;
         }
         self.imp().library_stack.set_visible_child_name("loading");
-        let library_dir = crate::settings::library_dir();
+        let sidecar_dir = paths::sidecar_dir();
         let weak = self.downgrade();
         glib::spawn_future_local(async move {
-            let result = gio::spawn_blocking(move || {
-                loader::load_snapshot(&snapshot, library_dir.as_deref())
-            })
-            .await;
+            let result =
+                gio::spawn_blocking(move || loader::load_snapshot(&snapshot, Some(&sidecar_dir)))
+                    .await;
             let Some(window) = weak.upgrade() else { return };
             match result {
                 Ok(Ok(snap)) => window.apply_snapshot(snap),
@@ -218,7 +217,7 @@ impl ColophonWindow {
             self.imp().library_stack.set_visible_child_name("loading");
         }
 
-        let library_dir = crate::settings::library_dir();
+        let sidecar_dir = paths::sidecar_dir();
         let weak = self.downgrade();
         glib::spawn_future_local(async move {
             let task_source = source.clone();
@@ -227,7 +226,7 @@ impl ColophonWindow {
                     &task_source,
                     &paths::staging_dir(),
                     &paths::snapshot_path(),
-                    library_dir.as_deref(),
+                    Some(&sidecar_dir),
                 )
             })
             .await;
@@ -304,18 +303,39 @@ impl ColophonWindow {
         self.refresh_content();
     }
 
-    /// Persist the KOReader library folder and reload from the canonical
-    /// snapshot, so the sidecar-derived finished status is re-read (or
-    /// dropped when cleared). A no-op path is stored as the empty string.
-    pub fn set_library_dir(&self, dir: Option<std::path::PathBuf>) {
-        if let Some(s) = settings::settings() {
-            let value = dir
-                .as_ref()
-                .map(|p| p.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            let _ = s.set_string(settings::KEY_LIBRARY_DIR, &value);
+    /// Takes a user-provided `.sdr` sidecar for the book with `md5`, copies
+    /// it into the app's own cache (never reading the device), and reloads so
+    /// the declared status appears. Rejects a file that belongs to a
+    /// different book. Any problem is a toast, never a crash.
+    pub fn add_sidecar_for(&self, md5: &str, source: &std::path::Path) {
+        let meta = match colophon_core::sidecar::parse_sidecar_file(source) {
+            Ok(m) => m,
+            Err(e) => {
+                self.show_toast(&format!("Couldn't read that sidecar: {e:#}"));
+                return;
+            }
+        };
+        // Guard against picking the wrong book's file (when it carries an md5
+        // to check against; some document types don't).
+        if let Some(file_md5) = &meta.partial_md5
+            && !file_md5.eq_ignore_ascii_case(md5)
+        {
+            self.show_toast("That sidecar belongs to a different book");
+            return;
         }
-        self.startup_load();
+        let dest = paths::sidecar_for(md5);
+        let saved = dest
+            .parent()
+            .map(std::fs::create_dir_all)
+            .unwrap_or(Ok(()))
+            .and_then(|_| std::fs::copy(source, &dest).map(|_| ()));
+        match saved {
+            Ok(()) => {
+                self.show_toast("Sidecar added");
+                self.startup_load();
+            }
+            Err(e) => self.show_toast(&format!("Couldn't save the sidecar: {e}")),
+        }
     }
 
     fn junk_filter_on(&self) -> bool {

@@ -19,3 +19,15 @@ pub fn snapshot_path() -> PathBuf {
 pub fn staging_dir() -> PathBuf {
     app_data_dir().join("import-tmp")
 }
+
+/// User-provided `.sdr` sidecars, one per book, named by the book's md5.
+/// Colophon copies here what the user hands it (never reads the device);
+/// a book with no file here simply falls back to inferred stats.
+pub fn sidecar_dir() -> PathBuf {
+    app_data_dir().join("sidecars")
+}
+
+/// The cached sidecar path for a given book md5 (lowercased).
+pub fn sidecar_for(md5: &str) -> PathBuf {
+    sidecar_dir().join(format!("{}.lua", md5.to_lowercase()))
+}
