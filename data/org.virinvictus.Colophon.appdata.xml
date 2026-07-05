@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.virinvictus.Colophon</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Colophon</name>
+  <summary>Reading statistics viewer for KOReader</summary>
+  <description>
+    <p>
+      Colophon turns KOReader's reading statistics into attractive, varied
+      graphs and widgets: a native GTK4 and libadwaita desktop app, not a
+      web dashboard or a self-hosted service.
+    </p>
+    <p>
+      It reads a copy of the device's statistics database and never touches
+      the original, then presents both a library-wide overview and per-book
+      detail.
+    </p>
+    <ul>
+      <li>An All Books overview: totals, streaks, a year heatmap, and a when-do-I-read grid</li>
+      <li>Per-book stat cards that match the numbers KOReader shows on the device</li>
+      <li>Reading-speed trends, session analytics, and a per-page activity strip</li>
+      <li>A 30, 90, 365, and all-time window selector</li>
+      <li>Local-first: no accounts, no telemetry, no cloud, fully offline</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">org.virinvictus.Colophon.desktop</launchable>
+  <url type="homepage">https://github.com/VirInvictus/Colophon</url>
+  <url type="bugtracker">https://github.com/VirInvictus/Colophon/issues</url>
+  <developer id="io.github.virinvictus">
+    <name>Brandon LaRocque</name>
+  </developer>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.6.0" date="2026-07-04" />
+    <release version="0.5.0" date="2026-07-03" />
+  </releases>
+</component>

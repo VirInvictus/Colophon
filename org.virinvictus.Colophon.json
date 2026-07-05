@@ -1,0 +1,39 @@
+{
+    "app-id": "org.virinvictus.Colophon",
+    "runtime": "org.gnome.Platform",
+    "runtime-version": "49",
+    "sdk": "org.gnome.Sdk",
+    "sdk-extensions": [
+        "org.freedesktop.Sdk.Extension.rust-stable"
+    ],
+    "command": "colophon",
+    "finish-args": [
+        "--share=ipc",
+        "--socket=fallback-x11",
+        "--socket=wayland",
+        "--device=dri",
+        "--filesystem=host:ro"
+    ],
+    "build-options": {
+        "append-path": "/usr/lib/sdk/rust-stable/bin",
+        "env": {
+            "CARGO_HOME": "/run/build/colophon/cargo"
+        }
+    },
+    "modules": [
+        {
+            "name": "colophon",
+            "buildsystem": "meson",
+            "config-opts": [
+                "--prefix=/app",
+                "--buildtype=release"
+            ],
+            "sources": [
+                {
+                    "type": "dir",
+                    "path": "."
+                }
+            ]
+        }
+    ]
+}

@@ -19,11 +19,11 @@ const APP_ID: &str = "org.virinvictus.Colophon";
 
 fn main() -> glib::ExitCode {
     // Dev-run GSettings shim: point gio at the schema build.rs compiled
-    // into data/, unless the environment already provides one (installed
-    // builds). Must happen before any gio call or thread spawn; set_var
-    // is unsafe in Rust 2024 exactly because of racing threads, and none
-    // exist yet on line one of main.
-    let dev_schema_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/data");
+    // into the top-level data/, unless the environment already provides one
+    // (installed builds). Must happen before any gio call or thread spawn;
+    // set_var is unsafe in Rust 2024 exactly because of racing threads, and
+    // none exist yet on line one of main.
+    let dev_schema_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../data");
     if std::env::var_os("GSETTINGS_SCHEMA_DIR").is_none()
         && std::path::Path::new(dev_schema_dir)
             .join("gschemas.compiled")

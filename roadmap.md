@@ -196,8 +196,19 @@ Tier B widgets (expected furniture, done correctly):
       `localtime`), so the metric functions and their tests are untouched.
       Load time is unchanged (both paths compute the view once); the win
       is memory and per-interaction render cost.
-- [ ] Meson wrapper + desktop entry + AppStream metainfo + Flatpak
-      manifest, matching the Atrium/Conservatory/Viaduct pattern.
+- [x] Meson wrapper + desktop entry + AppStream metainfo + Flatpak
+      manifest, matching the Atrium/Conservatory/Viaduct pattern. Top-level
+      `meson.build` orchestrates `cargo build --release` and installs the
+      GNOME-shaped layout (binary, gschema + compiled cache, `.desktop`,
+      `.metainfo.xml`, hicolor icon); the gschema moved from `colophon/data`
+      to a shared top-level `data/` (dev-run schema shim in `main.rs` and
+      `build.rs` updated to match). `org.virinvictus.Colophon.json` builds
+      it against the GNOME 49 runtime with a read-only host sandbox
+      (`--filesystem=host:ro`, fitting the read-only ethos so Refresh can
+      re-read a device path). Verified end to end: `meson setup/compile/
+      install` to a temp prefix lays the tree out correctly, and
+      `desktop-file-validate` + `appstreamcli validate` pass. The installed
+      icon is still the placeholder `logo.svg` pending the icon pass.
 - [ ] `VERSION` → `1.0.0`.
 
 ## Phase 5 — Post-1.0 candidates (each needs its own go/no-go)

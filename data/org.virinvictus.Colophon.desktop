@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Colophon
+Comment=Reading statistics viewer for KOReader
+Exec=colophon
+Icon=org.virinvictus.Colophon
+Terminal=false
+Type=Application
+Categories=GNOME;GTK;Utility;
+Keywords=KOReader;Reading;Statistics;Books;Ebook;Stats;
+StartupNotify=true
+DBusActivatable=true
