@@ -237,6 +237,29 @@ pub fn rgba(hex: &str) -> gdk::RGBA {
     gdk::RGBA::new(byte(1), byte(3), byte(5), 1.0)
 }
 
+// Phase 6a reference-sheet spike: previews the Hyprland-native target look
+// (flat, square, 1px hard borders, hidden window buttons) as overrides on
+// top of the still-present adwaita sheet. Gated on COLOPHON_FLAT so default
+// behaviour is untouched; deleted when the owned stylesheet lands (6c).
+fn flat_css(t: &Theme) -> String {
+    format!(
+        "\
+window.csd {{ border-radius: 0; box-shadow: none; }}
+headerbar {{ background: {bg_header}; background-image: none; box-shadow: none;
+  border-bottom: 1px solid {grid}; min-height: 34px; }}
+headerbar windowcontrols {{ opacity: 0; min-width: 0; margin: 0; }}
+button, entry, row, toast, popover > contents, scrollbar slider,
+progressbar trough, progressbar progress, .card, .pill,
+list.boxed-list {{ border-radius: 0; }}
+button {{ box-shadow: none; }}
+.card, list.boxed-list {{ border: 1px solid {grid}; box-shadow: none; }}
+popover > contents {{ border: 1px solid {grid}; box-shadow: none; }}
+",
+        bg_header = t.bg_header,
+        grid = t.grid,
+    )
+}
+
 fn css(t: &Theme) -> String {
     format!(
         "\
@@ -291,6 +314,14 @@ fn css(t: &Theme) -> String {
     )
 }
 
+fn css_with_overrides(t: &Theme) -> String {
+    let mut sheet = css(t);
+    if std::env::var_os("COLOPHON_FLAT").is_some() {
+        sheet.push_str(&flat_css(t));
+    }
+    sheet
+}
+
 fn apply(t: &'static Theme) {
     ACTIVE.with(|a| *a.borrow_mut() = t);
     let Some(display) = gdk::Display::default() else {
@@ -302,7 +333,7 @@ fn apply(t: &'static Theme) {
             gtk::style_context_remove_provider_for_display(&display, &old);
         }
         let provider = gtk::CssProvider::new();
-        provider.load_from_string(&css(t));
+        provider.load_from_string(&css_with_overrides(t));
         gtk::style_context_add_provider_for_display(
             &display,
             &provider,

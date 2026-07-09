@@ -433,32 +433,30 @@ Guardrails, restated because "never break userspace" binds hardest here:
 
 ### 6a — Design decisions first (spec.md before code)
 
-- [ ] **Decoration posture.** Sleek-on-Hyprland means no fat CSD headerbar:
-      Hyprland draws the borders and gaps, the app is content. Decide where
-      the headerbar's cargo goes (import, refresh, primary menu, the back
-      affordance): a slim flat toolbar, or minimal chrome with
-      keyboard-first access. Decide whether window buttons appear at all
-      (Hyprland binds close/float/fullscreen to keys; GNOME users still get
-      `Ctrl+Q` and their compositor's own affordances either way).
-- [ ] **The look itself.** Flat, square, hard 1px borders, no shadows,
-      denser spacing; the eight palettes unchanged. Cheap first step before
-      any widget churn: push one aggressive "Hyprland" reference sheet
-      through the existing `theme.rs` generator to lock the target look
-      while adwaita is still in place, so the migration has a visual spec
-      to hit rather than a vibe.
-- [ ] **Layout.** Replace `AdwNavigationSplitView` + `AdwBreakpoint`
-      (phone-style adaptive collapse) with a plain `GtkPaned` sidebar:
-      tiling-honest and simpler. Decide the narrow-tile behaviour
-      explicitly (sidebar toggle vs. paned shrink floor) instead of
-      inheriting adwaita's collapse heuristics.
-- [ ] **Follow-system dark/light without `adw::StyleManager`.** Plain GTK4
-      does not track the portal colour-scheme by itself. Options: read
+- [x] **Decoration posture.** Decided 2026-07-09 (spec "Design language"):
+      slim flat toolbar, no window buttons. A thin flat bar keeps the
+      title and the Import / Refresh / primary-menu buttons over a 1px
+      rule; closing is `Ctrl+Q` plus the compositor's own binds on either
+      desktop.
+- [x] **The look itself.** Flat, square, hard 1px borders, no shadows,
+      denser spacing; the eight palettes unchanged. The reference sheet
+      shipped as a `COLOPHON_FLAT`-gated override block in `theme.rs`
+      (square corners, 1px card borders, flat thin toolbar, window
+      controls hidden) and Brandon approved the direction live on Hyprland
+      2026-07-09. Known spike gaps (toast still a pill, spacing not yet
+      densified) are absorbed by the real owned sheet in 6c; the spike is
+      deleted when 6c lands.
+- [x] **Layout.** Decided 2026-07-09 (spec "Design language"): plain
+      `GtkPaned` with a manual sidebar toggle (`F9`), paned position
+      persisted in GSettings, no auto-collapse; the app never reshuffles
+      its own layout on resize.
+- [x] **Follow-system dark/light without `adw::StyleManager`.** Decided
+      2026-07-09 (spec "Design language"): keep Follow-system by reading
       `org.freedesktop.portal.Settings` directly over D-Bus via gio
-      (already a dependency through GTK, zero new crates), or drop
-      Follow-system and make the eight themes explicit-only. Lean: the gio
-      portal read; it preserves today's behaviour on both desktops. Either
-      way, note `xdg-desktop-portal-hyprland` or `-gtk` as the documented
-      runtime dependency for a non-GNOME session.
+      (already a dependency through GTK, zero new crates); degrades to the
+      dark default with no portal backend, never a failure.
+      `xdg-desktop-portal-hyprland` or `-gtk` is the documented runtime
+      dependency for a non-GNOME session.
 
 ### 6b — Widget migration (the mechanical middle)
 

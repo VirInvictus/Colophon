@@ -290,6 +290,40 @@ Rust 2024, GTK4 / libadwaita, `rusqlite` (read-only opens only). Two-crate
 workspace: `colophon-core` (ingestion/querying) and `colophon` (the GTK
 shell). Charting approach (native cairo drawing vs. a Rust charting crate)
 is an open decision for after Phase 0 — don't lock it in prematurely.
+Phase 6 removes libadwaita from this list (see "Design language" below);
+GTK4 stays.
+
+## Design language (Phase 6 — Hyprland-native; decisions locked 2026-07-09)
+
+Colophon's shell targets a tiling, keyboard-first desktop. GTK4 stays;
+libadwaita goes. The look is flat, square, and hard-edged: 1px borders,
+no rounded corners, no shadows, denser spacing than GNOME HIG. The eight
+palettes are unchanged; the app's own generated stylesheet (grown from
+`theme.rs`) is the single styling authority once the adwaita sheet is gone.
+The app must keep working under GNOME unchanged in behaviour; only the
+look stops being GNOME's.
+
+Decisions (Brandon, 2026-07-09):
+
+- **Decoration posture: slim flat toolbar, no window buttons.** A thin,
+  flat bar carries the title and the Import / Refresh / primary-menu
+  buttons, separated from content by a 1px rule. No close / minimize /
+  maximize buttons anywhere: Hyprland owns window management, and
+  `Ctrl+Q` (already bound) plus the compositor's own binds cover closing
+  on any desktop.
+- **Layout: `GtkPaned` with a manual sidebar toggle.** The
+  `AdwNavigationSplitView` adaptive collapse is replaced by a plain paned
+  layout; a keybind (`F9`) shows/hides the library sidebar and the paned
+  position persists in GSettings. The app never reshuffles its own layout
+  on resize; narrow tiles are the user's call.
+- **Follow-system dark/light survives via the portal.** Theme resolution
+  reads `org.freedesktop.portal.Settings` (the
+  `org.freedesktop.appearance` `color-scheme` key) directly over D-Bus
+  through gio; no new dependency. Fixed themes force their own polarity
+  exactly as today. Runtime note for non-GNOME sessions: a settings
+  portal backend (`xdg-desktop-portal-hyprland` or `-gtk`) must be
+  running for Follow-system to resolve; without one it degrades to the
+  dark default, never a failure.
 
 ## Non-goals (for now)
 
