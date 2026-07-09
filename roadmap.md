@@ -399,3 +399,132 @@ Ordered roughly by likelihood. None are commitments.
       device implies a Hardcover plugin is in use; a read-only "also on
       Hardcover" link-out is the most this should ever be (local-first
       rule).
+
+## Phase 6 — Hyprland-leaning design (post-1.0)
+
+Brandon moved his desktop from GNOME Shell to Hyprland (a Wayland tiling
+compositor) in 2026-07. Colophon stays GTK4/libadwaita; nothing here may
+regress GNOME Shell behavior, so every item is additive polish for a
+tiling-WM, keyboard-first, portal-mediated session, not a rewrite. Same
+discipline as Phase 5: each item is its own go/no-go, ordered roughly
+cheapest-first.
+
+- [ ] **Tiling geometry audit for the two fixed-width charts.**
+      `HourHeatmap` requests a hard content width of `LEFT + (CELL_W +
+      GAP) * 24` (34 + 25 * 24 = 634px, `charts/hour_heatmap.rs:41-42`),
+      and `YearHeatmap` grows with weeks of history (`LEFT + (CELL + GAP)
+      * weeks`, `charts/heatmap.rs:119-120`). Both already sit inside a
+      `GtkScrolledWindow` with `hscrollbar-policy: automatic` so they
+      scroll instead of forcing the window wide
+      (`overview_page.ui:146-148`, `:166-168`), while the outer page
+      scroller stays `hscrollbar-policy: never` (`overview_page.ui:6`) so
+      only the two heat grids can go wide. Confirm at a genuine
+      quarter-monitor tile (roughly 480px) that: (a) the horizontal
+      scrollbar is discoverable without a mouse hover, since Hyprland
+      users are more likely to be keyboard/touchpad-only; (b) cell size
+      and per-cell tooltip legibility survive being clipped to that
+      width; (c) `book_page.ui`'s activity strip and speed chart (which
+      only set `content_height`, not `content_width`) keep reflowing
+      cleanly at the same width instead of relying on the scroller.
+- [ ] **Width-adaptive label thinning instead of a hardcoded modulus.**
+      The session-starts bar chart currently hides all but every sixth
+      hour label at data-prep time (`hour % 6 == 0`,
+      `overview_page.rs:400-406`), a fixed choice independent of the
+      widget's actual allocated width. `BarChart::draw` already receives
+      the live width and computes slot width from it
+      (`charts/bar.rs`), so this is fixable inside the draw callback:
+      measure each candidate label with `text_width`
+      (`charts/mod.rs:107-115`) against the slot width and thin (or
+      widen) the label set to what actually fits at the tile's current
+      size, rather than a fixed skip-every-N baked in upstream. Apply the
+      same audit to the weekday/monthly bar labels and the hour-heatmap's
+      hour-of-day column headers, none of which currently vary their
+      density with allocation.
+- [ ] **Minimum-height audit on short tiles.** A quarter-monitor tile can
+      be short as well as narrow. Check the fixed chart heights
+      (`LineChart` 150px, `BarChart` 150px, `PageActivityStrip` 96px,
+      `SpanBar` 26px; the `set_content_height` calls in `charts/*.rs`)
+      against the overview page's full vertical stack (totals tiles,
+      streaks, both heatmaps, weekday/monthly bars, speed trend, session
+      charts, records, recap, finished-books rows) and confirm the outer
+      `GtkScrolledWindow` (`overview_page.ui:5`) reliably takes and keeps
+      keyboard-scroll focus, so a short tile is a scroll away rather than
+      a dead end.
+- [ ] **Fractional-scaling hairline check.** Chart rules and strokes are
+      drawn at fixed cairo widths: the baseline rule fill in
+      `charts/bar.rs:120` (`cr.rectangle(0.0, baseline, w, 1.0)`) and the
+      trend-line strokes in `charts/line.rs:200` (1.5px muted / 2.0px
+      active). Audit these under 1.25x and 1.5x fractional scale, the
+      classic Wayland blurry-or-misaligned-hairline bug, and snap to the
+      device pixel grid where cairo allows it instead of assuming the 1x
+      integer-scale GNOME default.
+- [ ] **Keyboard-first navigation pass.** Today's full accelerator table
+      is four entries: `Ctrl+O` import, `Ctrl+R` / `F5` refresh,
+      `Ctrl+comma` preferences, `Ctrl+Q` quit (`ui/actions.rs:91-94`).
+      The library list is already a `selection-mode: browse`
+      `GtkListBox` (`library_view.ui`), so arrow-key row navigation is
+      free, but there is no `GtkShortcutsWindow` documenting any of this,
+      and no explicit keyboard path back from a book's detail pane to the
+      library beyond `AdwNavigationSplitView`'s built-in collapsed-mode
+      back button. Add a shortcuts window (`Ctrl+question` / `F1`), an
+      explicit `Escape` binding back to the library when the split view
+      is collapsed, and confirm `Tab`/arrow focus order through the
+      overview's `GtkFlowBox` tile grids (`tiles` at
+      `overview_page.rs:28`, `profile_tiles` at `:32`, `record_tiles` at
+      `:62`, `recap_tiles` at `:66`) is sane when driven purely from the
+      keyboard, since a tiling-WM user is more likely to be mouse-light
+      than a GNOME Shell user.
+- [ ] **Reconfirm dark/light stays portal-clean.** Already correct and
+      worth protecting: theme resolution goes through
+      `adw::StyleManager` (`is_dark`, `connect_dark_notify`,
+      `theme.rs:321-345`), never a direct `org.gnome.desktop.interface`
+      GSettings read. Under Hyprland this only resolves correctly if a
+      settings portal implementation (`xdg-desktop-portal-hyprland` or
+      `-gtk`) is running and answering the color-scheme query; note that
+      as a documented runtime dependency for a non-GNOME session rather
+      than something Colophon needs to code around, and spot-check the
+      eight-theme Follow-system mode (`theme.rs`'s `resolve`) actually
+      flips live outside a GNOME session.
+- [ ] **Font family stays generic (no change needed, keep it that way).**
+      `charts/mod.rs:94-115`'s `draw_text` and `text_width` already
+      select `"sans-serif"` through cairo's toy font API, not a
+      GNOME-specific family like Cantarell. This item is a guardrail, not
+      a fix: don't let a future chart hardcode a GNOME default font, and
+      don't let the icon or headerbar styling pick one up either.
+- [ ] **App-id / window-rule stability audit (already sound, verify and
+      document).** `APP_ID` in `main.rs:18` (`org.virinvictus.Colophon`)
+      matches the `.desktop` basename
+      (`data/org.virinvictus.Colophon.desktop`) and the Flatpak `app-id`
+      (`org.virinvictus.Colophon.json:2`), and the native meson-built
+      binary sets the same `application_id` at runtime (`main.rs:37`), so
+      a Hyprland `windowrulev2` matched on app-id should already be
+      stable across the Flatpak and native-build paths alike. Confirm
+      this holds for both build paths and record it, since there is
+      nothing else to fix here.
+- [ ] **Narrow the Flatpak filesystem grant toward portal-only access.**
+      The manifest currently requests `--filesystem=host:ro`
+      (`org.virinvictus.Colophon.json`), a blanket read grant that
+      predates a fully portal-mediated import flow. Import already goes
+      through `gtk::FileDialog` (`ui/window.rs:173-176`), which is
+      portal-backed when sandboxed and grants access to the chosen file
+      through the document portal without a standing filesystem
+      permission. Evaluate dropping `--filesystem=host:ro` now that both
+      the statistics-db import and the per-book `.sdr` sidecar attachment
+      go through user-driven file pickers. This is a sandboxing
+      improvement in its own right, not a Hyprland-only fix, since it
+      reduces reliance on a broad host-trust grant either desktop offers;
+      it needs its own go/no-go against the `/mnt/Kindle`-style
+      auto-detect path used by Refresh, which does read the filesystem
+      directly rather than through a picker.
+- [ ] **CSD posture under a hidden-buttons layout.** Colophon's
+      headerbars are plain `AdwHeaderBar` with no custom
+      `decoration-layout` (`ui/window.ui:38`, `:126`), so they inherit
+      whatever the session's GTK settings provide. Several Hyprland
+      setups run with server-side decorations disabled and
+      `gtk-decoration-layout` configured to hide the minimize/maximize
+      buttons, or all three. Test the overview and book-page headerbars
+      with `GTK_DECORATION_LAYOUT` set to hide some or all window
+      buttons, and confirm header content (title, refresh/import/
+      preferences buttons) doesn't rely on button spacing for layout
+      balance, and that the window stays fully closable via `Ctrl+Q` when
+      no titlebar close button is drawn.
