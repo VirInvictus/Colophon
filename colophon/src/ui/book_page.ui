@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <interface>
-  <template class="BookPage" parent="AdwBin">
+  <template class="BookPage" parent="GtkWidget">
     <child>
       <object class="GtkScrolledWindow">
         <property name="hscrollbar-policy">never</property>

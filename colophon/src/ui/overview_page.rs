@@ -87,9 +87,10 @@ mod imp {
     impl ObjectSubclass for OverviewPage {
         const NAME: &'static str = "OverviewPage";
         type Type = super::OverviewPage;
-        type ParentType = adw::Bin;
+        type ParentType = gtk::Widget;
 
         fn class_init(klass: &mut Self::Class) {
+            klass.set_layout_manager_type::<gtk::BinLayout>();
             YearHeatmap::ensure_type();
             HourHeatmap::ensure_type();
             LineChart::ensure_type();
@@ -122,14 +123,21 @@ mod imp {
                 ));
             }
         }
+
+        // Template children are parented to the template widget itself;
+        // a plain gtk::Widget parent must unparent them on dispose.
+        fn dispose(&self) {
+            while let Some(child) = self.obj().first_child() {
+                child.unparent();
+            }
+        }
     }
     impl WidgetImpl for OverviewPage {}
-    impl BinImpl for OverviewPage {}
 }
 
 glib::wrapper! {
     pub struct OverviewPage(ObjectSubclass<imp::OverviewPage>)
-        @extends adw::Bin, gtk::Widget,
+        @extends gtk::Widget,
         @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 

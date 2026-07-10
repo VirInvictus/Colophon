@@ -5,9 +5,9 @@
 
 use std::cell::{Cell, RefCell};
 
-use adw::subclass::prelude::*;
 use gtk::glib;
 use gtk::prelude::*;
+use gtk::subclass::prelude::*;
 
 use crate::library::LibraryGroup;
 use crate::ui::book_row::BookRow;
@@ -43,9 +43,10 @@ mod imp {
     impl ObjectSubclass for LibraryView {
         const NAME: &'static str = "LibraryView";
         type Type = super::LibraryView;
-        type ParentType = adw::Bin;
+        type ParentType = gtk::Widget;
 
         fn class_init(klass: &mut Self::Class) {
+            klass.set_layout_manager_type::<gtk::BinLayout>();
             klass.bind_template();
         }
 
@@ -75,14 +76,21 @@ mod imp {
                 }
             ));
         }
+
+        // Template children are parented to the template widget itself;
+        // a plain gtk::Widget parent must unparent them on dispose.
+        fn dispose(&self) {
+            while let Some(child) = self.obj().first_child() {
+                child.unparent();
+            }
+        }
     }
     impl WidgetImpl for LibraryView {}
-    impl BinImpl for LibraryView {}
 }
 
 glib::wrapper! {
     pub struct LibraryView(ObjectSubclass<imp::LibraryView>)
-        @extends adw::Bin, gtk::Widget,
+        @extends gtk::Widget,
         @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 

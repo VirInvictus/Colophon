@@ -50,9 +50,10 @@ mod imp {
     impl ObjectSubclass for BookPage {
         const NAME: &'static str = "BookPage";
         type Type = super::BookPage;
-        type ParentType = adw::Bin;
+        type ParentType = gtk::Widget;
 
         fn class_init(klass: &mut Self::Class) {
+            klass.set_layout_manager_type::<gtk::BinLayout>();
             PageActivityStrip::ensure_type();
             LineChart::ensure_type();
             SpanBar::ensure_type();
@@ -64,14 +65,21 @@ mod imp {
         }
     }
 
-    impl ObjectImpl for BookPage {}
+    impl ObjectImpl for BookPage {
+        // Template children are parented to the template widget itself;
+        // a plain gtk::Widget parent must unparent them on dispose.
+        fn dispose(&self) {
+            while let Some(child) = self.obj().first_child() {
+                child.unparent();
+            }
+        }
+    }
     impl WidgetImpl for BookPage {}
-    impl BinImpl for BookPage {}
 }
 
 glib::wrapper! {
     pub struct BookPage(ObjectSubclass<imp::BookPage>)
-        @extends adw::Bin, gtk::Widget,
+        @extends gtk::Widget,
         @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
