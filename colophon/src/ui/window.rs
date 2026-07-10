@@ -28,11 +28,17 @@ mod imp {
     #[template(file = "window.ui")]
     pub struct ColophonWindow {
         #[template_child]
-        pub toast_overlay: TemplateChild<adw::ToastOverlay>,
+        pub paned: TemplateChild<gtk::Paned>,
         #[template_child]
-        pub split_view: TemplateChild<adw::NavigationSplitView>,
+        pub sidebar_box: TemplateChild<gtk::Box>,
         #[template_child]
-        pub schema_banner: TemplateChild<adw::Banner>,
+        pub schema_banner: TemplateChild<gtk::Revealer>,
+        #[template_child]
+        pub schema_banner_label: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub toast_revealer: TemplateChild<gtk::Revealer>,
+        #[template_child]
+        pub toast_label: TemplateChild<gtk::Label>,
         #[template_child]
         pub library_stack: TemplateChild<gtk::Stack>,
         #[template_child]
@@ -40,13 +46,16 @@ mod imp {
         #[template_child]
         pub refresh_button: TemplateChild<gtk::Button>,
         #[template_child]
-        pub content_page: TemplateChild<adw::NavigationPage>,
+        pub content_title: TemplateChild<gtk::Label>,
         #[template_child]
         pub content_stack: TemplateChild<gtk::Stack>,
         #[template_child]
         pub overview_page: TemplateChild<OverviewPage>,
         #[template_child]
         pub book_page: TemplateChild<BookPage>,
+        /// Pending auto-hide for the visible toast; cancelled when a newer
+        /// toast replaces it (newest wins).
+        pub toast_timeout: RefCell<Option<glib::SourceId>>,
         /// Unfiltered master copy; refilter() derives the visible groups.
         pub entries: RefCell<Vec<Rc<LibraryEntry>>>,
         /// Cached window-independent overview aggregates for the current
@@ -129,8 +138,44 @@ impl ColophonWindow {
         glib::Object::builder().property("application", app).build()
     }
 
+    /// Newest-wins transient notice in the content overlay. Auto-pull can
+    /// emit two in quick succession (sidecars, then the import result);
+    /// cancelling the pending hide keeps the newest visible for its full
+    /// four seconds.
     pub fn show_toast(&self, message: &str) {
-        self.imp().toast_overlay.add_toast(adw::Toast::new(message));
+        let imp = self.imp();
+        imp.toast_label.set_text(message);
+        imp.toast_revealer.set_reveal_child(true);
+        if let Some(previous) = imp.toast_timeout.take() {
+            previous.remove();
+        }
+        let weak = self.downgrade();
+        imp.toast_timeout.replace(Some(glib::timeout_add_local_once(
+            std::time::Duration::from_secs(4),
+            move || {
+                if let Some(window) = weak.upgrade() {
+                    window.imp().toast_timeout.replace(None);
+                    window.imp().toast_revealer.set_reveal_child(false);
+                }
+            },
+        )));
+    }
+
+    /// F9: show/hide the library sidebar. The paned collapses to the
+    /// surviving child on its own; the held position comes back with the
+    /// sidebar. Visibility deliberately isn't persisted (spec "Design
+    /// language"): every launch starts with the sidebar shown.
+    pub fn toggle_sidebar(&self) {
+        let imp = self.imp();
+        let show = !imp.sidebar_box.is_visible();
+        imp.sidebar_box.set_visible(show);
+        // Keep keyboard focus somewhere useful on either side of the flip.
+        if show {
+            imp.library_view.child_focus(gtk::DirectionType::TabForward);
+        } else {
+            imp.content_stack
+                .child_focus(gtk::DirectionType::TabForward);
+        }
     }
 
     /// Kick the initial load: open the existing snapshot if there is one,
@@ -321,14 +366,14 @@ impl ColophonWindow {
         let imp = self.imp();
 
         if snap.schema_version == colophon_core::EXPECTED_SCHEMA_VERSION {
-            imp.schema_banner.set_revealed(false);
+            imp.schema_banner.set_reveal_child(false);
         } else {
-            imp.schema_banner.set_title(&format!(
+            imp.schema_banner_label.set_text(&format!(
                 "Unfamiliar schema version {} (expected {}); numbers may be off",
                 snap.schema_version,
                 colophon_core::EXPECTED_SCHEMA_VERSION
             ));
-            imp.schema_banner.set_revealed(true);
+            imp.schema_banner.set_reveal_child(true);
         }
 
         let has_books = !snap.entries.is_empty();
@@ -464,8 +509,18 @@ impl ColophonWindow {
         }
         self.imp().selection.replace(selection);
         self.refresh_content();
-        // In collapsed (narrow) mode, selecting navigates forward.
-        self.imp().split_view.set_show_content(true);
+    }
+
+    /// The toolbar title label and the window title both follow the
+    /// content pane, so compositor bars stay meaningful.
+    fn set_content_title(&self, title: &str) {
+        self.imp().content_title.set_text(title);
+        let window_title = if title == "Colophon" {
+            String::from("Colophon")
+        } else {
+            format!("{title} \u{b7} Colophon")
+        };
+        self.set_title(Some(&window_title));
     }
 
     /// Renders the content pane for the current selection.
@@ -476,7 +531,7 @@ impl ColophonWindow {
 
         if imp.entries.borrow().is_empty() {
             imp.content_stack.set_visible_child_name("placeholder");
-            imp.content_page.set_title("Colophon");
+            self.set_content_title("Colophon");
             return;
         }
 
@@ -500,7 +555,7 @@ impl ColophonWindow {
                 drop(cache);
                 imp.overview_page.set_data(&overview, today);
                 imp.content_stack.set_visible_child_name("overview");
-                imp.content_page.set_title("All Books");
+                self.set_content_title("All Books");
             }
             Selection::Book(id) => {
                 let Some(entry) = entries.iter().find(|e| e.book.id == id) else {
@@ -541,7 +596,7 @@ impl ColophonWindow {
                     .set_speed(to_points(&entry.events), to_points(&all_events), bucket);
 
                 imp.content_stack.set_visible_child_name("book");
-                imp.content_page.set_title(entry.book.title.trim());
+                self.set_content_title(entry.book.title.trim());
             }
         }
     }
@@ -554,6 +609,7 @@ impl ColophonWindow {
     fn restore_geometry(&self) {
         let Some(s) = settings::settings() else {
             self.set_default_size(1000, 700);
+            self.imp().paned.set_position(320);
             return;
         };
         self.set_default_size(
@@ -563,6 +619,9 @@ impl ColophonWindow {
         if s.boolean(settings::KEY_WINDOW_MAXIMIZED) {
             self.maximize();
         }
+        self.imp()
+            .paned
+            .set_position(s.int(settings::KEY_SIDEBAR_WIDTH));
     }
 
     fn save_geometry(&self) {
@@ -575,5 +634,8 @@ impl ColophonWindow {
             let _ = s.set_int(settings::KEY_WINDOW_WIDTH, width);
             let _ = s.set_int(settings::KEY_WINDOW_HEIGHT, height);
         }
+        // Saved on close, not per notify::position: a drag fires that
+        // signal on every pixel and would hammer dconf.
+        let _ = s.set_int(settings::KEY_SIDEBAR_WIDTH, self.imp().paned.position());
     }
 }

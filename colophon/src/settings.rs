@@ -14,6 +14,7 @@ pub const KEY_THEME: &str = "theme";
 pub const KEY_WINDOW_WIDTH: &str = "window-width";
 pub const KEY_WINDOW_HEIGHT: &str = "window-height";
 pub const KEY_WINDOW_MAXIMIZED: &str = "window-maximized";
+pub const KEY_SIDEBAR_WIDTH: &str = "sidebar-width";
 
 const SCHEMA_ID: &str = "org.virinvictus.Colophon";
 

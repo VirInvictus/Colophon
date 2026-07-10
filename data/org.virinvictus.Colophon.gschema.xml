@@ -25,5 +25,10 @@
     <key name="window-maximized" type="b">
       <default>false</default>
     </key>
+    <key name="sidebar-width" type="i">
+      <default>320</default>
+      <summary>Sidebar width</summary>
+      <description>The library sidebar's paned position, saved on close.</description>
+    </key>
   </schema>
 </schemalist>

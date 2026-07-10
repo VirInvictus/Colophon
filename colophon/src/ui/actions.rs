@@ -25,6 +25,7 @@ where
 pub fn install_window_actions(window: &ColophonWindow) {
     register(window, "import", ColophonWindow::act_import);
     register(window, "refresh", ColophonWindow::act_refresh);
+    register(window, "toggle-sidebar", ColophonWindow::toggle_sidebar);
     register(window, "preferences", |window| {
         crate::ui::preferences::present(window)
     });
@@ -92,6 +93,7 @@ pub fn install_app_actions(app: &adw::Application) {
 
     app.set_accels_for_action("win.import", &["<Ctrl>o"]);
     app.set_accels_for_action("win.refresh", &["<Ctrl>r", "F5"]);
+    app.set_accels_for_action("win.toggle-sidebar", &["F9"]);
     app.set_accels_for_action("win.preferences", &["<Ctrl>comma"]);
     app.set_accels_for_action("app.quit", &["<Ctrl>q"]);
 }
