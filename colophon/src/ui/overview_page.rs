@@ -402,13 +402,9 @@ impl OverviewPage {
                 .iter()
                 .enumerate()
                 .map(|(hour, &count)| Bar {
-                    // 24 columns are too narrow for per-bar text; label
-                    // the quarters, let tooltips carry the numbers.
-                    label: if hour % 6 == 0 {
-                        format!("{hour:02}")
-                    } else {
-                        String::new()
-                    },
+                    // Every hour is labelled; BarChart thins the row
+                    // against its live width at draw time.
+                    label: format!("{hour:02}"),
                     value: f64::from(count),
                     display: String::new(),
                     tooltip: Some(format!("{hour:02}:00 \u{b7} {count} sessions")),
@@ -558,5 +554,11 @@ fn tile(value: &str, caption: &str, detail: Option<&str>) -> gtk::Widget {
     }
     let frame = gtk::Box::builder().css_classes(["card"]).build();
     frame.append(&card);
-    frame.upcast()
+    // Tiles are read-only; keeping them out of the Tab order sends
+    // keyboard focus to the charts and lists instead (6e).
+    gtk::FlowBoxChild::builder()
+        .child(&frame)
+        .focusable(false)
+        .build()
+        .upcast()
 }

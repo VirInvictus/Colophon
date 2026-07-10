@@ -3,7 +3,6 @@
 //! Selecting one persists it to GSettings and applies it live via the
 //! window.
 
-use gtk::gdk;
 use gtk::glib;
 use gtk::prelude::*;
 
@@ -93,24 +92,6 @@ pub fn present(window: &ColophonWindow) {
         .default_width(420)
         .child(&content)
         .build();
-
-    // Escape closes, which the adw dialog did for free.
-    let key = gtk::EventControllerKey::new();
-    key.connect_key_pressed(glib::clone!(
-        #[weak]
-        prefs,
-        #[upgrade_or]
-        glib::Propagation::Proceed,
-        move |_, keyval, _, _| {
-            if keyval == gdk::Key::Escape {
-                prefs.close();
-                glib::Propagation::Stop
-            } else {
-                glib::Propagation::Proceed
-            }
-        }
-    ));
-    prefs.add_controller(key);
-
+    super::close_on_escape(&prefs);
     prefs.present();
 }

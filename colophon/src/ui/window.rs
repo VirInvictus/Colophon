@@ -9,7 +9,7 @@ use std::rc::Rc;
 use chrono::Local;
 use gtk::prelude::*;
 use gtk::subclass::prelude::*;
-use gtk::{gio, glib};
+use gtk::{gdk, gio, glib};
 
 use crate::library::LibraryEntry;
 use crate::loader::LibrarySnapshot;
@@ -110,6 +110,25 @@ mod imp {
                 move || window.refresh_content()
             ));
             window.watch_mounts();
+
+            // 6e keyboard pass: Escape anywhere in the main window
+            // returns to the library (reshowing the sidebar if hidden).
+            let key = gtk::EventControllerKey::new();
+            key.connect_key_pressed(glib::clone!(
+                #[weak]
+                window,
+                #[upgrade_or]
+                glib::Propagation::Proceed,
+                move |_, keyval, _, _| {
+                    if keyval == gdk::Key::Escape {
+                        window.back_to_library();
+                        glib::Propagation::Stop
+                    } else {
+                        glib::Propagation::Proceed
+                    }
+                }
+            ));
+            window.add_controller(key);
         }
     }
 
@@ -158,6 +177,14 @@ impl ColophonWindow {
                 }
             },
         )));
+    }
+
+    /// Escape: back to the library, reshowing the sidebar if hidden and
+    /// moving focus into it.
+    fn back_to_library(&self) {
+        let imp = self.imp();
+        imp.sidebar_box.set_visible(true);
+        imp.library_view.child_focus(gtk::DirectionType::TabForward);
     }
 
     /// F9: show/hide the library sidebar. The paned collapses to the

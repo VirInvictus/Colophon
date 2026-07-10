@@ -115,6 +115,20 @@ impl BarChart {
         cr.rectangle(0.0, baseline, w, 1.0);
         let _ = cr.fill();
 
+        // Thin crowded label rows against the live allocation (6e): draw
+        // every stride-th label, where the stride is what the widest label
+        // actually needs at this width. A 24-column chart labels every
+        // hour when wide and every few hours in a narrow tile.
+        let widest_label = bars
+            .iter()
+            .map(|b| super::text_width(cr, 10.0, &b.label))
+            .fold(0.0, f64::max);
+        let stride = if slot > 0.0 {
+            (((widest_label + 6.0) / slot).ceil() as usize).max(1)
+        } else {
+            1
+        };
+
         for (i, bar) in bars.iter().enumerate() {
             let x = slot * i as f64 + (slot - bar_width) / 2.0;
             let center = slot * i as f64 + slot / 2.0;
@@ -141,15 +155,17 @@ impl BarChart {
                     &bar.display,
                 );
             }
-            let lw = super::text_width(cr, 10.0, &bar.label);
-            super::draw_text(
-                cr,
-                center - lw / 2.0,
-                h - 5.0,
-                10.0,
-                super::muted(dark),
-                &bar.label,
-            );
+            if i % stride == 0 {
+                let lw = super::text_width(cr, 10.0, &bar.label);
+                super::draw_text(
+                    cr,
+                    center - lw / 2.0,
+                    h - 5.0,
+                    10.0,
+                    super::muted(dark),
+                    &bar.label,
+                );
+            }
         }
     }
 }

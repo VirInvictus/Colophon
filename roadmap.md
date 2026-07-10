@@ -573,46 +573,49 @@ Closed 2026-07-10 (v2.0.0); both "evaluate" items resolved with a no.
 
 ### 6e — Tiling polish tail (survivors from the first Phase 6 cut)
 
-Written against the keep-adwaita frame but toolkit-agnostic; they run after
-the migration as its verification pass.
+Written against the keep-adwaita frame but toolkit-agnostic; they ran after
+the migration as its verification pass (2026-07-10, v2.0.0).
 
-- [ ] **Tiling geometry audit at a genuine quarter-monitor tile (~480px).**
-      `HourHeatmap` requests a hard 634px content width
-      (`charts/hour_heatmap.rs:41-42`) and `YearHeatmap` grows with weeks
-      of history (`charts/heatmap.rs:119-120`); both already sit in their
-      own `GtkScrolledWindow` (`overview_page.ui:146-148`, `:166-168`)
-      while the outer page scroller never scrolls horizontally. After the
-      `GtkPaned` migration, confirm the inner scrollbars stay discoverable
-      without a mouse hover, cells and tooltips survive clipping, and
-      `book_page.ui`'s activity strip and speed chart keep reflowing
-      cleanly at that width.
-- [ ] **Width-adaptive label thinning.** The session-starts chart hides all
-      but every sixth hour label at data-prep time
-      (`overview_page.rs:400-406`), independent of allocation.
-      `BarChart::draw` already knows its live width (`charts/bar.rs`), so
-      thin labels against measured slot width (`text_width`,
-      `charts/mod.rs:107-115`) inside the draw callback instead. Same audit
-      for the weekday/monthly bars and the hour-heatmap column headers.
-- [ ] **Minimum-height audit on short tiles.** Check the fixed chart
-      heights (`LineChart` and `BarChart` 150px, `PageActivityStrip` 96px,
-      `SpanBar` 26px) against the overview's full vertical stack, and
-      confirm the outer scroller reliably takes and keeps keyboard-scroll
-      focus so a short tile is a scroll away, not a dead end.
-- [ ] **Fractional-scaling hairline check.** Fixed-width cairo strokes (the
-      1px baseline rule, `charts/bar.rs:120`; the 1.5/2.0px trend strokes,
-      `charts/line.rs:200`) audited under 1.25x and 1.5x fractional scale,
-      snapped to the device pixel grid where cairo allows.
-- [ ] **Keyboard-first pass.** Accelerators today: `Ctrl+O` import,
-      `Ctrl+R`/`F5` refresh, `Ctrl+comma` preferences, `Ctrl+Q` quit
-      (`ui/actions.rs:91-94`). Add a shortcuts reference on
-      `Ctrl+question`/`F1` (hand-built: `gtk::ShortcutsWindow` is
-      deprecated and the adwaita replacement leaves with adwaita), an
-      explicit `Escape` path back to the library, and a sane Tab/arrow
-      order through the overview's `GtkFlowBox` tile grids
-      (`overview_page.rs:28`, `:32`, `:62`, `:66`).
-- [ ] **Font guardrail.** `draw_text`/`text_width` (`charts/mod.rs:94-115`)
-      stay on generic `sans-serif` through cairo's toy font API, and the
-      new stylesheet must not hardcode a GNOME family either. Bundling a
-      font is fine if the 6a look wants one; assuming an installed one is
-      not.
+- [x] **Tiling geometry audit at ~480px content width.** The tile FlowBox
+      reflows cleanly to two columns and cards stay intact (verified at a
+      455px sidebar forcing a ~480px content pane). The two heatmap
+      scrollers now set `overlay-scrolling=false`, so their scrollbar is a
+      steady gutter rather than a hover-only fading overlay. The remaining
+      eyeball items (heatmap tooltips under clipping, book-page strip
+      reflow on a true quarter tile) are in the hands-on pass below.
+- [x] **Width-adaptive label thinning.** `BarChart::draw` now thins the
+      label row against its live allocation (stride from the widest
+      label's measured width per slot), and the session-starts prep passes
+      all 24 hour labels instead of pre-hiding five in six; a wide window
+      now labels every hour, a narrow tile labels every few. Weekday and
+      monthly bars get the same behaviour for free; the hour-heatmap
+      headers are fixed-pitch cells and never crowd, so they needed
+      nothing.
+- [x] **Minimum-height audit.** Fixed chart heights are unchanged and the
+      overview's list rows remain focusable, so PageDown/arrows scroll the
+      outer scroller once anything has focus; tiles leaving the Tab order
+      (below) makes that focus land on useful widgets sooner.
+- [x] **Fractional-scaling hairline check.** Not reproducible on current
+      hardware: the only display runs scale 1.00, where 1px strokes sit on
+      the pixel grid by construction. Recorded as audited-not-applicable;
+      re-open if a fractionally scaled display ever joins the setup rather
+      than shipping unverifiable snapping code now.
+- [x] **Keyboard-first pass.** A hand-built shortcuts window (owned rows in
+      a modal, `gtk::ShortcutsWindow` being deprecated) on
+      `Ctrl+question`/`F1` and in the primary menu; `Escape` in the main
+      window returns to the library (reshowing the sidebar if hidden and
+      focusing it), and Escape closes the Preferences and Shortcuts
+      windows via a shared `close_on_escape` helper; the overview's tile
+      FlowBox children are `focusable=false` so Tab skips the read-only
+      tiles and reaches lists and controls.
+- [x] **Font guardrail.** Charts stay on cairo's generic `sans-serif`, and
+      the owned sheet contains no `font-family`, enforced by a unit test
+      since 6c.
+- [ ] **Hands-on confirmation pass (Brandon, keyboard in hand):** real
+      keypresses for F9 / Escape / Ctrl+question / F8-resize, heatmap
+      tooltips and the book page on a genuine quarter tile, a theme
+      live-flip from Preferences, a sidecar attach, and a GNOME-session
+      sanity check. Everything scriptable was verified live during the
+      migration (D-Bus-driven actions, screenshots across three palettes,
+      single-instance re-summon, refresh toast).
 
