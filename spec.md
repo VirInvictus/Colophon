@@ -325,6 +325,32 @@ Decisions (Brandon, 2026-07-09):
   running for Follow-system to resolve; without one it degrades to the
   dark default, never a failure.
 
+## Device auto-pull (decided 2026-07-09)
+
+The read-access principle, restated to cover automation: **Colophon reads
+only paths the user has explicitly given it**, and keeps them fresh when
+they appear. Two kinds of path qualify: the remembered statistics-db
+source path (GSettings `source-path`, set by every validated import) and
+each attached sidecar's remembered origin path (recorded when the user
+adds the file). Nothing is ever scanned or discovered; a book whose
+sidecar was never attached stays sidecar-less until the user adds one.
+
+Behaviour:
+
+- **On startup** and **whenever a filesystem mount change makes the
+  remembered source path readable** (the Kindle gets plugged in),
+  Colophon automatically re-imports through the existing pipeline
+  (staging → validate → promote), so a bad or half-written file can
+  never clobber the good snapshot. The usual import toast reports it.
+- **Attached sidecars ride along**: before the re-import, each cached
+  sidecar with a readable origin is re-copied, re-verified by the same
+  md5 join used at attach time. A failed or missing origin is skipped
+  silently and the cache keeps its last good copy.
+- Everything stays read-only toward the device: Colophon copies, never
+  opens in place, never writes to a device path.
+- Mount detection watches the kernel mount table (`gio`'s Unix mount
+  monitor); no polling, no daemon, no new dependency.
+
 ## Non-goals (for now)
 
 - Writing back to KOReader's database or config in any way.

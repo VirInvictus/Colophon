@@ -14,7 +14,7 @@ use gtk::{gio, glib};
 use crate::library::LibraryEntry;
 use crate::loader::LibrarySnapshot;
 use crate::ui::library_view::Selection;
-use crate::{library, loader, paths, settings, stats};
+use crate::{autopull, library, loader, paths, settings, stats};
 
 mod imp {
     use super::*;
@@ -58,6 +58,11 @@ mod imp {
         pub selection: RefCell<Selection>,
         /// Reentrancy guard for import/refresh.
         pub loading: Cell<bool>,
+        /// Whether the remembered source path was readable at the last
+        /// mount-table check; auto-pull fires only on absent → present.
+        pub device_present: Cell<bool>,
+        /// Keeps the kernel mount-table watch alive for the window's life.
+        pub mount_monitor: RefCell<Option<gio::UnixMountMonitor>>,
     }
 
     #[glib::object_subclass]
@@ -95,6 +100,7 @@ mod imp {
                 window,
                 move || window.refresh_content()
             ));
+            window.watch_mounts();
         }
     }
 
@@ -151,6 +157,58 @@ impl ColophonWindow {
                 }
                 Err(_) => window.show_toast("Background load crashed"),
             }
+        });
+    }
+
+    /// Watch the kernel mount table and auto-pull when the remembered
+    /// source path transitions absent → present (the device got mounted).
+    /// Spec "Device auto-pull".
+    fn watch_mounts(&self) {
+        let imp = self.imp();
+        imp.device_present
+            .set(settings::source_path().is_some_and(|p| p.exists()));
+        let monitor = gio::UnixMountMonitor::get();
+        monitor.connect_mounts_changed(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |_| {
+                let present = settings::source_path().is_some_and(|p| p.exists());
+                let was = window.imp().device_present.replace(present);
+                if present && !was {
+                    window.auto_pull();
+                }
+            }
+        ));
+        imp.mount_monitor.replace(Some(monitor));
+    }
+
+    /// Re-copy attached sidecars from their remembered origins, then
+    /// re-import the stats db through the normal validated pipeline.
+    /// No-op unless the remembered source path is readable.
+    pub fn auto_pull(&self) {
+        if self.imp().loading.get() {
+            return;
+        }
+        let Some(source) = settings::source_path() else {
+            return;
+        };
+        if !source.exists() {
+            return;
+        }
+        let sidecar_dir = paths::sidecar_dir();
+        let weak = self.downgrade();
+        glib::spawn_future_local(async move {
+            let refreshed = gio::spawn_blocking(move || autopull::refresh_sidecars(&sidecar_dir))
+                .await
+                .unwrap_or(0);
+            let Some(window) = weak.upgrade() else { return };
+            if refreshed > 0 {
+                window.show_toast(&format!(
+                    "Refreshed {refreshed} sidecar{} from the device",
+                    if refreshed == 1 { "" } else { "s" }
+                ));
+            }
+            window.start_import(source);
         });
     }
 
@@ -304,9 +362,10 @@ impl ColophonWindow {
     }
 
     /// Takes a user-provided `.sdr` sidecar for the book with `md5`, copies
-    /// it into the app's own cache (never reading the device), and reloads so
-    /// the declared status appears. Rejects a file that belongs to a
-    /// different book. Any problem is a toast, never a crash.
+    /// it into the app's own cache, remembers where it came from (so
+    /// auto-pull can keep it fresh), and reloads so the declared status
+    /// appears. Rejects a file that belongs to a different book. Any
+    /// problem is a toast, never a crash.
     pub fn add_sidecar_for(&self, md5: &str, source: &std::path::Path) {
         let meta = match colophon_core::sidecar::parse_sidecar_file(source) {
             Ok(m) => m,
@@ -331,6 +390,7 @@ impl ColophonWindow {
             .and_then(|_| std::fs::copy(source, &dest).map(|_| ()));
         match saved {
             Ok(()) => {
+                autopull::remember_origin(&paths::sidecar_dir(), md5, source);
                 self.show_toast("Sidecar added");
                 self.startup_load();
             }

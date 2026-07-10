@@ -20,9 +20,11 @@ pub fn staging_dir() -> PathBuf {
     app_data_dir().join("import-tmp")
 }
 
-/// User-provided `.sdr` sidecars, one per book, named by the book's md5.
-/// Colophon copies here what the user hands it (never reads the device);
-/// a book with no file here simply falls back to inferred stats.
+/// User-provided `.sdr` sidecars, one per book, named by the book's md5,
+/// plus a `<md5>.origin` note of where each was attached from so auto-pull
+/// can keep the copy fresh (spec "Device auto-pull"). Colophon copies here
+/// what the user hands it and only ever re-reads those exact paths; a book
+/// with no file here simply falls back to inferred stats.
 pub fn sidecar_dir() -> PathBuf {
     app_data_dir().join("sidecars")
 }

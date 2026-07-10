@@ -1,5 +1,6 @@
 //! Colophon: a native GTK4/libadwaita statistics viewer for KOReader.
 
+mod autopull;
 mod charts;
 mod fmt;
 mod library;
@@ -56,4 +57,7 @@ fn build_ui(app: &adw::Application) {
     let window = ColophonWindow::new(app);
     window.present();
     window.startup_load();
+    // Spec "Device auto-pull": if the device is already mounted at launch,
+    // pull fresh data behind the instant local-snapshot paint.
+    window.auto_pull();
 }

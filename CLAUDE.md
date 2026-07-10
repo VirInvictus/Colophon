@@ -44,9 +44,12 @@ Architecture worth knowing before you touch code:
   (`org.virinvictus.Colophon.json`, GNOME 49, `--filesystem=host:ro`).
 
 Standing rules that still bind post-1.0: every new widget's metric lands in
-`spec.md` first; ask before adding any dependency; Colophon never reads the
-device, so any stat needing a user-provided file stays hidden until they add
-it.
+`spec.md` first; ask before adding any dependency; Colophon reads only
+paths the user has explicitly given it (the remembered stats-db source and
+each attached sidecar's remembered origin; auto-pull keeps those fresh on
+mount, see spec "Device auto-pull"), never scans or discovers device files,
+and any stat needing a file the user has not provided stays hidden until
+they add it.
 
 Real sample databases and `.sdr` sidecars from Brandon's own Kindle live at
 `research/samples/` (**gitignored, never commit them**); the on-device plugin

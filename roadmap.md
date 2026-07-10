@@ -400,6 +400,25 @@ Ordered roughly by likelihood. None are commitments.
       Hardcover" link-out is the most this should ever be (local-first
       rule).
 
+## Phase 7 — Device auto-pull (greenlit 2026-07-09, ships as v1.1.0)
+
+Brandon's ask: stop hand-refreshing after every reading stretch. Colophon
+auto-imports whenever the data it was already given becomes reachable.
+Normative definition in `spec.md` ("Device auto-pull"); the read-access
+principle is restated there and in `CLAUDE.md`. Independent of Phase 6
+sequencing (it landed first).
+
+- [x] Sidecar origins remembered at attach time (`<md5>.origin` beside the
+      cached copy) and re-copied on auto-pull after the same md5
+      verification as attach; failures skip silently, the cache keeps its
+      last good copy (`autopull.rs`, std-only, unit-tested).
+- [x] Auto-pull on startup when the remembered source path is readable
+      (after the canonical snapshot paints, so launch stays instant).
+- [x] Auto-pull on mount: `gio::UnixMountMonitor` watches the kernel mount
+      table; an absent→present transition of the source path triggers the
+      existing staging → validate → promote import. No polling, no gvfs
+      dependency, no new crate.
+
 ## Phase 6 — Hyprland-native design: drop libadwaita (post-1.0, portfolio pilot)
 
 Brandon moved his desktop from GNOME Shell to Hyprland (a Wayland tiling

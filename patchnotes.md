@@ -1,5 +1,27 @@
 # Patchnotes
 
+## v1.1.0 — 2026-07-09
+
+Plug in the Kindle and the numbers are already right.
+
+- **Device auto-pull.** Colophon now re-imports on its own: at launch, and
+  the moment a mount makes your remembered source path readable. It still
+  reads only paths you explicitly gave it (the statistics database you
+  picked, the sidecars you attached), still copies rather than opening
+  anything in place, and still never writes to the device. The import goes
+  through the same staging, validate, promote pipeline as ever, so a bad or
+  half-written file can never clobber a good snapshot.
+- **Sidecars stay fresh too.** Attaching a `.sdr` now remembers where it
+  came from; auto-pull re-copies each attached sidecar from that origin,
+  re-verified against the book's md5 before it replaces the cached copy. A
+  missing or mismatched origin is skipped and your last good copy stays.
+- Mount detection watches the kernel mount table through gio. No polling,
+  no daemon, no new dependency.
+
+Also in this release, groundwork for the Hyprland-native design (Phase 6):
+the design decisions are locked in the spec, and a `COLOPHON_FLAT=1`
+environment gate previews the flat look. Default appearance is unchanged.
+
 ## v1.0.0 — 2026-07-05
 
 Colophon is 1.0.
