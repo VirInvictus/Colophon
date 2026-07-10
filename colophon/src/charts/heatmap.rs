@@ -4,10 +4,10 @@
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
 
-use adw::subclass::prelude::*;
 use chrono::{Datelike, Duration, NaiveDate};
 use gtk::glib;
 use gtk::prelude::*;
+use gtk::subclass::prelude::*;
 
 use crate::fmt::{humanize_secs, short_date};
 
@@ -64,12 +64,7 @@ mod imp {
                     None => false,
                 }
             });
-            let weak = widget.downgrade();
-            adw::StyleManager::default().connect_dark_notify(move |_| {
-                if let Some(this) = weak.upgrade() {
-                    this.queue_draw();
-                }
-            });
+            crate::theme::register_redraw(&*widget);
         }
     }
     impl WidgetImpl for YearHeatmap {}

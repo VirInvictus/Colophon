@@ -4,16 +4,17 @@
 //! variables and the chart colors, so a single definition themes the whole
 //! app; `charts` reads [`active`] at draw time.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
-use gtk::gdk;
+use gtk::prelude::*;
+use gtk::{gdk, gio, glib};
 
 /// A named palette. The colour roles feed both the generated adwaita CSS
 /// and the cairo chart widgets.
 pub struct Theme {
     pub id: &'static str,
     pub name: &'static str,
-    /// Polarity: forces the libadwaita colour-scheme so stock widgets match.
+    /// Polarity: drives GTK's prefer-dark setting so stock widgets match.
     pub dark: bool,
     pub bg: &'static str,        // view / sidebar background
     pub bg_window: &'static str, // window background
@@ -219,11 +220,109 @@ thread_local! {
     static ACTIVE: RefCell<&'static Theme> = RefCell::new(dragon());
     static PROVIDER: RefCell<Option<gtk::CssProvider>> = const { RefCell::new(None) };
     static SELECTION: RefCell<String> = RefCell::new(String::from(SYSTEM_ID));
+    // Dark until the settings portal says otherwise (spec: no portal backend
+    // degrades to the dark default, never a failure).
+    static SYSTEM_DARK: Cell<bool> = const { Cell::new(true) };
+    // Held so the SettingChanged subscription outlives startup.
+    static BUS: RefCell<Option<gio::DBusConnection>> = const { RefCell::new(None) };
+    static REDRAW: RefCell<Vec<glib::WeakRef<gtk::Widget>>> = const { RefCell::new(Vec::new()) };
 }
 
 /// The theme charts should draw with. Reflects the last [`set`]/[`load`].
 pub fn active() -> &'static Theme {
     ACTIVE.with(|a| *a.borrow())
+}
+
+/// Queue a redraw on `widget` whenever the applied theme changes. Weak
+/// registration: dead widgets are pruned on the next theme change, so a
+/// registered widget never outlives its window through this list.
+pub fn register_redraw(widget: &impl IsA<gtk::Widget>) {
+    let weak = widget.upcast_ref::<gtk::Widget>().downgrade();
+    REDRAW.with(|r| r.borrow_mut().push(weak));
+}
+
+/// The portal's `color-scheme` values (org.freedesktop.appearance): 0 no
+/// preference, 1 prefer dark, 2 prefer light. Matching AdwStyleManager,
+/// only an explicit 1 is dark, so behaviour under GNOME is unchanged.
+fn portal_scheme_is_dark(scheme: u32) -> bool {
+    scheme == 1
+}
+
+/// Ask the settings portal for the current colour scheme. `None` on any
+/// failure (no portal backend, no bus): the caller keeps the dark default.
+fn read_portal_scheme(conn: &gio::DBusConnection) -> Option<u32> {
+    let args = ("org.freedesktop.appearance", "color-scheme").to_variant();
+    let reply_ty = glib::VariantTy::new("(v)").ok()?;
+    let call = |method: &str| {
+        conn.call_sync(
+            Some("org.freedesktop.portal.Desktop"),
+            "/org/freedesktop/portal/desktop",
+            "org.freedesktop.portal.Settings",
+            method,
+            Some(&args),
+            Some(reply_ty),
+            gio::DBusCallFlags::NONE,
+            1000,
+            gio::Cancellable::NONE,
+        )
+    };
+    match call("ReadOne") {
+        Ok(reply) => reply.child_value(0).as_variant()?.get::<u32>(),
+        // Portals older than the ReadOne addition answer Read, which wraps
+        // the value in a second layer of variant.
+        Err(_) => call("Read")
+            .ok()?
+            .child_value(0)
+            .as_variant()?
+            .as_variant()?
+            .get::<u32>(),
+    }
+}
+
+/// Read the desktop's dark preference from `org.freedesktop.portal.Settings`
+/// and keep following it. Replaces `adw::StyleManager`: the initial read is
+/// synchronous (once, at startup, before the first frame), the subscription
+/// re-resolves only the follow-system selection, and every failure path
+/// leaves the dark default in place.
+fn watch_system_dark() {
+    let Ok(conn) = gio::bus_get_sync(gio::BusType::Session, gio::Cancellable::NONE) else {
+        return;
+    };
+    if let Some(scheme) = read_portal_scheme(&conn) {
+        SYSTEM_DARK.with(|d| d.set(portal_scheme_is_dark(scheme)));
+    }
+    conn.signal_subscribe(
+        Some("org.freedesktop.portal.Desktop"),
+        Some("org.freedesktop.portal.Settings"),
+        Some("SettingChanged"),
+        Some("/org/freedesktop/portal/desktop"),
+        None,
+        gio::DBusSignalFlags::NONE,
+        |_, _, _, _, _, params| {
+            let ns = params.child_value(0).get::<String>();
+            let key = params.child_value(1).get::<String>();
+            if ns.as_deref() != Some("org.freedesktop.appearance")
+                || key.as_deref() != Some("color-scheme")
+            {
+                return;
+            }
+            let dark = params
+                .child_value(2)
+                .as_variant()
+                .and_then(|v| v.get::<u32>())
+                .map(portal_scheme_is_dark)
+                .unwrap_or(true);
+            SYSTEM_DARK.with(|d| d.set(dark));
+            // Only the follow-system selection re-resolves on a system
+            // flip; fixed themes hold their polarity.
+            SELECTION.with(|s| {
+                if *s.borrow() == SYSTEM_ID {
+                    apply(resolve(SYSTEM_ID, dark));
+                }
+            });
+        },
+    );
+    BUS.with(|b| *b.borrow_mut() = Some(conn));
 }
 
 /// Parse a `#rrggbb` string to an RGBA (opaque), black on malformed input.
@@ -327,6 +426,12 @@ fn apply(t: &'static Theme) {
     let Some(display) = gdk::Display::default() else {
         return;
     };
+    // Flip GTK's default-theme variant too, so widget internals the owned
+    // sheet doesn't reach (text selection, spinners, dialog guts) follow
+    // the theme's polarity.
+    if let Some(settings) = gtk::Settings::default() {
+        settings.set_gtk_application_prefer_dark_theme(t.dark);
+    }
     PROVIDER.with(|slot| {
         let mut slot = slot.borrow_mut();
         if let Some(old) = slot.take() {
@@ -341,41 +446,26 @@ fn apply(t: &'static Theme) {
         );
         *slot = Some(provider);
     });
+    REDRAW.with(|r| {
+        r.borrow_mut()
+            .retain(|w| w.upgrade().map(|w| w.queue_draw()).is_some())
+    });
 }
 
-/// Apply a theme selection (`SYSTEM_ID` or a theme id): force libadwaita's
-/// colour-scheme to the theme's polarity (or follow the system in
-/// `SYSTEM_ID`), then install its palette. Charts must be redrawn by the
-/// caller afterwards (the window refreshes the visible page).
+/// Apply a theme selection (`SYSTEM_ID` or a theme id) and install its
+/// palette; registered chart widgets are redrawn automatically. Data-bearing
+/// surfaces are refreshed by the caller (the window repaints the visible
+/// page).
 pub fn set(selection: &str) {
     SELECTION.with(|s| *s.borrow_mut() = selection.to_string());
-    let sm = adw::StyleManager::default();
-    if selection == SYSTEM_ID {
-        sm.set_color_scheme(adw::ColorScheme::Default);
-    } else {
-        let dark = by_id(selection).map(|t| t.dark).unwrap_or(true);
-        sm.set_color_scheme(if dark {
-            adw::ColorScheme::ForceDark
-        } else {
-            adw::ColorScheme::ForceLight
-        });
-    }
-    apply(resolve(selection, sm.is_dark()));
+    apply(resolve(selection, SYSTEM_DARK.with(Cell::get)));
 }
 
 /// Install the initial theme and keep `SYSTEM_ID` in sync with the desktop
 /// preference. Call once from `Application::connect_startup`.
 pub fn load(selection: &str) {
+    watch_system_dark();
     set(selection);
-    adw::StyleManager::default().connect_dark_notify(|sm| {
-        // Only the follow-system selection re-resolves on a system flip;
-        // fixed themes hold their polarity.
-        SELECTION.with(|s| {
-            if *s.borrow() == SYSTEM_ID {
-                apply(resolve(SYSTEM_ID, sm.is_dark()));
-            }
-        });
-    });
 }
 
 #[cfg(test)]
@@ -391,6 +481,16 @@ mod tests {
         assert_eq!(ids.len(), n, "duplicate theme id");
         assert!(by_id(DEFAULT_DARK).is_some_and(|t| t.dark));
         assert!(by_id(DEFAULT_LIGHT).is_some_and(|t| !t.dark));
+    }
+
+    #[test]
+    fn portal_scheme_maps_like_adwaita() {
+        // 1 = prefer dark; 0 (no preference) and 2 (prefer light) are
+        // light, and unknown future values must not read as dark.
+        assert!(portal_scheme_is_dark(1));
+        assert!(!portal_scheme_is_dark(0));
+        assert!(!portal_scheme_is_dark(2));
+        assert!(!portal_scheme_is_dark(3));
     }
 
     #[test]

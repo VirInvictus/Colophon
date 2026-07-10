@@ -8,9 +8,9 @@
 use std::cell::{Cell, RefCell};
 use std::f64::consts::PI;
 
-use adw::subclass::prelude::*;
 use gtk::glib;
 use gtk::prelude::*;
+use gtk::subclass::prelude::*;
 
 const HEIGHT: i32 = 26;
 const BAR_H: f64 = 10.0;
@@ -52,12 +52,7 @@ mod imp {
                 }
                 None => false,
             });
-            let weak = widget.downgrade();
-            adw::StyleManager::default().connect_dark_notify(move |_| {
-                if let Some(this) = weak.upgrade() {
-                    this.queue_draw();
-                }
-            });
+            crate::theme::register_redraw(&*widget);
         }
     }
     impl WidgetImpl for SpanBar {}

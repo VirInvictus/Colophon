@@ -4,9 +4,9 @@
 
 use std::cell::RefCell;
 
-use adw::subclass::prelude::*;
 use gtk::glib;
 use gtk::prelude::*;
+use gtk::subclass::prelude::*;
 
 #[derive(Debug, Clone, Default)]
 pub struct Bar {
@@ -60,12 +60,7 @@ mod imp {
                     None => false,
                 }
             });
-            let weak = widget.downgrade();
-            adw::StyleManager::default().connect_dark_notify(move |_| {
-                if let Some(this) = weak.upgrade() {
-                    this.queue_draw();
-                }
-            });
+            crate::theme::register_redraw(&*widget);
         }
     }
     impl WidgetImpl for BarChart {}

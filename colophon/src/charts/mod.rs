@@ -26,7 +26,7 @@ use crate::theme;
 pub use theme::rgba;
 
 pub fn is_dark() -> bool {
-    adw::StyleManager::default().is_dark()
+    theme::active().dark
 }
 
 // The chart colours read the active theme (`theme::active`), so they
