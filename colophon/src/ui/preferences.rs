@@ -1,14 +1,16 @@
-//! The Preferences dialog. One group for now, the theme picker: a combo of
-//! "Follow system" plus every palette in `theme::THEMES`. Selecting one
-//! persists it to GSettings and applies it live via the window.
+//! The Preferences window. One group for now, the theme picker: a
+//! dropdown of "Follow system" plus every palette in `theme::THEMES`.
+//! Selecting one persists it to GSettings and applies it live via the
+//! window.
 
-use adw::prelude::*;
+use gtk::gdk;
 use gtk::glib;
+use gtk::prelude::*;
 
 use crate::theme;
 use crate::ui::window::ColophonWindow;
 
-/// Combo index 0 is "Follow system"; the rest map to `theme::THEMES`.
+/// Dropdown index 0 is "Follow system"; the rest map to `theme::THEMES`.
 fn selection_for_index(index: u32) -> String {
     if index == 0 {
         theme::SYSTEM_ID.to_string()
@@ -33,36 +35,82 @@ fn index_for_selection(selection: &str) -> u32 {
 }
 
 pub fn present(window: &ColophonWindow) {
-    let dialog = adw::PreferencesDialog::new();
-    dialog.set_title("Preferences");
-
-    let page = adw::PreferencesPage::new();
-    let group = adw::PreferencesGroup::builder()
-        .title("Appearance")
-        .description("Charts and the whole window follow the chosen palette.")
-        .build();
-
     let names = gtk::StringList::new(&["Follow system"]);
     for t in theme::THEMES {
         names.append(t.name);
     }
-
-    let combo = adw::ComboRow::builder()
-        .title("Theme")
+    let dropdown = gtk::DropDown::builder()
         .model(&names)
         .selected(index_for_selection(&crate::settings::theme()))
+        .valign(gtk::Align::Center)
         .build();
-
-    combo.connect_selected_notify(glib::clone!(
+    dropdown.connect_selected_notify(glib::clone!(
         #[weak]
         window,
-        move |row| {
-            window.apply_theme(&selection_for_index(row.selected()));
+        move |dd| {
+            window.apply_theme(&selection_for_index(dd.selected()));
         }
     ));
 
-    group.add(&combo);
-    page.add(&group);
-    dialog.add(&page);
-    dialog.present(Some(window));
+    let list = gtk::ListBox::builder()
+        .selection_mode(gtk::SelectionMode::None)
+        .css_classes(["boxed-list"])
+        .build();
+    list.append(&crate::ui::rows::row(
+        "Theme",
+        None,
+        Some(dropdown.upcast_ref()),
+    ));
+
+    let heading = gtk::Label::builder()
+        .label("Appearance")
+        .xalign(0.0)
+        .css_classes(["heading"])
+        .build();
+    let description = gtk::Label::builder()
+        .label("Charts and the whole window follow the chosen palette.")
+        .xalign(0.0)
+        .wrap(true)
+        .css_classes(["caption", "dim-label"])
+        .build();
+
+    let content = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(8)
+        .margin_top(14)
+        .margin_bottom(14)
+        .margin_start(14)
+        .margin_end(14)
+        .build();
+    content.append(&heading);
+    content.append(&description);
+    content.append(&list);
+
+    let prefs = gtk::Window::builder()
+        .title("Preferences")
+        .transient_for(window)
+        .modal(true)
+        .default_width(420)
+        .child(&content)
+        .build();
+
+    // Escape closes, which the adw dialog did for free.
+    let key = gtk::EventControllerKey::new();
+    key.connect_key_pressed(glib::clone!(
+        #[weak]
+        prefs,
+        #[upgrade_or]
+        glib::Propagation::Proceed,
+        move |_, keyval, _, _| {
+            if keyval == gdk::Key::Escape {
+                prefs.close();
+                glib::Propagation::Stop
+            } else {
+                glib::Propagation::Proceed
+            }
+        }
+    ));
+    prefs.add_controller(key);
+
+    prefs.present();
 }

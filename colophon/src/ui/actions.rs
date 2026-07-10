@@ -2,8 +2,8 @@
 //! actions whose bodies are `ColophonWindow` methods, app-level actions,
 //! and the accelerator table.
 
-use adw::prelude::*;
 use gtk::gio;
+use gtk::prelude::*;
 
 use crate::settings;
 use crate::ui::window::ColophonWindow;
@@ -75,16 +75,18 @@ pub fn install_app_actions(app: &adw::Application) {
     let weak = app.downgrade();
     about.connect_activate(move |_, _| {
         let Some(app) = weak.upgrade() else { return };
-        let dialog = adw::AboutDialog::builder()
-            .application_name("Colophon")
-            .application_icon("org.virinvictus.Colophon")
-            .developer_name("Brandon LaRocque")
+        let dialog = gtk::AboutDialog::builder()
+            .program_name("Colophon")
+            .logo_icon_name("org.virinvictus.Colophon")
+            .authors(vec!["Brandon LaRocque"])
             .version(env!("CARGO_PKG_VERSION"))
             .website("https://github.com/VirInvictus/Colophon")
             .license_type(gtk::License::MitX11)
             .comments("A reading-statistics viewer for KOReader")
+            .modal(true)
             .build();
-        dialog.present(app.active_window().as_ref());
+        dialog.set_transient_for(app.active_window().as_ref());
+        dialog.present();
     });
     app.add_action(&about);
 
