@@ -4,15 +4,16 @@
 
 use std::cell::RefCell;
 
-use adw::prelude::*;
-use adw::subclass::prelude::*;
 use chrono::NaiveDate;
 use gtk::glib;
+use gtk::prelude::*;
+use gtk::subclass::prelude::*;
 
 use crate::charts::bar::Bar;
 use crate::charts::line::Point;
 use crate::fmt::{humanize_secs, short_date};
 use crate::stats::{Overview, SESSION_BUCKETS};
+use crate::ui::rows;
 
 type WindowChangedHandler = Box<dyn Fn()>;
 
@@ -334,16 +335,11 @@ impl OverviewPage {
             } else {
                 format!("{} \u{b7} {when}", f.author)
             };
-            let row = adw::ActionRow::builder()
-                .title(&f.title)
-                .subtitle(&subtitle)
-                .build();
-            let time = gtk::Label::builder()
-                .label(humanize_secs(f.total_secs))
-                .css_classes(["dim-label"])
-                .build();
-            row.add_suffix(&time);
-            imp.finished_rows.append(&row);
+            imp.finished_rows.append(&rows::value_row(
+                &f.title,
+                &humanize_secs(f.total_secs),
+                Some(&subtitle),
+            ));
         }
 
         imp.heatmap.set_data(&overview.daily, today);
@@ -467,16 +463,11 @@ impl OverviewPage {
             } else {
                 format!("{} book{plural}", s.books)
             };
-            let row = adw::ActionRow::builder()
-                .title(&s.name)
-                .subtitle(&subtitle)
-                .build();
-            let time = gtk::Label::builder()
-                .label(humanize_secs(s.total_secs))
-                .css_classes(["dim-label"])
-                .build();
-            row.add_suffix(&time);
-            imp.series_rows.append(&row);
+            imp.series_rows.append(&rows::value_row(
+                &s.name,
+                &humanize_secs(s.total_secs),
+                Some(&subtitle),
+            ));
         }
 
         // Author affinity (spec.md "Rollups"): most-read authors, hidden
@@ -493,16 +484,11 @@ impl OverviewPage {
             } else {
                 format!("{} book{plural}", a.books)
             };
-            let row = adw::ActionRow::builder()
-                .title(&a.name)
-                .subtitle(&subtitle)
-                .build();
-            let time = gtk::Label::builder()
-                .label(humanize_secs(a.total_secs))
-                .css_classes(["dim-label"])
-                .build();
-            row.add_suffix(&time);
-            imp.author_rows.append(&row);
+            imp.author_rows.append(&rows::value_row(
+                &a.name,
+                &humanize_secs(a.total_secs),
+                Some(&subtitle),
+            ));
         }
 
         // Forgotten books (spec.md "Forgotten books"): unfinished and
@@ -517,16 +503,11 @@ impl OverviewPage {
             } else {
                 format!("{} \u{b7} last read {}", f.author, short_date(f.last_read))
             };
-            let row = adw::ActionRow::builder()
-                .title(&f.title)
-                .subtitle(&subtitle)
-                .build();
-            let days = gtk::Label::builder()
-                .label(format!("{}d ago", f.days_since))
-                .css_classes(["dim-label"])
-                .build();
-            row.add_suffix(&days);
-            imp.forgotten_rows.append(&row);
+            imp.forgotten_rows.append(&rows::value_row(
+                &f.title,
+                &format!("{}d ago", f.days_since),
+                Some(&subtitle),
+            ));
         }
     }
 }

@@ -3,14 +3,15 @@
 //! device's "time spent reading"), with the uncapped sum alongside, and
 //! the estimates run on capped avg_time.
 
-use adw::prelude::*;
-use adw::subclass::prelude::*;
 use chrono::NaiveDate;
 use gtk::glib;
+use gtk::prelude::*;
+use gtk::subclass::prelude::*;
 
 use crate::fmt::{humanize_secs, short_date};
 use crate::library::LibraryEntry;
 use crate::stats::{self, BookDetail};
+use crate::ui::rows;
 
 mod imp {
     use super::*;
@@ -142,7 +143,7 @@ impl BookPage {
         imp.rows.remove_all();
         let add = |title: &str, value: String, subtitle: Option<String>| {
             imp.rows
-                .append(&stat_row(title, &value, subtitle.as_deref()));
+                .append(&rows::value_row(title, &value, subtitle.as_deref()));
         };
 
         // The device's own declared status once the user has provided this
@@ -158,22 +159,21 @@ impl BookPage {
             };
             add("Status", label.to_string(), Some("from your device".into()));
         } else if let Some(md5) = book.md5.clone() {
-            let row = adw::ActionRow::builder()
-                .title("Add reading status")
-                .subtitle("Give Colophon this book's .sdr sidecar to use the device's own finished status")
-                .build();
             let button = gtk::Button::builder()
                 .label("Add file\u{2026}")
                 .valign(gtk::Align::Center)
                 .css_classes(["flat"])
                 .build();
-            row.add_suffix(&button);
             button.connect_clicked(glib::clone!(
                 #[weak(rename_to = page)]
                 self,
                 move |_| page.pick_sidecar(&md5)
             ));
-            imp.rows.append(&row);
+            imp.rows.append(&rows::row(
+                "Add reading status",
+                Some("Give Colophon this book's .sdr sidecar to use the device's own finished status"),
+                Some(button.upcast_ref()),
+            ));
         }
 
         add(
@@ -257,28 +257,25 @@ impl BookPage {
                 .map(|d| short_date(d.with_timezone(&chrono::Local).date_naive()));
             let end = chrono::DateTime::from_timestamp(completion.end_time, 0)
                 .map(|d| short_date(d.with_timezone(&chrono::Local).date_naive()));
-            let row = adw::ActionRow::builder()
-                .title(format!("Read-through {}", i + 1))
-                .subtitle(match (start, end) {
-                    (Some(s), Some(e)) if s != e => format!("{s} \u{2013} {e}"),
-                    (Some(s), _) => s,
-                    _ => String::new(),
-                })
-                .build();
+            let dates = match (start, end) {
+                (Some(s), Some(e)) if s != e => format!("{s} \u{2013} {e}"),
+                (Some(s), _) => s,
+                _ => String::new(),
+            };
             let span_days = ((completion.end_time - completion.start_time) / 86_400).max(0) + 1;
-            let value = gtk::Label::builder()
-                .label(format!(
-                    "{} \u{b7} {} sessions \u{b7} {:.0} pages/hour \u{b7} {:.0} pages/day \u{b7} {:.0}% covered",
-                    humanize_secs(completion.seconds),
-                    completion.sessions,
-                    completion.pages_per_hour,
-                    completion.pages_read as f64 / span_days as f64,
-                    completion.coverage * 100.0
-                ))
-                .css_classes(["dim-label"])
-                .build();
-            row.add_suffix(&value);
-            imp.completion_rows.append(&row);
+            let value = format!(
+                "{} \u{b7} {} sessions \u{b7} {:.0} pages/hour \u{b7} {:.0} pages/day \u{b7} {:.0}% covered",
+                humanize_secs(completion.seconds),
+                completion.sessions,
+                completion.pages_per_hour,
+                completion.pages_read as f64 / span_days as f64,
+                completion.coverage * 100.0
+            );
+            imp.completion_rows.append(&rows::value_row(
+                &format!("Read-through {}", i + 1),
+                &value,
+                Some(&dates),
+            ));
         }
     }
 
@@ -353,17 +350,4 @@ fn date_range(start: Option<NaiveDate>, last: Option<NaiveDate>) -> Option<Strin
         (Some(s), _) => Some(format!("started {}", short_date(s))),
         _ => None,
     }
-}
-
-fn stat_row(title: &str, value: &str, subtitle: Option<&str>) -> adw::ActionRow {
-    let row = adw::ActionRow::builder().title(title).build();
-    if let Some(subtitle) = subtitle {
-        row.set_subtitle(subtitle);
-    }
-    let value_label = gtk::Label::builder()
-        .label(value)
-        .css_classes(["dim-label"])
-        .build();
-    row.add_suffix(&value_label);
-    row
 }
