@@ -6,9 +6,8 @@
         <property name="hscrollbar-policy">never</property>
         <property name="vexpand">true</property>
         <child>
-          <object class="AdwClamp">
+          <object class="Clamp">
             <property name="maximum-size">820</property>
-            <property name="tightening-threshold">640</property>
             <child>
               <object class="GtkBox">
                 <property name="orientation">vertical</property>

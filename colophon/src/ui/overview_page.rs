@@ -92,6 +92,7 @@ mod imp {
 
         fn class_init(klass: &mut Self::Class) {
             klass.set_layout_manager_type::<gtk::BinLayout>();
+            crate::ui::clamp::Clamp::ensure_type();
             YearHeatmap::ensure_type();
             HourHeatmap::ensure_type();
             LineChart::ensure_type();
