@@ -1,15 +1,16 @@
 //! Theming. A registry of named palettes (Kanagawa, Gruvbox, Nord, Rosé
 //! Pine, Solarized) plus a "Follow system" mode that tracks the desktop's
-//! light/dark preference. One [`Theme`] drives both the libadwaita CSS
-//! variables and the chart colors, so a single definition themes the whole
-//! app; `charts` reads [`active`] at draw time.
+//! light/dark preference. One [`Theme`] drives both the generated
+//! application stylesheet (Colophon's own; there is no adwaita sheet
+//! underneath) and the chart colors, so a single definition themes the
+//! whole app; `charts` reads [`active`] at draw time.
 
 use std::cell::{Cell, RefCell};
 
 use gtk::prelude::*;
 use gtk::{gdk, gio, glib};
 
-/// A named palette. The colour roles feed both the generated adwaita CSS
+/// A named palette. The colour roles feed both the generated stylesheet
 /// and the cairo chart widgets.
 pub struct Theme {
     pub id: &'static str,
@@ -336,67 +337,162 @@ pub fn rgba(hex: &str) -> gdk::RGBA {
     gdk::RGBA::new(byte(1), byte(3), byte(5), 1.0)
 }
 
-// Phase 6a reference-sheet spike: previews the Hyprland-native target look
-// (flat, square, 1px hard borders, hidden window buttons) as overrides on
-// top of the still-present adwaita sheet. Gated on COLOPHON_FLAT so default
-// behaviour is untouched; deleted when the owned stylesheet lands (6c).
-fn flat_css(t: &Theme) -> String {
-    format!(
-        "\
-window.csd {{ border-radius: 0; box-shadow: none; }}
-headerbar {{ background: {bg_header}; background-image: none; box-shadow: none;
-  border-bottom: 1px solid {grid}; min-height: 34px; }}
-headerbar windowcontrols {{ opacity: 0; min-width: 0; margin: 0; }}
-button, entry, row, toast, popover > contents, scrollbar slider,
-progressbar trough, progressbar progress, .card, .pill,
-list.boxed-list {{ border-radius: 0; }}
-button {{ box-shadow: none; }}
-.card, list.boxed-list {{ border: 1px solid {grid}; box-shadow: none; }}
-popover > contents {{ border: 1px solid {grid}; box-shadow: none; }}
-",
-        bg_header = t.bg_header,
-        grid = t.grid,
-    )
+// The structural half of the owned sheet: every rule reads the palette
+// through the --c-* custom properties css() emits per theme (GTK 4.16+,
+// which is why the workspace pins v4_16). The look is the locked 6a
+// design language: flat, square, hard 1px borders, no shadows, denser
+// spacing than GNOME HIG. No font-family anywhere, ever (house rule:
+// never assume an installed font).
+const STRUCTURE: &str = "\
+window { background-color: var(--c-bg-window); color: var(--c-fg); }
+window.csd { border-radius: 0; box-shadow: none; }
+decoration { border-radius: 0; box-shadow: none; }
+
+headerbar {
+  background-color: var(--c-bg-header);
+  background-image: none;
+  color: var(--c-fg);
+  box-shadow: none;
+  border-bottom: 1px solid var(--c-grid);
+  min-height: 34px;
+  padding: 0 4px;
+}
+headerbar button { min-height: 24px; }
+
+paned > separator {
+  background-color: var(--c-grid);
+  background-image: none;
+  min-width: 1px;
+  min-height: 1px;
+}
+.sidebar { background-color: var(--c-bg); }
+
+.title-1 { font-weight: 800; font-size: 170%; }
+.title-2 { font-weight: 800; font-size: 140%; }
+.title-4 { font-weight: 700; font-size: 105%; }
+.heading { font-weight: 700; }
+.caption { font-size: 82%; }
+.caption-heading { font-weight: 700; font-size: 82%; }
+.dim-label { color: var(--c-fg-dim); }
+.success { color: var(--c-ok); }
+.status-title { font-weight: 700; font-size: 135%; }
+
+.card, list.boxed-list {
+  background-color: var(--c-bg-card);
+  color: var(--c-fg);
+  border: 1px solid var(--c-grid);
+  border-radius: 0;
+  box-shadow: none;
+}
+list.boxed-list > row { border-bottom: 1px solid var(--c-grid); }
+list.boxed-list > row:last-child { border-bottom: none; }
+
+list, listview { background-color: transparent; }
+row { border-radius: 0; }
+row.activatable:hover { background-color: var(--c-grid); }
+row:selected { background-color: var(--c-accent); color: var(--c-on-accent); }
+row:selected label { color: var(--c-on-accent); }
+
+button {
+  background-color: var(--c-bg-card);
+  background-image: none;
+  color: var(--c-fg);
+  border: 1px solid var(--c-grid);
+  border-radius: 0;
+  box-shadow: none;
+  min-height: 24px;
+  padding: 2px 10px;
+}
+button:hover { background-color: var(--c-grid); }
+button:active, button:checked {
+  background-color: var(--c-accent);
+  color: var(--c-on-accent);
+  border-color: var(--c-accent);
+}
+button.flat { background-color: transparent; border-color: transparent; }
+button.flat:hover { background-color: var(--c-grid); }
+button.suggested-action {
+  background-color: var(--c-accent);
+  color: var(--c-on-accent);
+  border-color: var(--c-accent);
+}
+.linked > button:not(:first-child) { border-left-width: 0; }
+
+popover > arrow { background-color: var(--c-bg-card); }
+popover > contents {
+  background-color: var(--c-bg-card);
+  color: var(--c-fg);
+  border: 1px solid var(--c-grid);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 4px;
+}
+popover.menu modelbutton { border-radius: 0; padding: 5px 8px; }
+modelbutton:hover { background-color: var(--c-accent); color: var(--c-on-accent); }
+popover.menu separator { background-color: var(--c-grid); min-height: 1px; margin: 4px 0; }
+
+.toast {
+  background-color: var(--c-bg-card);
+  color: var(--c-fg);
+  border: 1px solid var(--c-grid);
+  padding: 6px 12px;
+}
+.banner {
+  background-color: var(--c-warn);
+  color: var(--c-on-accent);
+  border-bottom: 1px solid var(--c-grid);
+  padding: 6px 12px;
 }
 
+tooltip, tooltip.background {
+  background-color: var(--c-bg-header);
+  color: var(--c-fg);
+  border: 1px solid var(--c-grid);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 4px 8px;
+}
+
+scrollbar { background-color: transparent; }
+scrollbar slider {
+  background-color: var(--c-grid);
+  border-radius: 0;
+  min-width: 6px;
+  min-height: 6px;
+}
+scrollbar slider:hover { background-color: var(--c-fg-dim); }
+
+selection { background-color: var(--c-accent); color: var(--c-on-accent); }
+*:focus-visible { outline: 1px solid var(--c-accent); outline-offset: -1px; }
+
+.book-row .stats { color: var(--c-fg-dim); }
+row:selected .stats { color: var(--c-on-accent); }
+.group-header label { color: var(--c-heading); font-weight: 600; }
+.group-member { border-left: 2px solid var(--c-grid); }
+";
+
+/// The full application sheet for one palette: the --c-* custom
+/// properties followed by the palette-independent [`STRUCTURE`] rules.
 fn css(t: &Theme) -> String {
     format!(
         "\
 :root {{
-  --window-bg-color: {bg_window};
-  --window-fg-color: {fg};
-  --view-bg-color: {bg};
-  --view-fg-color: {fg};
-  --headerbar-bg-color: {bg_header};
-  --headerbar-fg-color: {fg};
-  --sidebar-bg-color: {bg};
-  --sidebar-fg-color: {fg};
-  --card-bg-color: {bg_card};
-  --card-fg-color: {fg};
-  --popover-bg-color: {bg_card};
-  --popover-fg-color: {fg};
-  --dialog-bg-color: {bg_card};
-  --dialog-fg-color: {fg};
-  --accent-bg-color: {accent};
-  --accent-fg-color: {on_accent};
-  --accent-color: {accent};
-  --warning-bg-color: {warn};
-  --warning-fg-color: {on_accent};
-  --warning-color: {warn};
-  --error-bg-color: {err};
-  --error-fg-color: {on_accent};
-  --error-color: {err};
-  --destructive-bg-color: {err};
-  --destructive-fg-color: {on_accent};
-  --destructive-color: {err};
-  --success-bg-color: {ok};
-  --success-fg-color: {on_accent};
-  --success-color: {ok};
+  --c-bg: {bg};
+  --c-bg-window: {bg_window};
+  --c-bg-header: {bg_header};
+  --c-bg-card: {bg_card};
+  --c-fg: {fg};
+  --c-fg-dim: {fg_dim};
+  --c-heading: {heading};
+  --c-accent: {accent};
+  --c-on-accent: {on_accent};
+  --c-secondary: {secondary};
+  --c-grid: {grid};
+  --c-warn: {warn};
+  --c-err: {err};
+  --c-ok: {ok};
 }}
-.book-row .stats {{ color: {fg_dim}; }}
-.group-header label {{ color: {heading}; font-weight: 600; }}
-.group-member {{ border-left: 2px solid {grid}; }}
-",
+{STRUCTURE}",
         bg = t.bg,
         bg_window = t.bg_window,
         bg_header = t.bg_header,
@@ -406,19 +502,12 @@ fn css(t: &Theme) -> String {
         heading = t.heading,
         accent = t.accent,
         on_accent = t.on_accent,
+        secondary = t.secondary,
+        grid = t.grid,
         warn = t.warn,
         err = t.err,
         ok = t.ok,
-        grid = t.grid,
     )
-}
-
-fn css_with_overrides(t: &Theme) -> String {
-    let mut sheet = css(t);
-    if std::env::var_os("COLOPHON_FLAT").is_some() {
-        sheet.push_str(&flat_css(t));
-    }
-    sheet
 }
 
 fn apply(t: &'static Theme) {
@@ -438,11 +527,16 @@ fn apply(t: &'static Theme) {
             gtk::style_context_remove_provider_for_display(&display, &old);
         }
         let provider = gtk::CssProvider::new();
-        provider.load_from_string(&css_with_overrides(t));
+        provider.load_from_string(&css(t));
+        // Above USER priority on purpose: Colophon carries its own
+        // complete theming system (the eight palettes), and a global
+        // ~/.config/gtk-4.0/gtk.css skin outranks APPLICATION (600) at
+        // USER (800), which left the in-app theme half-applied on themed
+        // systems. The picker in Preferences owns this app's look.
         gtk::style_context_add_provider_for_display(
             &display,
             &provider,
-            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+            gtk::STYLE_PROVIDER_PRIORITY_USER + 1,
         );
         *slot = Some(provider);
     });
@@ -508,7 +602,9 @@ mod tests {
             assert_eq!(rgba(t.accent).alpha(), 1.0);
             let sheet = css(t);
             assert!(sheet.contains(t.accent));
-            assert!(sheet.contains("--window-bg-color"));
+            assert!(sheet.contains("--c-bg"));
+            // House rule: the sheet must never name a font family.
+            assert!(!sheet.contains("font-family"));
         }
     }
 }
