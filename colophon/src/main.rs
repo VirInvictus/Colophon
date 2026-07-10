@@ -1,4 +1,4 @@
-//! Colophon: a native GTK4/libadwaita statistics viewer for KOReader.
+//! Colophon: a native GTK4 statistics viewer for KOReader.
 
 mod autopull;
 mod charts;
@@ -11,8 +11,8 @@ mod stats;
 mod theme;
 mod ui;
 
-use adw::prelude::*;
 use gtk::glib;
+use gtk::prelude::*;
 
 use crate::ui::window::ColophonWindow;
 
@@ -35,7 +35,7 @@ fn main() -> glib::ExitCode {
         }
     }
 
-    let app = adw::Application::builder().application_id(APP_ID).build();
+    let app = gtk::Application::builder().application_id(APP_ID).build();
     app.connect_startup(|app| {
         theme::load(&settings::theme());
         ui::actions::install_app_actions(app);
@@ -44,7 +44,7 @@ fn main() -> glib::ExitCode {
     app.run()
 }
 
-fn build_ui(app: &adw::Application) {
+fn build_ui(app: &gtk::Application) {
     // Single-instance re-summon: present the existing window if one is up.
     if let Some(window) = app
         .windows()

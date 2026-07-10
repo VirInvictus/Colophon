@@ -6,9 +6,9 @@ use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use adw::prelude::*;
-use adw::subclass::prelude::*;
 use chrono::Local;
+use gtk::prelude::*;
+use gtk::subclass::prelude::*;
 use gtk::{gio, glib};
 
 use crate::library::LibraryEntry;
@@ -78,7 +78,7 @@ mod imp {
     impl ObjectSubclass for ColophonWindow {
         const NAME: &'static str = "ColophonWindow";
         type Type = super::ColophonWindow;
-        type ParentType = adw::ApplicationWindow;
+        type ParentType = gtk::ApplicationWindow;
 
         fn class_init(klass: &mut Self::Class) {
             LibraryView::ensure_type();
@@ -123,18 +123,17 @@ mod imp {
     }
 
     impl ApplicationWindowImpl for ColophonWindow {}
-    impl AdwApplicationWindowImpl for ColophonWindow {}
 }
 
 glib::wrapper! {
     pub struct ColophonWindow(ObjectSubclass<imp::ColophonWindow>)
-        @extends adw::ApplicationWindow, gtk::ApplicationWindow, gtk::Window, gtk::Widget,
+        @extends gtk::ApplicationWindow, gtk::Window, gtk::Widget,
         @implements gio::ActionGroup, gio::ActionMap, gtk::Accessible, gtk::Buildable,
                     gtk::ConstraintTarget, gtk::Native, gtk::Root, gtk::ShortcutManager;
 }
 
 impl ColophonWindow {
-    pub fn new(app: &adw::Application) -> Self {
+    pub fn new(app: &gtk::Application) -> Self {
         glib::Object::builder().property("application", app).build()
     }
 

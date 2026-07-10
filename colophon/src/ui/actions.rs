@@ -62,7 +62,7 @@ pub fn install_window_actions(window: &ColophonWindow) {
     }
 }
 
-pub fn install_app_actions(app: &adw::Application) {
+pub fn install_app_actions(app: &gtk::Application) {
     let quit = gio::SimpleAction::new("quit", None);
     let weak = app.downgrade();
     quit.connect_activate(move |_, _| {

@@ -24,47 +24,47 @@
       </item>
     </section>
   </menu>
-  <template class="ColophonWindow" parent="AdwApplicationWindow">
+  <template class="ColophonWindow" parent="GtkApplicationWindow">
     <property name="title">Colophon</property>
-    <property name="content">
-      <object class="GtkBox">
-        <property name="orientation">vertical</property>
-        <child>
-          <object class="GtkHeaderBar" id="header_bar">
-            <property name="show-title-buttons">false</property>
-            <property name="title-widget">
-              <object class="GtkLabel" id="content_title">
-                <property name="label">Colophon</property>
-                <property name="single-line-mode">true</property>
-                <property name="ellipsize">end</property>
-                <style>
-                  <class name="heading"/>
-                </style>
-              </object>
-            </property>
-            <child type="start">
-              <object class="GtkButton">
-                <property name="icon-name">document-open-symbolic</property>
-                <property name="tooltip-text">Import statistics database</property>
-                <property name="action-name">win.import</property>
-              </object>
-            </child>
-            <child type="start">
-              <object class="GtkButton" id="refresh_button">
-                <property name="icon-name">view-refresh-symbolic</property>
-                <property name="tooltip-text">Re-import from the last source</property>
-                <property name="action-name">win.refresh</property>
-              </object>
-            </child>
-            <child type="end">
-              <object class="GtkMenuButton">
-                <property name="icon-name">open-menu-symbolic</property>
-                <property name="tooltip-text">Main menu</property>
-                <property name="menu-model">primary_menu</property>
-              </object>
-            </child>
+    <property name="titlebar">
+      <object class="GtkHeaderBar" id="header_bar">
+        <property name="show-title-buttons">false</property>
+        <property name="title-widget">
+          <object class="GtkLabel" id="content_title">
+            <property name="label">Colophon</property>
+            <property name="single-line-mode">true</property>
+            <property name="ellipsize">end</property>
+            <style>
+              <class name="heading"/>
+            </style>
+          </object>
+        </property>
+        <child type="start">
+          <object class="GtkButton">
+            <property name="icon-name">document-open-symbolic</property>
+            <property name="tooltip-text">Import statistics database</property>
+            <property name="action-name">win.import</property>
           </object>
         </child>
+        <child type="start">
+          <object class="GtkButton" id="refresh_button">
+            <property name="icon-name">view-refresh-symbolic</property>
+            <property name="tooltip-text">Re-import from the last source</property>
+            <property name="action-name">win.refresh</property>
+          </object>
+        </child>
+        <child type="end">
+          <object class="GtkMenuButton">
+            <property name="icon-name">open-menu-symbolic</property>
+            <property name="tooltip-text">Main menu</property>
+            <property name="menu-model">primary_menu</property>
+          </object>
+        </child>
+      </object>
+    </property>
+    <property name="child">
+      <object class="GtkBox">
+        <property name="orientation">vertical</property>
         <child>
           <object class="GtkOverlay" id="toast_overlay">
             <property name="vexpand">true</property>

@@ -3,9 +3,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use adw::subclass::prelude::*;
 use gtk::glib;
 use gtk::prelude::*;
+use gtk::subclass::prelude::*;
 
 use crate::fmt::{humanize_secs, relative_date};
 use crate::library::LibraryEntry;

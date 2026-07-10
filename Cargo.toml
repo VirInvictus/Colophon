@@ -18,4 +18,3 @@ chrono = "0.4"
 # chunk). Vendored so it builds from source, like rusqlite's bundled sqlite.
 mlua = { version = "0.10", features = ["lua54", "vendored"] }
 gtk = { version = "0.9", package = "gtk4", features = ["v4_16"] }
-adw = { version = "0.7", package = "libadwaita", features = ["v1_7"] }
