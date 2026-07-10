@@ -8,7 +8,7 @@ commitment, not a brainstorm.
 
 ## Core concept
 
-Colophon is a native GTK4 / libadwaita desktop app that turns KOReader's
+Colophon is a native GTK4 desktop app that turns KOReader's
 reading-statistics database into attractive graphs and a wide variety of
 statistic widgets. It is a *viewer*, not a KOReader plugin and not a sync
 service — it operates on a local copy of the data.
@@ -23,7 +23,7 @@ service — it operates on a local copy of the data.
   offline. On-brand for the rest of the portfolio.
 - **Native, not a web dashboard.** The explicit gap this project targets:
   every existing KOReader stats tool Brandon has run into is a web UI or a
-  self-hosted Docker service. This is a real GTK4/libadwaita app.
+  self-hosted Docker service. This is a real native GTK4 app.
 - **Breadth over one fixed report.** KOReader's own in-app statistics screen
   already covers the basics (calendar heatmap, per-book totals). Colophon's
   reason to exist is a *wide variety* of widgets/charts pulling different
@@ -286,12 +286,11 @@ one real sample still to be copied when the Kindle is next mounted).
 
 ## Stack
 
-Rust 2024, GTK4 / libadwaita, `rusqlite` (read-only opens only). Two-crate
+Rust 2024, plain GTK4, `rusqlite` (read-only opens only). Two-crate
 workspace: `colophon-core` (ingestion/querying) and `colophon` (the GTK
-shell). Charting approach (native cairo drawing vs. a Rust charting crate)
-is an open decision for after Phase 0 — don't lock it in prematurely.
-Phase 6 removes libadwaita from this list (see "Design language" below);
-GTK4 stays.
+shell). Charts are native cairo drawing (decided Phase 3; no charting
+crate). Phase 6 (shipped as v2.0.0, 2026-07-10) removed libadwaita per
+"Design language" below; GTK4 stays.
 
 ## Design language (Phase 6 — Hyprland-native; decisions locked 2026-07-09)
 

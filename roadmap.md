@@ -483,56 +483,93 @@ The full adwaita surface, inventoried 2026-07-09: 17 `adw::` types across
 roughly 3,000 lines of UI layer (`ui/*.rs`, `ui/*.ui`, `theme.rs`). No
 replacement below needs a new dependency.
 
-- [ ] `Application` / `ApplicationWindow` → `gtk::Application` /
-      `gtk::ApplicationWindow`.
-- [ ] `NavigationSplitView` / `NavigationPage` / `Breakpoint` → `GtkPaned`,
-      per the 6a layout decision.
-- [ ] `ToolbarView` / `HeaderBar` → plain box plus the 6a toolbar decision.
-- [ ] `Clamp` → width-capped box (halign centre + CSS max-width/margins).
-- [ ] `StatusPage` (empty states) → small composite: icon + title +
-      description labels.
-- [ ] `Banner` (schema-version warning) → `GtkRevealer` + styled label.
-- [ ] `Toast` / `ToastOverlay` → `GtkOverlay` + auto-hiding revealer
-      notice.
-- [ ] `Bin` (chart-widget parents) → `gtk::Widget` subclass with
-      `BinLayout`.
-- [ ] `ActionRow` / `ComboRow` / `PreferencesDialog` / `PreferencesPage` /
-      `PreferencesGroup` → a plain `gtk::Window` preferences surface with
-      listbox rows + `GtkDropDown` (the only preference today is the theme
-      picker, so this is small).
-- [ ] `AboutDialog` → `gtk::AboutDialog`.
-- [ ] `StyleManager` / `ColorScheme` → the 6a portal decision.
+All shipped 2026-07-10 (v2.0.0), in commit-sized steps that stayed green.
+
+- [x] `Application` / `ApplicationWindow` → `gtk::Application` /
+      `gtk::ApplicationWindow` (the final toolkit-cut commit: template
+      parent, the adw `content` property renamed to `child`, and the
+      headerbar promoted to a real titlebar, which AdwApplicationWindow
+      forbade).
+- [x] `NavigationSplitView` / `NavigationPage` / `Breakpoint` → `GtkPaned`,
+      per the 6a layout decision. New `sidebar-width` GSettings key, saved
+      on close (not per notify::position, which fires every pixel of a
+      drag); F9 `win.toggle-sidebar` action, also in the primary menu.
+- [x] `ToolbarView` / `HeaderBar` → one flat `GtkHeaderBar`
+      (`show-title-buttons` off) whose title label follows the content
+      pane; the window title follows too, so compositor bars stay useful.
+- [x] `Clamp` → owned `ui/clamp.rs`. The width-capped-box idea didn't
+      survive contact: GTK CSS has no max-width, so it's a small
+      `gtk::Widget` subclass with a measure override (caps natural width,
+      answers height-for-width at the clamped width) and a centering
+      allocate. The tightening-threshold easing was deliberately dropped.
+- [x] `StatusPage` (empty states) → inline title + description composites
+      (no icon was in use, so no new widget type).
+- [x] `Banner` (schema-version warning) → `GtkRevealer` + styled label.
+- [x] `Toast` / `ToastOverlay` → `GtkOverlay` + auto-hiding revealer,
+      newest-wins with the pending hide cancelled on re-show (auto-pull
+      emits two back-to-back; the import result must survive).
+- [x] `Bin` (page-widget parents) → `gtk::Widget` subclass with
+      `BinLayout` + dispose unparenting. (The charts never were adw::Bin;
+      their only tie was `StyleManager::connect_dark_notify`, replaced by
+      a weak-ref redraw registry in `theme.rs` that also fixes a listener
+      leak: every chart used to add a permanent closure to the singleton.)
+- [x] `ActionRow` / `ComboRow` / `PreferencesDialog` / `PreferencesPage` /
+      `PreferencesGroup` → owned `ui/rows.rs` (`row`/`value_row`, shared
+      by both pages) and a plain `gtk::Window` preferences surface with a
+      `GtkDropDown`; Escape closes it via an explicit key controller.
+- [x] `AboutDialog` → `gtk::AboutDialog` (a toplevel rather than adwaita's
+      in-window sheet).
+- [x] `StyleManager` / `ColorScheme` → the 6a portal decision:
+      `org.freedesktop.portal.Settings` ReadOne (with the deprecated
+      double-wrapped Read as fallback) + a SettingChanged subscription,
+      dark default when no portal answers; fixed themes force polarity via
+      `gtk-application-prefer-dark-theme` so stock-widget internals follow.
 
 ### 6c — The owned stylesheet
 
-- [ ] Dropping libadwaita drops its entire stylesheet, and plain GTK4's
-      default theme is bare; Colophon authors its own application sheet.
-      `theme.rs` already generates CSS per palette from one `Theme` struct:
-      retarget it from adwaita's variables (`--accent-bg-color` et al.) to
-      Colophon's own classes and grow it into the full sheet implementing
-      the 6a look.
-- [ ] Replace the adwaita style classes in use (inventoried 2026-07-09:
-      `title-1`, `title-4`, `boxed-list`, `dim-label`, `caption`,
-      `caption-heading`, `heading`, `pill`, `linked`, `suggested-action`,
-      `success`) with owned equivalents in the generated sheet.
-- [ ] Chart colours already come from the same `Theme`; confirm parity and
-      nothing more.
+Shipped 2026-07-10 (v2.0.0).
+
+- [x] The owned sheet: `theme.rs` emits a `:root` block of owned `--c-*`
+      custom properties per palette (GTK 4.16, why `v4_16` is pinned) plus
+      a palette-independent structural sheet implementing the 6a look,
+      including the GTK-default gaps (menu popovers/modelbuttons,
+      tooltips, scrollbars, text selection, a visible focus outline). The
+      `COLOPHON_FLAT` spike is deleted. No `font-family` anywhere,
+      enforced by a unit test.
+- [x] Adwaita style classes: kept the class *names* (zero `.ui` churn) but
+      owned their definitions; `pill` deleted (contradicts square).
+- [x] Chart parity holds by construction (same `Theme` feeds vars and
+      cairo). Discovery that matters portfolio-wide: a global
+      `~/.config/gtk-4.0/gtk.css` skin loads at USER priority (800) and
+      outranks APPLICATION (600), silently half-overriding in-app themes
+      on themed systems, invisible when both are Kanagawa Dragon. The
+      provider now registers just above USER; the sibling apps must do
+      the same when they take this template.
 
 ### 6d — Packaging follow-through
 
-- [ ] Flatpak: evaluate moving off the GNOME 49 runtime to the freedesktop
-      runtime once libadwaita is gone (smaller base, honest dependency
-      story). The metainfo/screenshots refresh rides along.
-- [ ] Narrow the filesystem grant: evaluate dropping `--filesystem=host:ro`
-      now that both the statistics-db import and the per-book `.sdr`
-      attachment go through portal-backed `gtk::FileDialog`
-      (`ui/window.rs:173-176`). Carried over from the first Phase 6 cut;
-      still needs its go/no-go against the `/mnt/Kindle`-style direct read
-      that Refresh performs.
-- [ ] Meson, `.desktop`, metainfo, and app-id are unchanged. `APP_ID`
-      (`org.virinvictus.Colophon`, `main.rs:18`) already matches the
-      `.desktop` basename and the Flatpak `app-id` on both build paths, so
-      Hyprland `windowrulev2` matching stays stable; keep it that way.
+Closed 2026-07-10 (v2.0.0); both "evaluate" items resolved with a no.
+
+- [x] Flatpak runtime: **evaluated, staying on GNOME 49.** GTK4 ships in
+      the GNOME runtime and does not ship in org.freedesktop.Platform, so
+      moving would mean building and maintaining GTK4 as manifest modules
+      for the sake of a name. Revisit only if a gtk4 freedesktop
+      BaseApp/extension appears. Metainfo reworded (no more libadwaita)
+      and the 2.0.0 release entry added; the metainfo carries no
+      screenshots, so nothing to retake there.
+- [x] Filesystem grant: **evaluated, keeping `--filesystem=host:ro`.**
+      Refresh and device auto-pull re-read the remembered `source-path`
+      (and sidecar origins) directly across app restarts; portal
+      FileDialog grants do not persist for that, so dropping the grant
+      breaks both features in the Flatpak. Narrowing to
+      `/run/media;/media;/mnt` was considered and rejected: the source is
+      legitimately arbitrary (a synced folder, `~/backups/...`). Read-only
+      matches the contract.
+- [x] Meson, `.desktop`, metainfo, and app-id unchanged; `APP_ID` still
+      matches the `.desktop` basename and the Flatpak `app-id` on both
+      build paths, so Hyprland `windowrulev2` matching stays stable. CI
+      dropped `libadwaita-devel` (the Fedora container stays for
+      GTK >= 4.16).
 
 ### 6e — Tiling polish tail (survivors from the first Phase 6 cut)
 

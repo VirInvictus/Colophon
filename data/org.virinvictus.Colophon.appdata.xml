@@ -8,8 +8,8 @@
   <description>
     <p>
       Colophon turns KOReader's reading statistics into attractive, varied
-      graphs and widgets: a native GTK4 and libadwaita desktop app, not a
-      web dashboard or a self-hosted service.
+      graphs and widgets: a native GTK4 desktop app with its own flat,
+      hard-edged design, not a web dashboard or a self-hosted service.
     </p>
     <p>
       It reads a copy of the device's statistics database and never touches
@@ -32,6 +32,11 @@
   </developer>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2.0.0" date="2026-07-10">
+      <description>
+        <p>Colophon's look is now entirely its own. libadwaita is gone: plain GTK4 widgets, an app-generated stylesheet per palette (flat, square, 1px borders, no shadows), a slim toolbar without window buttons, a manual F9 sidebar toggle with a persisted width, and follow-system dark and light read directly from the desktop settings portal. All statistics, imports, themes, and sidecar features are unchanged.</p>
+      </description>
+    </release>
     <release version="1.1.0" date="2026-07-09">
       <description>
         <p>Device auto-pull: Colophon re-imports automatically at launch and when the device is mounted, refreshing the statistics database and any attached sidecars from the exact paths you previously provided. Still read-only, still copy-based.</p>

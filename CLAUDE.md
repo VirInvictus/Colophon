@@ -7,20 +7,24 @@ to Colophon.
 
 ## What this project is
 
-A native GTK4/libadwaita desktop app that turns KOReader's reading
-statistics into attractive, varied graphs and widgets. The explicit reason
+A native GTK4 desktop app (no libadwaita since v2.0.0) that turns
+KOReader's reading statistics into attractive, varied graphs and widgets. The explicit reason
 it exists: every KOReader stats tool Brandon has found is a web dashboard or
 a self-hosted Docker instance, and he doesn't want that. See `README.md` and
 `spec.md`.
 
-## Where this stands right now (2026-07-05, v1.0.0)
+## Where this stands right now (2026-07-10, v2.0.0)
 
-**Shipped 1.0.** Phases 0 through 4.6 are all complete; the spec is fully
-built. Scaffolding was Sonnet's, everything since is Fable's. Phase 5 is the
-post-1.0 candidate list, and each item needs its own go/no-go; the big open
-one is a word-count axis, which is off the stats-DB-only contract because it
-means reading the library EPUB files. Don't start any of it without a
-decision.
+**Shipped 2.0.** Phases 0 through 4.6 plus Phase 7 (device auto-pull,
+v1.1.0) and Phase 6 (the de-adwaita migration, v2.0.0) are complete; the
+spec is fully built and the app is the portfolio's de-adwaita pilot, the
+template for Atrium/Conservatory/Viaduct/Framework. Scaffolding was
+Sonnet's, everything since is Fable's. The Phase 6e polish tail (tiling
+geometry audit, draw-time label thinning, keyboard pass, shortcuts window)
+is the only Phase 6 remainder. Phase 5 is the post-1.0 candidate list, and
+each item needs its own go/no-go; the big open one is a word-count axis,
+which is off the stats-DB-only contract because it means reading the
+library EPUB files. Don't start any of it without a decision.
 
 Architecture worth knowing before you touch code:
 
@@ -32,14 +36,21 @@ Architecture worth knowing before you touch code:
   streaks, interval-union coverage, capped/uncapped totals, speed series,
   completion detection), and `sidecar` (sandboxed `mlua`, `StdLib::NONE`,
   joining `partial_md5_checksum` → `book.md5`).
-- **`colophon`** is the GTK4/libadwaita app: a NavigationSplitView
-  (Viaduct-style composite templates, GSettings, `gio::spawn_blocking` for db
-  work, no tokio). Sidebar "All Books" overview + per-book detail, both
-  respecting the junk filter. Overview aggregates live in `src/stats.rs`
-  (pure, tested), split into `OverviewBase` (window-independent, cached) and
-  the windowed charts so a window toggle stays cheap. Charts are custom cairo
-  on `GtkDrawingArea` (`src/charts/`), no charting crate. Eight themes drive
-  both the generated adwaita CSS and the chart colours from one `Theme`.
+- **`colophon`** is the plain-GTK4 app: a GtkPaned shell with one flat
+  headerbar and an F9 sidebar toggle (Viaduct-style composite templates,
+  GSettings, `gio::spawn_blocking` for db work, no tokio). Sidebar "All
+  Books" overview + per-book detail, both respecting the junk filter.
+  Overview aggregates live in `src/stats.rs` (pure, tested), split into
+  `OverviewBase` (window-independent, cached) and the windowed charts so a
+  window toggle stays cheap. Charts are custom cairo on `GtkDrawingArea`
+  (`src/charts/`), no charting crate. Eight themes drive both the
+  app-owned generated stylesheet and the chart colours from one `Theme`;
+  the provider registers just above USER priority so a global
+  ~/.config/gtk-4.0/gtk.css skin can't half-override the in-app palettes.
+  Follow-system dark/light reads org.freedesktop.portal.Settings over gio
+  D-Bus (dark default when no portal answers); small owned widgets replace
+  the adw ones (`ui/clamp.rs`, `ui/rows.rs`, the toast/banner revealers in
+  `window.ui`).
 - **Packaging**: Meson wrapper + `.desktop` + AppStream metainfo + Flatpak
   (`org.virinvictus.Colophon.json`, GNOME 49, `--filesystem=host:ro`).
 
@@ -77,12 +88,11 @@ matter a lot here)
 
 ## Stack
 
-Rust 2024, GTK4 / libadwaita, `rusqlite` (read-only opens only). Two-crate
-workspace (`colophon-core`, `colophon`), matching the shape of
-`Viaduct`/`Conservatory` rather than Atrium's larger seven-crate split —
-this project doesn't need that much separation yet. Charting library choice
-is explicitly deferred to after Phase 0 (see `spec.md` non-goals/open
-questions) — don't pick one prematurely.
+Rust 2024, plain GTK4 (v4_16; libadwaita removed in v2.0.0), `rusqlite`
+(read-only opens only). Two-crate workspace (`colophon-core`, `colophon`),
+matching the shape of `Viaduct`/`Conservatory` rather than Atrium's larger
+seven-crate split — this project doesn't need that much separation yet.
+Charts are hand-drawn cairo (decided Phase 3; no charting crate).
 
 ## Naming
 

@@ -1,5 +1,42 @@
 # Patchnotes
 
+## v2.0.0 — 2026-07-10
+
+The look is now Colophon's own. libadwaita is gone; GTK4 stays.
+
+- **The whole design language changed.** Flat, square, hard-edged: 1px
+  borders, no rounded corners, no shadows, denser spacing. Every rule comes
+  from an app-generated stylesheet driven by the same `Theme` that colours
+  the charts, so the eight palettes and Follow-system mode carry over
+  unchanged. A slim flat toolbar carries the title and the Import, Refresh,
+  and menu buttons; there are no window buttons anywhere (the compositor
+  owns window management; Ctrl+Q still quits).
+- **Layout is manual, the tiling way.** The adaptive split view became a
+  plain paned layout: F9 shows and hides the library sidebar, the divider
+  position persists across launches, and the app never reshuffles itself on
+  resize.
+- **Follow-system dark/light now reads the desktop portal directly**
+  (org.freedesktop.portal.Settings over D-Bus). On a session without a
+  settings portal backend it quietly defaults to the dark palette. Fixed
+  themes force their own polarity exactly as before.
+- **The in-app themes now always win.** The stylesheet registers above the
+  user-CSS priority level, so a global ~/.config/gtk-4.0/gtk.css skin (say,
+  a system-wide Kanagawa GTK theme) no longer half-overrides the palette
+  you picked in Preferences. This had been silently wrong on themed
+  systems.
+- **Nothing about the data changed.** Imports, refresh, auto-pull, the junk
+  filter, sidecar attachment, every chart and card, and all keyboard
+  shortcuts behave exactly as in 1.1.0; the app still runs fine under
+  GNOME. A small bonus: the window title now follows the selected book, so
+  compositor bars and window switchers read usefully.
+
+Under the hood: adw widgets were replaced by plain GTK plus a few small
+owned ones (a width clamp, shared list rows, toast and banner revealers),
+chart redraws on theme change go through a weak-ref registry (fixing a slow
+listener leak), and CI builds without libadwaita. Colophon is the
+portfolio's pilot for this migration; the pattern now rolls out to the
+sibling apps.
+
 ## v1.1.0 — 2026-07-09
 
 Plug in the Kindle and the numbers are already right.
