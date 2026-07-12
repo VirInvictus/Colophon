@@ -618,4 +618,17 @@ the migration as its verification pass (2026-07-10, v2.0.0).
       sanity check. Everything scriptable was verified live during the
       migration (D-Bus-driven actions, screenshots across three palettes,
       single-instance re-summon, refresh toast).
+- [ ] **Accent focus-flash on a bare modifier press (found via Conservatory,
+      2026-07-12).** `theme.rs`'s `*:focus-visible { outline: 1px solid
+      var(--c-accent) }` is universal: pressing a bare modifier (e.g. a
+      tiling-WM workspace-switch chord like Fn+Win / Ctrl+Super) flips GTK into
+      keyboard-focus-visible mode, and the `*` selector then outlines every
+      widget in the focus chain at once, flashing the accent across the window
+      before it fades. It does not show in a screenshot (grabbing one changes
+      input state and clears it), which makes it slippery to spot. Under an
+      animated system GTK theme the flash is more pronounced. Fix (as shipped in
+      Conservatory v0.3.7): scope the focus ring to the discrete interactive
+      controls (`button:focus-visible, entry:focus-visible, switch:focus-visible,
+      scale:focus-visible`, …) and drop the universal `*`; list/grid position is
+      already shown by the selection background.
 
