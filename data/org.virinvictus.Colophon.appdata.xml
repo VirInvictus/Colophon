@@ -32,6 +32,11 @@
   </developer>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2.0.1" date="2026-07-16">
+      <description>
+        <p>Fixes a visual glitch where pressing a bare modifier key flashed the accent colour across the whole window: the keyboard focus ring is now drawn only on interactive controls, not on every widget in the focus chain.</p>
+      </description>
+    </release>
     <release version="2.0.0" date="2026-07-10">
       <description>
         <p>Colophon's look is now entirely its own. libadwaita is gone: plain GTK4 widgets, an app-generated stylesheet per palette (flat, square, 1px borders, no shadows), a slim toolbar without window buttons, a manual F9 sidebar toggle with a persisted width, and follow-system dark and light read directly from the desktop settings portal. All statistics, imports, themes, and sidecar features are unchanged.</p>

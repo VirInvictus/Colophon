@@ -463,7 +463,20 @@ scrollbar slider {
 scrollbar slider:hover { background-color: var(--c-fg-dim); }
 
 selection { background-color: var(--c-accent); color: var(--c-on-accent); }
-*:focus-visible { outline: 1px solid var(--c-accent); outline-offset: -1px; }
+/* Keyboard-focus ring, scoped to the discrete interactive controls. NOT the
+   universal `*`: pressing a bare modifier (e.g. Fn+Win = Ctrl+Super to switch
+   workspaces) flips GTK into keyboard-focus-visible mode, and a `*` rule then
+   outlines every cell/row/container in the focus chain at once, flashing the
+   accent across the whole window. Rows show their position through the
+   selection background already, so they do not need a focus outline. */
+button:focus-visible,
+entry:focus-visible,
+spinbutton:focus-visible,
+switch:focus-visible,
+checkbutton:focus-visible,
+check:focus-visible,
+dropdown:focus-visible,
+scale:focus-visible { outline: 1px solid var(--c-accent); outline-offset: -1px; }
 
 .book-row .stats { color: var(--c-fg-dim); }
 row:selected .stats { color: var(--c-on-accent); }

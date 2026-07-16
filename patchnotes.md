@@ -1,6 +1,16 @@
 # Patchnotes
 
-## v2.0.0 — 2026-07-10
+## v2.0.1 — 2026-07-16
+
+- **Fixed: the accent colour no longer flashes across the window on a bare
+  modifier press.** Pressing a modifier on its own (say, starting a
+  workspace-switch chord on a tiling WM) puts GTK into keyboard-focus
+  mode, and the stylesheet's universal `*:focus-visible` rule then
+  outlined every widget in the focus chain at once. The focus ring is now
+  scoped to the discrete interactive controls (buttons, entries, switches,
+  dropdowns, and friends); lists and grids already show their position
+  through the selection background. Same fix as Conservatory v0.3.7, where
+  the bug was first spotted.
 
 The look is now Colophon's own. libadwaita is gone; GTK4 stays.
 
