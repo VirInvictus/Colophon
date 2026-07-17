@@ -360,6 +360,20 @@ third. Ordered cheapest-first.
 
 Ordered roughly by likelihood. None are commitments.
 
+Shipped from this list's spirit (new stats-DB-only overview charts, no new
+deps, on-contract):
+
+- [x] **Speed by hour of day** (v2.1.0, 2026-07-16): pages/hour by clock
+      hour, a 24-bar companion to the speed trend, windowed. `speed_by_hour`
+      in `colophon-core::metrics::speed`; overview sub-section under Reading
+      speed.
+- [x] **Cumulative reading curve** (v2.1.0, 2026-07-16): whole-history
+      running total of reading time, one point per active day, an odometer
+      line. `stats::cumulative_time` on `OverviewBase`; "Reading over time"
+      overview section.
+
+Still open:
+
 - [ ] **Word-count axis (the big one; needs a scope decision).** Tome's
       largest capability delta (`RESEARCH.md` §5.5): true words-per-minute
       (pagination-independent, unlike Colophon's pages/hour), lifetime

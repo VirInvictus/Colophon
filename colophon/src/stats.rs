@@ -38,6 +38,13 @@ pub struct Overview {
     /// start): daily buckets under ~10 weeks of history, weekly after.
     pub speed: Vec<(NaiveDate, SpeedPoint)>,
     pub speed_bucket: Bucket,
+    /// Reading speed resolved by local clock hour (0..24), windowed like
+    /// the speed trend. Zero points for hours with no reading.
+    pub speed_by_hour: [SpeedPoint; 24],
+    /// Whole-history cumulative reading time: `(day, cumulative seconds)`
+    /// at each active day. Window-independent (an odometer starts at zero,
+    /// so a shorter window never rebases it).
+    pub cumulative: Vec<(NaiveDate, i64)>,
     pub sessions: SessionSummary,
     /// Series in the library, most-recently-read first (whole-library,
     /// window-independent).
@@ -469,6 +476,7 @@ pub struct OverviewBase {
     daily: BTreeMap<NaiveDate, DayTotal>,
     streaks: Streaks,
     monthly: Vec<(NaiveDate, i64)>,
+    cumulative: Vec<(NaiveDate, i64)>,
     series: Vec<SeriesStat>,
     authors: Vec<AuthorStat>,
     records: Records,
@@ -491,6 +499,7 @@ pub fn overview_base<Tz: TimeZone>(
     let days = daily.keys().copied().collect();
     let streaks = metrics::streaks(&days, today);
     let monthly = monthly_totals(&daily, today);
+    let cumulative = cumulative_time(&daily);
     // One whole-history session pass, shared by the records card and the
     // recap's session count.
     let all_sessions = session_summary(&all_events, tz);
@@ -526,6 +535,7 @@ pub fn overview_base<Tz: TimeZone>(
         recap,
         finished_books: finished_timeline(entries, tz),
         monthly,
+        cumulative,
         series: series_breakdown(entries),
         authors: author_breakdown(entries),
     }
@@ -618,6 +628,8 @@ pub fn overview_windowed<Tz: TimeZone>(
         monthly: base.monthly.clone(),
         speed,
         speed_bucket,
+        speed_by_hour: metrics::speed_by_hour(&windowed, tz),
+        cumulative: base.cumulative.clone(),
         sessions: session_summary(&windowed, tz),
         daily: base.daily.clone(),
         streaks: base.streaks,
@@ -663,6 +675,20 @@ pub fn monthly_totals(
         }
     }
     out
+}
+
+/// Running total of daily reading seconds from the first reading day
+/// onward, one point per active day (spec.md "Cumulative reading curve").
+/// Whole-history: the reading odometer, so the window never rebases it.
+fn cumulative_time(daily: &BTreeMap<NaiveDate, DayTotal>) -> Vec<(NaiveDate, i64)> {
+    let mut running = 0i64;
+    daily
+        .iter()
+        .map(|(date, total)| {
+            running += total.seconds;
+            (*date, running)
+        })
+        .collect()
 }
 
 fn next_month(month: NaiveDate) -> NaiveDate {
@@ -1417,6 +1443,12 @@ mod tests {
             monthly: Vec::new(),
             speed: Vec::new(),
             speed_bucket: Bucket::Day,
+            speed_by_hour: [SpeedPoint {
+                pages: 0,
+                seconds: 0,
+                pages_per_hour: 0.0,
+            }; 24],
+            cumulative: Vec::new(),
             sessions: SessionSummary {
                 count: 3,
                 median_secs: 1800,

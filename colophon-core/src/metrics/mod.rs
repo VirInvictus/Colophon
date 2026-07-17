@@ -19,4 +19,4 @@ pub use progress::{
     rescaled_last_page, uncapped_seconds, unique_pages_read,
 };
 pub use sessions::sessions;
-pub use speed::{Bucket, speed_series};
+pub use speed::{Bucket, speed_by_hour, speed_series};

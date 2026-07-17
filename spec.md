@@ -195,6 +195,22 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
   estimate, from the number of distinct reading days behind the pace: high
   from 7 days, medium from 3, low below. Only present when there is an
   estimate.
+- **Speed by hour of day**: reading speed resolved by local clock hour
+  (0–23): for each hour, the distinct (book, page) pages read during it over
+  the uncapped seconds spent in it, as pages/hour. Exactly the distinct-pages
+  / uncapped-time rule of the speed trend, bucketed by hour of day instead of
+  by date, and (like the trend) scoped to the selected window. An event's
+  whole duration is attributed to its start hour (same rule as the
+  when-do-I-read heatmap). Hours with no reading are empty. Library-wide (junk
+  filter applied). It answers whether pace changes across the day, not just
+  where the reading falls.
+- **Cumulative reading curve**: a whole-history running total of reading
+  time, one point per active day, from the first reading day onward, plotted
+  as a monotonic series. Uses the default uncapped "Time read". Because it is
+  an odometer that starts at zero, it is window-independent (a shorter window
+  never rebases it) and library-wide (junk filter applied). It shows the
+  long-run shape of a reading habit: pushes as steep stretches, lulls as
+  plateaus.
 
 ## Widget catalogue (v1 commitment)
 
@@ -228,6 +244,14 @@ Nothing below exists in KOReader or any of the four tools.
    style, weekly rhythm) as a compact "reading personality" on the
    overview, each a plain-language label plus the number behind it. A
    narrative read of the same behaviour data the charts show.
+8. **Speed by hour of day.** A 24-bar companion to the speed trend:
+   pages/hour by clock hour, windowed. Where the when-do-I-read heatmap
+   shows *when* reading happens, this shows *how fast*, so the two read
+   together (e.g. a night owl who slows after 21:00).
+9. **Cumulative reading curve.** A whole-history "odometer": total time
+   read accumulated across every active day, one monotonic line. Pushes
+   show up as steep stretches, lulls as plateaus; it only gets richer as
+   history banks.
 
 ### Tier B — expected furniture (table stakes, done well)
 

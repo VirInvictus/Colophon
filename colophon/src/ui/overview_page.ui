@@ -158,6 +158,18 @@
                 </child>
                 <child>
                   <object class="GtkLabel">
+                    <property name="label">Reading over time</property>
+                    <property name="xalign">0</property>
+                    <style>
+                      <class name="title-4"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="LineChart" id="cumulative_chart"/>
+                </child>
+                <child>
+                  <object class="GtkLabel">
                     <property name="label">When do I read</property>
                     <property name="xalign">0</property>
                     <style>
@@ -188,6 +200,19 @@
                 </child>
                 <child>
                   <object class="LineChart" id="speed_chart"/>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="label">Pages/hour by time of day</property>
+                    <property name="xalign">0</property>
+                    <style>
+                      <class name="caption"/>
+                      <class name="dim-label"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="BarChart" id="speed_by_hour_chart"/>
                 </child>
                 <child>
                   <object class="GtkLabel">

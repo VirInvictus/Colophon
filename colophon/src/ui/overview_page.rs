@@ -40,6 +40,10 @@ mod imp {
         #[template_child]
         pub speed_chart: TemplateChild<LineChart>,
         #[template_child]
+        pub speed_by_hour_chart: TemplateChild<BarChart>,
+        #[template_child]
+        pub cumulative_chart: TemplateChild<LineChart>,
+        #[template_child]
         pub session_caption: TemplateChild<gtk::Label>,
         #[template_child]
         pub session_chart: TemplateChild<BarChart>,
@@ -363,6 +367,46 @@ impl OverviewPage {
                         point.pages,
                         humanize_secs(point.seconds)
                     ),
+                })
+                .collect(),
+        );
+
+        // Speed resolved by clock hour: 24 bars, empty where nothing was
+        // read. Bars are too narrow for on-bar values, so the numbers live
+        // in the hover, like the session-starts chart.
+        imp.speed_by_hour_chart.set_bars(
+            overview
+                .speed_by_hour
+                .iter()
+                .enumerate()
+                .map(|(hour, point)| Bar {
+                    label: format!("{hour:02}"),
+                    value: point.pages_per_hour,
+                    display: String::new(),
+                    tooltip: Some(if point.seconds > 0 {
+                        format!(
+                            "{hour:02}:00 \u{b7} {:.0} pages/hour \u{b7} {} pages in {}",
+                            point.pages_per_hour,
+                            point.pages,
+                            humanize_secs(point.seconds)
+                        )
+                    } else {
+                        format!("{hour:02}:00 \u{b7} no reading")
+                    }),
+                })
+                .collect(),
+        );
+
+        // Cumulative reading time: the whole-history odometer, one step per
+        // active day, in hours on the axis (seconds in the hover).
+        imp.cumulative_chart.set_points(
+            overview
+                .cumulative
+                .iter()
+                .map(|(date, secs)| Point {
+                    date: *date,
+                    value: *secs as f64 / 3600.0,
+                    display: format!("{} total", humanize_secs(*secs)),
                 })
                 .collect(),
         );

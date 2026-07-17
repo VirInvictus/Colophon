@@ -1,5 +1,22 @@
 # Patchnotes
 
+## v2.1.0 — 2026-07-16
+
+Two new overview charts, both from the stats database alone (no new
+dependencies, no reading of your library files).
+
+- **Speed by hour of day.** A 24-bar companion under the reading-speed
+  trend: pages per hour by clock hour. The when-do-I-read heatmap already
+  shows *when* you read; this shows *how fast*, so the two read together.
+  Do you actually slow down late, or are you sharper at night? Windowed
+  with the 30/90/365/all selector, like the trend itself. Hover a bar for
+  the pages and time behind it.
+- **Reading over time.** A cumulative "odometer" line: your total reading
+  time built up across every active day, from the first day to the last.
+  A big push shows as a steep stretch, a quiet spell as a plateau. It is
+  whole-history by nature, so the window selector leaves it alone, and it
+  only gets richer as your history grows.
+
 ## v2.0.1 — 2026-07-16
 
 - **Fixed: the accent colour no longer flashes across the window on a bare

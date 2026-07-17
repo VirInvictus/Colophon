@@ -32,6 +32,11 @@
   </developer>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2.1.0" date="2026-07-16">
+      <description>
+        <p>Two new overview charts, computed from the statistics database alone: a speed-by-hour-of-day bar chart (pages per hour by clock hour, a companion to the speed trend), and a cumulative reading-time curve that plots total time read across your whole history.</p>
+      </description>
+    </release>
     <release version="2.0.1" date="2026-07-16">
       <description>
         <p>Fixes a visual glitch where pressing a bare modifier key flashed the accent colour across the whole window: the keyboard focus ring is now drawn only on interactive controls, not on every widget in the focus chain.</p>

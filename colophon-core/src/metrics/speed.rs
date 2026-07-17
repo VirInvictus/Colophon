@@ -68,6 +68,47 @@ pub fn speed_series<Tz: TimeZone>(
         .collect()
 }
 
+/// Reading speed resolved by local clock hour (0..24): for each hour,
+/// distinct (book, page) pages read during it over the uncapped seconds
+/// spent in it, as pages/hour. The same distinct-pages / uncapped-time
+/// rule as [`speed_series`], bucketed by hour of day instead of by date,
+/// so it reveals whether pace shifts across the day (e.g. a night owl
+/// slowing after 21:00). An event's whole duration is attributed to its
+/// start hour, matching `hourly_profile`. Hours with no reading report a
+/// zero `SpeedPoint`.
+pub fn speed_by_hour<Tz: TimeZone>(events: &[PageEvent], tz: &Tz) -> [SpeedPoint; 24] {
+    let mut seconds = [0i64; 24];
+    let mut pages: [BTreeSet<(i64, i64)>; 24] = std::array::from_fn(|_| BTreeSet::new());
+
+    for event in events {
+        if event.duration <= 0 {
+            continue;
+        }
+        let local = tz
+            .timestamp_opt(event.start_time, 0)
+            .single()
+            .expect("epoch timestamp maps to exactly one instant");
+        let hour = chrono::Timelike::hour(&local) as usize;
+        seconds[hour] += event.duration;
+        pages[hour].insert((event.book_id, event.page));
+    }
+
+    std::array::from_fn(|h| {
+        let pages = pages[h].len() as u32;
+        let seconds = seconds[h];
+        let pages_per_hour = if seconds > 0 {
+            pages as f64 / (seconds as f64 / 3600.0)
+        } else {
+            0.0
+        };
+        SpeedPoint {
+            pages,
+            seconds,
+            pages_per_hour,
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,6 +168,42 @@ mod tests {
         let events = vec![ev(1, ts(2026, 7, 1, 12), 60), ev(1, ts(2026, 7, 1, 13), 60)];
         let series = speed_series(&events, &Utc, Bucket::Day);
         let point = series[&date("2026-07-01")];
+        assert_eq!(point.pages, 1);
+        assert_eq!(point.seconds, 120);
+    }
+
+    #[test]
+    fn speed_by_hour_buckets_on_the_start_hour() {
+        // 20 distinct pages in 20 minutes at 15:00 = 60 pages/hour.
+        let events: Vec<_> = (1..=20)
+            .map(|p| ev(p, ts(2026, 7, 1, 15) + p * 60, 60))
+            .collect();
+        let hours = speed_by_hour(&events, &Utc);
+        assert_eq!(hours[15].pages, 20);
+        assert_eq!(hours[15].seconds, 1200);
+        assert!((hours[15].pages_per_hour - 60.0).abs() < 1e-9);
+        // Every other hour is a zero point.
+        assert_eq!(hours[14].pages, 0);
+        assert_eq!(hours[14].pages_per_hour, 0.0);
+    }
+
+    #[test]
+    fn speed_by_hour_respects_timezone() {
+        // 01:00 UTC reads as 21:00 the previous day in UTC-4.
+        let events = vec![ev(1, ts(2026, 7, 3, 1), 60)];
+        let toronto = chrono::FixedOffset::west_opt(4 * 3600).unwrap();
+        assert_eq!(speed_by_hour(&events, &toronto)[21].pages, 1);
+        assert_eq!(speed_by_hour(&events, &Utc)[1].pages, 1);
+    }
+
+    #[test]
+    fn speed_by_hour_counts_rereads_once() {
+        // Same page revisited within the hour: one distinct page, both durations.
+        let events = vec![
+            ev(1, ts(2026, 7, 1, 9), 60),
+            ev(1, ts(2026, 7, 1, 9) + 300, 60),
+        ];
+        let point = speed_by_hour(&events, &Utc)[9];
         assert_eq!(point.pages, 1);
         assert_eq!(point.seconds, 120);
     }
