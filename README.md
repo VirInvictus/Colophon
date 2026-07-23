@@ -116,7 +116,7 @@ meson install -C build
 ```
 
 A Flatpak manifest (`org.virinvictus.Colophon.json`) builds it against the
-GNOME 49 runtime (which is where GTK4 ships; the app no longer uses
+GNOME 50 runtime (which is where GTK4 ships; the app no longer uses
 libadwaita) with a read-only host sandbox.
 
 ## License

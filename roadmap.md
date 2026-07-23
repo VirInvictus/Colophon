@@ -564,7 +564,7 @@ Shipped 2026-07-10 (v2.0.0).
 
 Closed 2026-07-10 (v2.0.0); both "evaluate" items resolved with a no.
 
-- [x] Flatpak runtime: **evaluated, staying on GNOME 49.** GTK4 ships in
+- [x] Flatpak runtime: **evaluated, staying on the GNOME runtime.** GTK4 ships in
       the GNOME runtime and does not ship in org.freedesktop.Platform, so
       moving would mean building and maintaining GTK4 as manifest modules
       for the sake of a name. Revisit only if a gtk4 freedesktop
@@ -646,4 +646,45 @@ the migration as its verification pass (2026-07-10, v2.0.0).
       scale:focus-visible`, …) and drop the universal `*`; list/grid position is
       already shown by the selection background. Fixed in v2.0.1 (2026-07-16),
       porting Conservatory's scoped rule verbatim.
+
+### 6f — Runtime version alignment (opened 2026-07-22)
+
+Separate from 6d's closed "stay on GNOME" verdict, which still stands: GTK4
+ships in the GNOME runtime and not in `org.freedesktop.Platform`, so leaving
+is not on the table. This is a *version* bump inside the GNOME runtime.
+
+- [x] **Bump `org.virinvictus.Colophon.json` from GNOME 49 to GNOME 50.**
+      *(Done 2026-07-23.)* Colophon was the only Flatpak in the portfolio
+      still on 49; Atrium, Hermitage, and Framework all target 50, so 49
+      existed on the build machine solely for this manifest. Found during a
+      2026-07-22 disk audit: `org.gnome.Sdk 49` was 2.3 GB of otherwise-dead
+      weight, and it was pinned, so `flatpak uninstall --unused` would not
+      touch it while the manifest asked for it. GNOME 50 ships GTK 4.20
+      against 49's 4.18 and the app requires only 4.16, so no API work was
+      needed. `org.gnome.Platform 49` stays installed regardless
+      (MissionCenter is the only thing still using it), so the reclaim was
+      the SDK alone, and it has been taken. `CLAUDE.md` and `README.md`
+      packaging lines updated in the same commit.
+
+      **⚠ The Flatpak build was NOT verified, by decision.** The check this
+      item asked for turned out to be impossible as written: the manifest
+      needs `org.freedesktop.Sdk.Extension.rust-stable`, and **no branch of
+      it is installed** (not `25.08` for GNOME 50, and not `24.08` for the
+      old 49 either). So the Flatpak has not been locally buildable for some
+      time, independent of this bump; the item's premise that a passing
+      build existed to re-run was wrong. Pulling `rust-stable//25.08` costs
+      556 MB down / 2.0 GB installed, which would have consumed almost the
+      entire 2.3 GB this bump exists to reclaim, so it was skipped
+      deliberately. What *was* verified: the manifest is valid JSON,
+      `org.gnome.Platform` and `org.gnome.Sdk` 50 are both present, the
+      GTK `v4_16` feature is well under 50's 4.20, and `cargo build
+      --release` is green.
+
+- [ ] **Verify the Flatpak build, whenever the Rust SDK extension is
+      installed.** Not urgent and not blocking anything: the from-source and
+      Meson paths are unaffected, and this only gates shipping a Flatpak
+      artifact. Atrium and Viaduct need the same
+      `org.freedesktop.Sdk.Extension.rust-stable//25.08`, so install it once
+      and verify all three Rust Flatpaks together rather than paying 2.0 GB
+      for one. Then `flatpak-builder` a build and launch it.
 

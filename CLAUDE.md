@@ -13,10 +13,15 @@ it exists: every KOReader stats tool Brandon has found is a web dashboard or
 a self-hosted Docker instance, and he doesn't want that. See `README.md` and
 `spec.md`.
 
-## Where this stands right now (2026-07-10, v2.0.0)
+## Where this stands right now (2026-07-16, v2.1.0)
 
-**Shipped 2.0.** Phases 0 through 4.6 plus Phase 7 (device auto-pull,
-v1.1.0) and Phase 6 (the de-adwaita migration, v2.0.0) are complete; the
+**Shipped 2.1.** Phases 0 through 4.6 plus Phase 7 (device auto-pull,
+v1.1.0) and Phase 6 (the de-adwaita migration, v2.0.0) are complete. Two
+releases followed the migration: **v2.0.1** scoped the focus ring to
+discrete interactive controls (`button`/`entry`/`switch`/`scale`
+`:focus-visible`), ending the accent flash a bare modifier press used to
+fire across every widget in the focus chain; **v2.1.0** added the
+speed-by-hour chart and the cumulative reading curve. The
 spec is fully built and the app is the portfolio's de-adwaita pilot, the
 template for Atrium/Conservatory/Viaduct/Framework. Scaffolding was
 Sonnet's, everything since is Fable's. The Phase 6e polish tail (tiling
@@ -52,7 +57,7 @@ Architecture worth knowing before you touch code:
   the adw ones (`ui/clamp.rs`, `ui/rows.rs`, the toast/banner revealers in
   `window.ui`).
 - **Packaging**: Meson wrapper + `.desktop` + AppStream metainfo + Flatpak
-  (`org.virinvictus.Colophon.json`, GNOME 49, `--filesystem=host:ro`).
+  (`org.virinvictus.Colophon.json`, GNOME 50, `--filesystem=host:ro`).
 
 Standing rules that still bind post-1.0: every new widget's metric lands in
 `spec.md` first; ask before adding any dependency; Colophon reads only
