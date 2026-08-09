@@ -10,6 +10,10 @@ statistics database and turns it into a wide set of attractive, varied
 graphs and widgets. No server, no account, no cloud, and it never touches
 the live file on your device.
 
+<p align="center">
+  <img src="docs/screenshots/per-book.png" alt="Colophon's per-book view: reading stats table with the pace-through-the-book and reading-speed charts">
+</p>
+
 **Status:** v2.0.0. Ingestion, the app shell, the full widget catalogue,
 per-book sidecar reconciliation, eight themes, device auto-pull, and Meson +
 Flatpak packaging are all shipped. 2.0.0 replaced the GNOME design language
