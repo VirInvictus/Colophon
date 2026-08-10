@@ -49,22 +49,11 @@ mod imp {
         fn constructed(&self) {
             self.parent_constructed();
             let widget = self.obj();
-            widget.set_draw_func(glib::clone!(
-                #[weak(rename_to = this)]
-                widget,
-                move |_, cr, w, h| this.draw(cr, w, h)
-            ));
-            widget.set_has_tooltip(true);
-            widget.connect_query_tooltip(|this, x, y, _, tooltip| {
-                match this.tooltip_at(f64::from(x), f64::from(y)) {
-                    Some(text) => {
-                        tooltip.set_text(Some(&text));
-                        true
-                    }
-                    None => false,
-                }
-            });
-            crate::theme::register_redraw(&*widget);
+            super::super::init_chart(
+                &*widget,
+                |this, cr, w, h| this.draw(cr, w, h),
+                |this, x, y| this.tooltip_at(x, y),
+            );
         }
     }
     impl WidgetImpl for YearHeatmap {}
@@ -149,7 +138,7 @@ impl YearHeatmap {
                         TOP - 6.0,
                         9.0,
                         super::muted(dark),
-                        &month_abbr(week_start.month()),
+                        crate::fmt::month_abbr(week_start.month()),
                     );
                 }
                 last_month = week_start.month();
@@ -192,11 +181,4 @@ impl YearHeatmap {
             None => format!("{} \u{b7} no reading", short_date(date)),
         })
     }
-}
-
-fn month_abbr(month: u32) -> String {
-    [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-    ][(month as usize) - 1]
-        .to_owned()
 }

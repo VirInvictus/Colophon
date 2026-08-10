@@ -14,8 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     # Colophon requires gtk4 >= 4.16 (v4_16); Ubuntu runners ship 4.14, so
     # the build aborts in gdk4-sys. Fedora carries a new-enough GTK.
-    # rusqlite is bundled and mlua vendored, so both compile from source
-    # and need only a C toolchain.
+    # rusqlite is bundled and mlua vendored, so both compile their C from
+    # source and need only a toolchain, not the system -devel packages.
     container: fedora:latest
     steps:
       - name: Install system dependencies
@@ -26,10 +26,9 @@ jobs:
             pkgconf-pkg-config \
             glib2-devel \
             gtk4-devel \
-            sqlite-devel \
             xorg-x11-server-Xvfb
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable

@@ -39,20 +39,11 @@ mod imp {
             let widget = self.obj();
             widget.set_content_height(HEIGHT);
             widget.set_hexpand(true);
-            widget.set_draw_func(glib::clone!(
-                #[weak(rename_to = this)]
-                widget,
-                move |_, cr, w, h| this.draw(cr, w, h)
-            ));
-            widget.set_has_tooltip(true);
-            widget.connect_query_tooltip(|this, _, _, _, tooltip| match this.tooltip() {
-                Some(text) => {
-                    tooltip.set_text(Some(&text));
-                    true
-                }
-                None => false,
-            });
-            crate::theme::register_redraw(&*widget);
+            super::super::init_chart(
+                &*widget,
+                |this, cr, w, h| this.draw(cr, w, h),
+                |this, _, _| this.tooltip(),
+            );
         }
     }
     impl WidgetImpl for SpanBar {}

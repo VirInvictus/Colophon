@@ -40,22 +40,11 @@ mod imp {
             let widget = self.obj();
             widget.set_content_width((LEFT + (CELL_W + GAP) * 24.0) as i32);
             widget.set_content_height((TOP + (CELL_H + GAP) * 7.0) as i32);
-            widget.set_draw_func(glib::clone!(
-                #[weak(rename_to = this)]
-                widget,
-                move |_, cr, w, h| this.draw(cr, w, h)
-            ));
-            widget.set_has_tooltip(true);
-            widget.connect_query_tooltip(|this, x, y, _, tooltip| {
-                match this.tooltip_at(f64::from(x), f64::from(y)) {
-                    Some(text) => {
-                        tooltip.set_text(Some(&text));
-                        true
-                    }
-                    None => false,
-                }
-            });
-            crate::theme::register_redraw(&*widget);
+            super::super::init_chart(
+                &*widget,
+                |this, cr, w, h| this.draw(cr, w, h),
+                |this, x, y| this.tooltip_at(x, y),
+            );
         }
     }
     impl WidgetImpl for HourHeatmap {}

@@ -62,7 +62,9 @@ pub fn hour_label(hour: u32) -> String {
     }
 }
 
-fn month_abbr(month: u32) -> &'static str {
+/// "Jan".."Dec". The single copy of this table: the year heatmap's month
+/// ruler and the monthly bar chart's labels both come through here.
+pub fn month_abbr(month: u32) -> &'static str {
     [
         "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
     ][(month as usize) - 1]

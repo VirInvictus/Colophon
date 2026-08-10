@@ -31,6 +31,20 @@ each item needs its own go/no-go; the big open one is a word-count axis,
 which is off the stats-DB-only contract because it means reading the
 library EPUB files. Don't start any of it without a decision.
 
+Phase 6f opened later for packaging: the Flatpak moved to the GNOME 50
+runtime and the build was verified for real (2026-07-23), leaving one open
+item, vendoring the cargo sources so the build works offline for Flathub.
+
+**Read `roadmap.md`'s "Known defects" section before touching the metric
+layer.** The 2026-08-09 sweep fixed five live bugs and left three latent
+ones recorded there with their triggers and fix shapes: merged books
+conflating two page axes (`db.rs` `page_totals`/`rescaled_events`), a NULL
+`pages` silently zeroing a book's page-derived stats, and three
+library-wide aggregations in `stats.rs` deduping on title alone where
+`library.rs::group_key`'s `(title, authors)` is the project's definition of
+a work. None reproduces on the current sample database, which is why they
+are carried rather than guessed at.
+
 Architecture worth knowing before you touch code:
 
 - **`colophon-core`** is the read-only ingestion + pure derived-metric layer:

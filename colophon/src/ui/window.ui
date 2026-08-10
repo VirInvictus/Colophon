@@ -207,7 +207,7 @@
                                   </object>
                                 </child>
                                 <child>
-                                  <object class="GtkLabel">
+                                  <object class="GtkLabel" id="placeholder_detail">
                                     <property name="label">Import statistics to see your reading here.</property>
                                     <property name="wrap">true</property>
                                     <property name="justify">center</property>

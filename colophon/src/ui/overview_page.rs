@@ -350,24 +350,13 @@ impl OverviewPage {
         imp.heatmap.set_data(&overview.daily, today);
         imp.hour_heatmap.set_grid(overview.hourly);
 
-        imp.speed_title.set_text(match overview.speed_bucket {
-            colophon_core::metrics::Bucket::Day => "Reading speed \u{b7} pages/hour by day",
-            _ => "Reading speed \u{b7} pages/hour by week",
-        });
+        imp.speed_title
+            .set_text(crate::charts::line::speed_title(overview.speed_bucket));
         imp.speed_chart.set_points(
             overview
                 .speed
                 .iter()
-                .map(|(date, point)| Point {
-                    date: *date,
-                    value: point.pages_per_hour,
-                    display: format!(
-                        "{:.0} pages/hour \u{b7} {} pages in {}",
-                        point.pages_per_hour,
-                        point.pages,
-                        humanize_secs(point.seconds)
-                    ),
-                })
+                .map(|(date, point)| crate::charts::line::speed_point(*date, point))
                 .collect(),
         );
 
@@ -555,9 +544,7 @@ impl OverviewPage {
 
 fn month_label(month: NaiveDate) -> String {
     use chrono::Datelike;
-    let abbr = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-    ][(month.month() as usize) - 1];
+    let abbr = crate::fmt::month_abbr(month.month());
     // Disambiguate January across year boundaries.
     if month.month() == 1 {
         format!("{abbr} {}", month.year())

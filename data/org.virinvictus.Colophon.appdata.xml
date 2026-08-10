@@ -32,6 +32,11 @@
   </developer>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2.1.1" date="2026-08-09">
+      <description>
+        <p>A maintenance release. Weekday averages are no longer inflated inside a 30/90/365-day window, a failed import no longer leaves a copy of the database behind, a library with every book filtered out now shows the empty state instead of a dashboard of zeros, untitled books no longer produce a blank window title, and reading-speed tooltips name the nearest point rather than the earliest one within a pixel.</p>
+      </description>
+    </release>
     <release version="2.1.0" date="2026-07-16">
       <description>
         <p>Two new overview charts, computed from the statistics database alone: a speed-by-hour-of-day bar chart (pages per hour by clock hour, a companion to the speed trend), and a cumulative reading-time curve that plots total time read across your whole history.</p>

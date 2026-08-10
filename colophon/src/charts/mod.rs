@@ -20,10 +20,49 @@ pub use span_bar::SpanBar;
 
 use gtk::cairo;
 use gtk::gdk;
+use gtk::prelude::*;
 
 use crate::theme;
 
 pub use theme::rgba;
+
+/// The wiring every chart widget shares: a draw callback that holds only a
+/// weak reference back to the widget, tooltips switched on, and enrolment
+/// in the theme redraw registry. Sizing stays with each chart, since that
+/// is the part that genuinely differs between them.
+///
+/// The weak reference is the point. `theme::register_redraw` keeps its
+/// entries for the life of the process, so a strong capture here would
+/// pin every chart and its data alongside them; charts previously grew a
+/// permanent closure on the style singleton for the same reason. One
+/// helper means one place to get that right.
+/// `tooltip` is handed the pointer position; charts that key on one axis
+/// (or none) simply ignore the arguments they don't use.
+pub fn init_chart<W, D, T>(widget: &W, draw: D, tooltip: T)
+where
+    W: IsA<gtk::DrawingArea> + IsA<gtk::Widget>,
+    D: Fn(&W, &cairo::Context, i32, i32) + 'static,
+    T: Fn(&W, f64, f64) -> Option<String> + 'static,
+{
+    let weak = widget.downgrade();
+    let area: &gtk::DrawingArea = widget.upcast_ref();
+    area.set_draw_func(move |_, cr, w, h| {
+        if let Some(this) = weak.upgrade() {
+            draw(&this, cr, w, h);
+        }
+    });
+    widget.set_has_tooltip(true);
+    widget.connect_query_tooltip(move |this, x, y, _, tip| {
+        match tooltip(this, f64::from(x), f64::from(y)) {
+            Some(text) => {
+                tip.set_text(Some(&text));
+                true
+            }
+            None => false,
+        }
+    });
+    theme::register_redraw(widget);
+}
 
 pub fn is_dark() -> bool {
     theme::active().dark

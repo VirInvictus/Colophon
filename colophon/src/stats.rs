@@ -587,6 +587,18 @@ pub fn overview_windowed<Tz: TimeZone>(
         unique_pages += metrics::unique_pages_read(metrics::coverage(&events), entry.book.pages);
     }
 
+    // Denominator span for the weekday averages: the window's own calendar
+    // start, clamped to the day history actually begins so a young library
+    // isn't divided by weekdays that predate it. Deriving it from
+    // `windowed_daily`'s first key instead would silently reintroduce the
+    // "last n days with data" skew this function's contract rules out.
+    let history_start = base.daily.keys().next().copied();
+    let weekday_since = match (cutoff, history_start) {
+        (Some(c), Some(h)) => c.max(h),
+        (None, Some(h)) => h,
+        _ => today,
+    };
+
     let speed_bucket = speed_bucket_for(windowed_daily.keys().next().copied(), today);
     let speed = metrics::speed_series(&windowed, tz, speed_bucket)
         .into_iter()
@@ -623,7 +635,7 @@ pub fn overview_windowed<Tz: TimeZone>(
             .iter()
             .max_by_key(|(_, t)| t.seconds)
             .map(|(d, t)| (*d, t.seconds)),
-        weekday_avg_secs: weekday_averages(&windowed_daily, today),
+        weekday_avg_secs: weekday_averages(&windowed_daily, weekday_since, today),
         hourly: metrics::hourly_profile(&windowed, tz),
         monthly: base.monthly.clone(),
         speed,
@@ -873,18 +885,28 @@ pub fn reader_profile(o: &Overview) -> Option<ReaderProfile> {
 }
 
 /// Mean seconds per weekday, denominator = occurrences of that weekday in
-/// [first reading day, today] inclusive. Empty history yields zeros.
-pub fn weekday_averages(daily: &BTreeMap<NaiveDate, DayTotal>, today: NaiveDate) -> [i64; 7] {
-    let Some((&first, _)) = daily.iter().next() else {
+/// [`since`, today] inclusive. Empty history yields zeros.
+///
+/// `since` is the caller's business precisely because it must not be read
+/// off `daily`'s own first key: inside a time window that would make the
+/// denominator "days since your first *active* day in the window", which
+/// inflates every bar whenever a window opens on a quiet stretch. See the
+/// call in [`overview_windowed`].
+pub fn weekday_averages(
+    daily: &BTreeMap<NaiveDate, DayTotal>,
+    since: NaiveDate,
+    today: NaiveDate,
+) -> [i64; 7] {
+    if daily.is_empty() {
         return [0; 7];
-    };
+    }
     let mut totals = [0i64; 7];
     for (date, day) in daily {
         totals[date.weekday().num_days_from_monday() as usize] += day.seconds;
     }
     let mut out = [0i64; 7];
     for (weekday, total) in totals.into_iter().enumerate() {
-        let count = weekday_occurrences(first, today, weekday);
+        let count = weekday_occurrences(since, today, weekday);
         out[weekday] = if count > 0 { total / count } else { 0 };
     }
     out
@@ -1227,9 +1249,43 @@ mod tests {
                 ..Default::default()
             },
         );
-        let avg = weekday_averages(&daily, date("2026-07-06"));
+        let avg = weekday_averages(&daily, date("2026-06-29"), date("2026-07-06"));
         assert_eq!(avg[0], 600);
         assert_eq!(avg[1], 0);
+    }
+
+    #[test]
+    fn weekday_averages_divide_by_the_window_not_the_first_active_day() {
+        // One Monday's reading inside a window that opened three Mondays
+        // earlier. The denominator must be the window's four Mondays, not
+        // the one-and-a-bit since reading resumed: taking the span from the
+        // map's own first key is the "last n days with data" skew.
+        let mut daily = BTreeMap::new();
+        daily.insert(
+            date("2026-07-20"),
+            DayTotal {
+                seconds: 3600,
+                ..Default::default()
+            },
+        );
+        let today = date("2026-07-30");
+
+        let windowed = weekday_averages(&daily, date("2026-07-01"), today);
+        assert_eq!(windowed[0], 900, "3600s over the window's four Mondays");
+
+        // The old behaviour, kept here as the thing we must not do: spanning
+        // from the first active day sees only two Mondays and doubles it.
+        let from_first_active = weekday_averages(&daily, date("2026-07-20"), today);
+        assert_eq!(from_first_active[0], 1800);
+    }
+
+    #[test]
+    fn weekday_averages_are_empty_without_history() {
+        let daily = BTreeMap::new();
+        assert_eq!(
+            weekday_averages(&daily, date("2026-07-01"), date("2026-07-30")),
+            [0; 7]
+        );
     }
 
     #[test]

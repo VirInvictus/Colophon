@@ -69,6 +69,19 @@ fn group_key(book: &Book) -> (String, String) {
     (book.title.trim().to_owned(), book.authors.trim().to_owned())
 }
 
+/// The title to show for a book, trimmed, with a placeholder for the
+/// untitled ones (KOReader stores a NULL title for a file whose metadata
+/// never resolved, and `db.rs` reads that as an empty string). Every
+/// surface that displays a title goes through here so they agree.
+pub fn display_title(book: &Book) -> &str {
+    let title = book.title.trim();
+    if title.is_empty() {
+        "(untitled)"
+    } else {
+        title
+    }
+}
+
 /// Junk-filters, groups by (title, authors), and orders: groups by their
 /// most recently opened member (desc), members within a group likewise.
 pub fn grouped(
@@ -228,5 +241,14 @@ mod tests {
     #[test]
     fn empty_in_empty_out() {
         assert!(grouped(&[], true, DEFAULT_JUNK_THRESHOLD_SECS).is_empty());
+    }
+
+    #[test]
+    fn display_title_falls_back_for_untitled_books() {
+        let titled = book("  Novel  ", "Author", "aaaa", 1000, 100);
+        assert_eq!(display_title(&titled.book), "Novel");
+
+        let untitled = book("   ", "Author", "bbbb", 1000, 100);
+        assert_eq!(display_title(&untitled.book), "(untitled)");
     }
 }

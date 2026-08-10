@@ -78,12 +78,8 @@ impl BookRow {
             imp.authors_label.set_visible(false);
             self.add_css_class("group-member");
         } else {
-            let title = if book.title.trim().is_empty() {
-                "(untitled)"
-            } else {
-                book.title.trim()
-            };
-            imp.title_label.set_text(title);
+            imp.title_label
+                .set_text(crate::library::display_title(book));
             let authors = book.authors.trim();
             imp.authors_label.set_visible(!authors.is_empty());
             imp.authors_label.set_text(authors);

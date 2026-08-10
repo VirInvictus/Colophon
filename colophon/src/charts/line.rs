@@ -30,6 +30,31 @@ pub struct Series {
     pub muted: bool,
 }
 
+/// A speed-series point with its tooltip line. The overview and the book
+/// page both plot `metrics::speed_series` output, so they build their
+/// points and their heading here rather than each keeping a copy of the
+/// format string.
+pub fn speed_point(date: NaiveDate, point: &colophon_core::model::SpeedPoint) -> Point {
+    Point {
+        date,
+        value: point.pages_per_hour,
+        display: format!(
+            "{:.0} pages/hour \u{b7} {} pages in {}",
+            point.pages_per_hour,
+            point.pages,
+            crate::fmt::humanize_secs(point.seconds)
+        ),
+    }
+}
+
+/// Heading for a speed chart, naming the bucket its points are in.
+pub fn speed_title(bucket: colophon_core::metrics::Bucket) -> &'static str {
+    match bucket {
+        colophon_core::metrics::Bucket::Day => "Reading speed \u{b7} pages/hour by day",
+        _ => "Reading speed \u{b7} pages/hour by week",
+    }
+}
+
 const HEIGHT: i32 = 150;
 const PAD_TOP: f64 = 10.0;
 const PAD_BOTTOM: f64 = 18.0;
@@ -56,22 +81,11 @@ mod imp {
             let widget = self.obj();
             widget.set_content_height(HEIGHT);
             widget.set_hexpand(true);
-            widget.set_draw_func(glib::clone!(
-                #[weak(rename_to = this)]
-                widget,
-                move |_, cr, w, h| this.draw(cr, w, h)
-            ));
-            widget.set_has_tooltip(true);
-            widget.connect_query_tooltip(|this, x, _, _, tooltip| {
-                match this.tooltip_at(f64::from(x)) {
-                    Some(text) => {
-                        tooltip.set_text(Some(&text));
-                        true
-                    }
-                    None => false,
-                }
-            });
-            crate::theme::register_redraw(&*widget);
+            super::super::init_chart(
+                &*widget,
+                |this, cr, w, h| this.draw(cr, w, h),
+                |this, x, _| this.tooltip_at(x),
+            );
         }
     }
     impl WidgetImpl for LineChart {}
@@ -232,10 +246,15 @@ impl LineChart {
         let range = self.date_range()?;
         let w = f64::from(self.width());
         let primary = series.iter().find(|s| !s.muted)?;
-        let point = primary
-            .points
-            .iter()
-            .min_by_key(|p| (self.x_of(p.date, range, w) - x).abs() as i64)?;
+        // Compare the pixel distances as floats: truncating them to i64
+        // collapsed everything within a pixel of the cursor to distance 0,
+        // and min_by_key then answered with the earliest tied point rather
+        // than the nearest one. Dense series (daily buckets in a narrow
+        // pane) put several points inside that pixel.
+        let point = primary.points.iter().min_by(|a, b| {
+            let d = |p: &Point| (self.x_of(p.date, range, w) - x).abs();
+            d(a).total_cmp(&d(b))
+        })?;
         Some(format!(
             "{} \u{b7} {}",
             short_date(point.date),

@@ -97,6 +97,21 @@ pub fn import(
     canonical: &Path,
     sidecar_dir: Option<&Path>,
 ) -> Result<LibrarySnapshot> {
+    let promoted = stage_and_promote(source, staging_dir, canonical);
+    // The staging dir is ours and holds a whole copy of the database, so
+    // clear it however the promotion went. It used to be cleaned only after
+    // a successful rename, which stranded a full snapshot in the app data
+    // dir on any failure (an interrupted copy, a bad pick, the device
+    // unplugged mid-read) until the next import happened to overwrite it.
+    let _ = std::fs::remove_dir_all(staging_dir);
+    promoted?;
+
+    load_snapshot(canonical, sidecar_dir)
+}
+
+/// Snapshot → validate → rename over `canonical`. Split out of [`import`]
+/// so every failure path funnels through one staging-dir cleanup.
+fn stage_and_promote(source: &Path, staging_dir: &Path, canonical: &Path) -> Result<()> {
     let staged = colophon_core::snapshot(source, staging_dir)
         .context("copying the database (is the device still mounted?)")?;
 
@@ -119,9 +134,7 @@ pub fn import(
     }
     std::fs::rename(&staged, canonical)
         .with_context(|| format!("installing snapshot at {}", canonical.display()))?;
-    let _ = std::fs::remove_dir_all(staging_dir);
-
-    load_snapshot(canonical, sidecar_dir)
+    Ok(())
 }
 
 #[cfg(test)]
@@ -244,6 +257,11 @@ mod tests {
         assert_eq!(
             std::fs::read(&canonical).unwrap(),
             b"pretend this is a good snapshot"
+        );
+        // The rejected copy must not be left sitting in the app data dir.
+        assert!(
+            !staging.exists(),
+            "staging dir cleaned after a failed import"
         );
 
         std::fs::remove_dir_all(&root).ok();

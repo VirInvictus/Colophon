@@ -50,6 +50,8 @@ mod imp {
         #[template_child]
         pub content_stack: TemplateChild<gtk::Stack>,
         #[template_child]
+        pub placeholder_detail: TemplateChild<gtk::Label>,
+        #[template_child]
         pub overview_page: TemplateChild<OverviewPage>,
         #[template_child]
         pub book_page: TemplateChild<BookPage>,
@@ -555,7 +557,18 @@ impl ColophonWindow {
         let entries = self.filtered_entries();
         let today = Local::now().date_naive();
 
-        if imp.entries.borrow().is_empty() {
+        // Test the *filtered* set: with the junk filter on and every book
+        // below the threshold there is nothing to show, and rendering the
+        // overview anyway produced a dashboard of zeros instead of the
+        // empty state. Say which of the two emptinesses it is, so the
+        // prompt to import never appears to someone who already has.
+        if entries.is_empty() {
+            imp.placeholder_detail
+                .set_text(if imp.entries.borrow().is_empty() {
+                    "Import statistics to see your reading here."
+                } else {
+                    "Every book is filtered out. Turn off the junk filter in the menu to see them."
+                });
             imp.content_stack.set_visible_child_name("placeholder");
             self.set_content_title("Colophon");
             return;
@@ -605,24 +618,15 @@ impl ColophonWindow {
                 let bucket = stats::speed_bucket_for(first_day, today);
                 let to_points = |events: &[colophon_core::PageEvent]| {
                     colophon_core::metrics::speed_series(events, &Local, bucket)
-                        .into_iter()
-                        .map(|(date, point)| crate::charts::line::Point {
-                            date,
-                            value: point.pages_per_hour,
-                            display: format!(
-                                "{:.0} pages/hour \u{b7} {} pages in {}",
-                                point.pages_per_hour,
-                                point.pages,
-                                crate::fmt::humanize_secs(point.seconds)
-                            ),
-                        })
+                        .iter()
+                        .map(|(date, point)| crate::charts::line::speed_point(*date, point))
                         .collect::<Vec<_>>()
                 };
                 imp.book_page
                     .set_speed(to_points(&entry.events), to_points(&all_events), bucket);
 
                 imp.content_stack.set_visible_child_name("book");
-                self.set_content_title(entry.book.title.trim());
+                self.set_content_title(crate::library::display_title(&entry.book));
             }
         }
     }

@@ -1,5 +1,48 @@
 # Patchnotes
 
+## v2.1.1 — 2026-08-09
+
+A maintenance release: five fixes out of a full-repo sweep, plus some
+tidying underneath. Nothing about how you import or what is stored changed.
+
+- **Fixed: weekday averages were inflated inside a time window.** The
+  weekday bars divide each weekday's total by how many times that weekday
+  came around, so a long history doesn't out-shout a short one. Inside a
+  30/90/365-day window it was dividing by the days since your first
+  *active* day in that window instead of by the window itself, so any
+  window that opened on a quiet stretch reported bars that were too tall.
+  The denominator is now the window's own span, clamped to the day your
+  history actually starts so a young library isn't measured against
+  weekdays that predate it. All-time was always correct and is unchanged.
+- **Fixed: a failed import left a copy of the database behind.** The
+  staging area was only cleared after a successful import, so a copy
+  interrupted halfway (the device unplugged mid-read) or a file that failed
+  validation stranded a whole snapshot in Colophon's data directory until
+  the next import happened to overwrite it. It is now cleared whatever
+  happens. As before, a failed import cannot touch your good snapshot.
+- **Fixed: an empty library after filtering showed a dashboard of zeros.**
+  With the junk filter on and every book below the threshold, the overview
+  rendered anyway, all zeros. It now shows the empty state, and says which
+  emptiness it is: nothing imported yet, or everything filtered out. It no
+  longer tells you to import statistics you already imported.
+- **Fixed: a book with no title showed a blank window title.** The library
+  list and the book page both fall back to "(untitled)"; the toolbar and
+  the window title did not, so a titleless book gave compositor bars and
+  window switchers a stray "· Colophon". All three now agree.
+- **Fixed: reading-speed tooltips could name the wrong point.** On a dense
+  series in a narrow pane the nearest-point search compared distances as
+  whole pixels, so several points within a pixel of the cursor tied and the
+  earliest one won. It compares real distances now.
+
+Under the hood: two unused dependencies dropped (`thiserror`, and
+`rusqlite`'s `time` feature, which pulled in five crates nothing used), the
+month-name table and the speed-chart labels each collapsed to one
+definition instead of three and two, and the six chart widgets now share
+one initialiser, which puts the weak-reference discipline that a listener
+leak once hid in exactly one place. The vendored KOReader plugin source
+under `research/` gained a README recording that it is AGPL and why it is
+not part of the build.
+
 ## v2.1.0 — 2026-07-16
 
 Two new overview charts, both from the stats database alone (no new
@@ -28,6 +71,8 @@ dependencies, no reading of your library files).
   dropdowns, and friends); lists and grids already show their position
   through the selection background. Same fix as Conservatory v0.3.7, where
   the bug was first spotted.
+
+## v2.0.0 — 2026-07-10
 
 The look is now Colophon's own. libadwaita is gone; GTK4 stays.
 

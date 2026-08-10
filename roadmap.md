@@ -705,3 +705,111 @@ is not on the table. This is a *version* bump inside the GNOME runtime.
       Shared shape with Atrium's Phase 9 task and with Viaduct, which has the
       same manifest gap. Only blocks Flathub submission; local builds work.
 
+## Known defects — carried, not yet fixed (2026-08-09 sweep)
+
+Three latent correctness bugs found in the 2026-08-09 full-repo sweep and
+deliberately **not** fixed in that pass. All three are latent rather than
+live: none of them is reachable on the current sample database
+(`research/samples/statistics.sqlite3`, 9 books, 1,075 events), which was
+checked directly for every trigger condition below and has zero md5-merged
+books, zero NULL/zero `pages`, and zero empty titles.
+
+They are recorded here rather than fixed because D1 and D2 change numbers
+in the KOReader-parity path, and the standing rule is that a metric's
+definition lands in `spec.md` before the code moves. Each needs that spec
+amendment as its first step. The live bugs from the same sweep were fixed
+and are in `patchnotes.md`.
+
+- [ ] **D1 — Merged books conflate two page axes.** `StatsDb::books`
+      (`colophon-core/src/db.rs:210`, `merge_by_md5`) merges KOReader `book`
+      rows sharing an md5, keeping every underlying row id in
+      `Book::all_ids`. `page_totals` (`db.rs:143`) then queries the
+      `page_stat` view with `id_book IN (…) GROUP BY page`, and
+      `rescaled_events` (`db.rs:165`) loops the same ids and concatenates.
+      **The trigger:** the view rescales every row against *its own*
+      `book.id`'s `pages` column, via `JOIN book ON book.id = id_book`
+      (`RESEARCH.md` §1). So when two merged rows recorded different page
+      counts — ordinary after a font-size or margin change between metadata
+      edits — `GROUP BY page` sums positions from two different pagination
+      axes into one bucket, while the canonical `Book::pages` is only the
+      most-recently-opened row's.
+      **Wrong output:** `capped_secs` and `view_pages`
+      (`colophon/src/loader.rs`, the "as shown on device" totals),
+      `revisited_pages` in `stats.rs` (two unrelated pages sharing a number
+      read as one page read twice), and the per-page activity strip.
+      **Not affected, so don't widen the fix:** `coverage`,
+      `coverage_spans`, `furthest_position`, `completions`, `daily_totals`,
+      and `speed_series` all read raw `page_stat_data` through
+      `db.events()` and normalise each event against its own recorded
+      `total_pages`, so they are immune by construction.
+      **Fix shape:** rescale per row id against that id's own `pages`, then
+      map onto the canonical axis before aggregating — i.e. do the
+      per-axis reduction in Rust rather than letting one SQL `GROUP BY`
+      flatten both. Cheaper alternative worth costing first: restrict the
+      parity path to the canonical id and treat the older rows' events as
+      contributing time but not page positions.
+      **Verify with:** a fixture with one md5 and two `book` rows whose
+      `pages` differ (say 300 and 350), asserting the strip and
+      `revisited_pages` do not merge the two axes. The synthetic-fixture
+      builder in `colophon-core/tests/common/mod.rs` already emits the
+      verbatim KOReader DDL, so the fixture is a few rows, not a new
+      harness.
+
+- [ ] **D2 — A NULL `pages` silently reads as zero and zeroes a book's
+      stats.** KOReader's `book` table declares `pages integer` with no
+      `NOT NULL` (`RESEARCH.md` §1; unlike `page_stat_data`'s `page` /
+      `duration` / `total_pages`, which are all `NOT NULL DEFAULT 0`).
+      `db.rs:89` reads it as `Option<i64>` and `unwrap_or(0)`, and nothing
+      downstream distinguishes "0 pages" from "page count unknown".
+      **Wrong output, three ways:** `unique_pages_read`
+      (`colophon-core/src/metrics/progress.rs:81`) multiplies coverage by
+      `pages`, so it returns 0 for a fully-read book; `rescaled_last_page`
+      (`progress.rs:92`) returns 1 for every event regardless of how far the
+      book was read; and on the SQL side the NULL propagates through the
+      view's `JOIN book`, making the `idx <= (last_page - first_page + 1)`
+      predicate NULL, so **the view emits no rows at all** for that book and
+      `page_totals` returns an empty `Vec`. The result is `capped_secs = 0`
+      beside a `db.events()` history showing hours of real reading, with no
+      error anywhere.
+      **Fix shape:** carry the unknown through the model (`pages:
+      Option<i64>`, or a sentinel with one accessor) and let the existing
+      "a stat that needs a file the user has not provided stays hidden"
+      principle (spec.md, restated in `CLAUDE.md`) cover it: hide the
+      page-derived stats for such a book rather than printing a confident
+      zero. The time-derived stats stay valid and should keep rendering.
+      **Note the existing half-guard:** `loader.rs`'s round-trip test
+      asserts `unique_pages <= book.pages.max(1)`, which shows the `0` case
+      was known but only its downstream invariant was defended, not the
+      number itself.
+
+- [ ] **D3 — Three library-wide aggregations dedup on title alone.**
+      `colophon/src/library.rs:68` defines a work as `(title, authors)` and
+      `grouped()` uses it; `spec.md`'s "Book identity" says the same. Three
+      places in `stats.rs` do not follow it and key on the trimmed title
+      only: `forgotten_books` (`stats.rs:343`), `finished_timeline`
+      (`stats.rs:410`), and the Recap's `finished_works` / `started_works`
+      sets (`stats.rs:510` and `:515`).
+      **The trigger:** two *different* works sharing a title. Most reachable
+      via untitled books — `db.rs:85` turns a NULL title into `""`, so every
+      book whose metadata never resolved collides under one empty key.
+      **Wrong output:** `finished_timeline` *replaces* rather than merges
+      (`.and_modify(|f| if finish_date > f.finish_date …)`), so the earlier
+      book's finish silently vanishes from the timeline along with its time
+      and author; `forgotten_books` ORs the finished flag across colliding
+      titles and then filters finished works out, so a genuinely abandoned
+      book disappears from "Set aside"; and the Recap's two sets undercount
+      distinct works, skewing `Recap::completion_rate`.
+      **Fix shape:** small and mechanical — key all three on
+      `library::group_key`'s `(title, authors)` instead of the title. Make
+      `group_key` `pub(crate)` and reuse it rather than writing a fourth
+      copy of the tuple. **Check while doing it:** `stats.rs:108` and `:169`
+      also key on title, but those sit *inside* a series or author bucket
+      where the other half of the identity is already fixed, so they are
+      correct as they stand and must not be "fixed" too.
+      **Verify with:** two entries, same title, different authors, one
+      finished and one abandoned, asserting both survive
+      `finished_timeline` / `forgotten_books` and that `completion_rate`
+      reads 1 of 2 rather than 1 of 1. The Jingo pair in the real sample is
+      the *opposite* case (one work, two files, one author) and must keep
+      collapsing to one — worth an assertion so the fix doesn't overshoot.
+

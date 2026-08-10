@@ -127,11 +127,8 @@ impl BookPage {
         let imp = self.imp();
         let book = &entry.book;
 
-        imp.title_label.set_text(if book.title.trim().is_empty() {
-            "(untitled)"
-        } else {
-            book.title.trim()
-        });
+        imp.title_label
+            .set_text(crate::library::display_title(book));
         let authors = book.authors.trim();
         imp.authors_label.set_visible(!authors.is_empty());
         imp.authors_label.set_text(authors);
@@ -296,10 +293,8 @@ impl BookPage {
         if !has_data {
             return;
         }
-        imp.speed_title.set_text(match bucket {
-            colophon_core::metrics::Bucket::Day => "Reading speed \u{b7} pages/hour by day",
-            _ => "Reading speed \u{b7} pages/hour by week",
-        });
+        imp.speed_title
+            .set_text(crate::charts::line::speed_title(bucket));
         imp.speed_caption
             .set_text("this book, with the whole library shown muted behind it");
         imp.speed_chart.set_series(vec![
