@@ -13,7 +13,7 @@ it exists: every KOReader stats tool Brandon has found is a web dashboard or
 a self-hosted Docker instance, and he doesn't want that. See `README.md` and
 `spec.md`.
 
-## Where this stands right now (2026-07-16, v2.1.0)
+## Where this stands right now (prose written 2026-07-16 at v2.1.0; current release v2.1.1)
 
 **Shipped 2.1.** Phases 0 through 4.6 plus Phase 7 (device auto-pull,
 v1.1.0) and Phase 6 (the de-adwaita migration, v2.0.0) are complete. Two
