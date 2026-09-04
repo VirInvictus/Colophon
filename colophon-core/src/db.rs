@@ -86,7 +86,7 @@ impl StatsDb {
                     authors: row.get::<_, Option<String>>(2)?.unwrap_or_default(),
                     notes: row.get::<_, Option<i64>>(3)?.unwrap_or(0),
                     highlights: row.get::<_, Option<i64>>(4)?.unwrap_or(0),
-                    pages: row.get::<_, Option<i64>>(5)?.unwrap_or(0),
+                    pages: row.get::<_, Option<i64>>(5)?,
                     series: row.get(6)?,
                     language: row.get(7)?,
                     md5: row.get(8)?,
@@ -129,26 +129,53 @@ impl StatsDb {
         Ok(rows)
     }
 
-    /// Per current-axis page aggregates from the `page_stat` view, ordered
-    /// by page: the `GROUP BY page` reduction that replaces pulling the
-    /// fanned-out view into memory (the view expands each stored row across
-    /// the `numbers` join, up to ~1000x). One row per page instead, at most
-    /// `book.pages` of them. Feeds the capped totals, the distinct-page
-    /// count, and the per-page activity strip.
+    /// Per canonical-axis page aggregates replacing the `page_stat` view's
+    /// `GROUP BY page` reduction: one row per page instead of the fanned-out
+    /// view (which expands each stored row across the `numbers` join, up to
+    /// ~1000x). Feeds the capped totals, the distinct-page count, and the
+    /// per-page activity strip.
     ///
-    /// `secs` sums *all* view rows for the page (0-duration rows included,
-    /// so the page still counts toward KOReader's capped distinct-page
-    /// total); `reads` counts only positive-duration rows (the activity
-    /// strip's read count).
+    /// D1 (audit 2026-09): the view rescales every stored row against *its
+    /// own* book row's `pages`, so merged rows recorded under different
+    /// paginations land on different axes and a bare `GROUP BY page` sums
+    /// positions from both. This query rescales every row of the merged
+    /// book onto the *canonical* row's page count instead — one axis.
+    /// (Zero-`total_pages` rows drop out, exactly as they do in the view,
+    /// where the division yields NULL and the fan-out predicate rejects.)
+    ///
+    /// D2: a book with an unknown page count has no canonical axis, so the
+    /// page-derived aggregates are empty and the UI hides them; the time-
+    /// derived stats from `events()` are unaffected.
+    ///
+    /// `secs` sums *all* rescaled rows for the page (0-duration rows
+    /// included, so the page still counts toward KOReader's capped
+    /// distinct-page total); `reads` counts only positive-duration rows
+    /// (the activity strip's read count).
     pub fn page_totals(&self, book: &Book) -> Result<Vec<PageTotal>> {
+        let Some(canon) = book.pages else {
+            return Ok(Vec::new());
+        };
         let sql = format!(
-            "SELECT page, SUM(duration) AS secs, SUM(duration > 0) AS reads
-             FROM page_stat WHERE id_book IN ({}) GROUP BY page ORDER BY page",
+            "SELECT page, SUM(duration) AS secs, SUM(duration > 0) AS reads FROM (
+                 SELECT first_page + idx - 1 AS page,
+                        start_time,
+                        duration / (last_page - first_page + 1) AS duration
+                 FROM (
+                     SELECT page, total_pages, start_time, duration,
+                            ((page - 1) * ?1) / total_pages + 1 AS first_page,
+                            max(((page - 1) * ?1) / total_pages + 1,
+                                (page * ?1) / total_pages) AS last_page
+                     FROM page_stat_data
+                     WHERE id_book IN ({})
+                 )
+                 JOIN (SELECT number AS idx FROM numbers)
+                      ON idx <= (last_page - first_page + 1)
+             ) GROUP BY page ORDER BY page",
             id_list(book)
         );
         let mut stmt = self.conn.prepare(&sql)?;
         let rows = stmt
-            .query_map([], |row| {
+            .query_map([canon], |row| {
                 Ok(PageTotal {
                     page: row.get(0)?,
                     secs: row.get::<_, Option<i64>>(1)?.unwrap_or(0),
@@ -159,18 +186,32 @@ impl StatsDb {
         Ok(rows)
     }
 
-    /// Events for one (merged) book from the `page_stat` view: rescaled by
-    /// KOReader onto the book's current page count, so the page axis is
-    /// stable across font-size changes. Ordered by time.
+    /// Events for one (merged) book, rescaled onto the *canonical* page axis
+    /// (see `page_totals` for why the per-row axis would conflate merged
+    /// rows). A book with an unknown page count yields no rescaled events.
+    /// Ordered by time.
     pub fn rescaled_events(&self, book: &Book) -> Result<Vec<RescaledEvent>> {
+        let Some(canon) = book.pages else {
+            return Ok(Vec::new());
+        };
+        let sql = "SELECT id_book, first_page + idx - 1 AS page, start_time,
+                    duration / (last_page - first_page + 1) AS duration
+             FROM (
+                 SELECT id_book, page, total_pages, start_time, duration,
+                        ((page - 1) * ?1) / total_pages + 1 AS first_page,
+                        max(((page - 1) * ?1) / total_pages + 1,
+                            (page * ?1) / total_pages) AS last_page
+                 FROM page_stat_data
+                 WHERE id_book = ?2
+             )
+             JOIN (SELECT number AS idx FROM numbers)
+                  ON idx <= (last_page - first_page + 1)
+             ORDER BY start_time";
         let mut out = Vec::new();
-        let mut stmt = self.conn.prepare(
-            "SELECT id_book, page, start_time, duration
-             FROM page_stat WHERE id_book = ?1 ORDER BY start_time",
-        )?;
+        let mut stmt = self.conn.prepare(sql)?;
         for id in &book.all_ids {
             let rows = stmt
-                .query_map([id], |row| {
+                .query_map(rusqlite::params![canon, id], |row| {
                     Ok(RescaledEvent {
                         book_id: row.get(0)?,
                         page: row.get(1)?,

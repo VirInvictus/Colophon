@@ -1,3 +1,35 @@
+# v2.2.0 (2026-09-04)
+
+**Data-quality fixes from the 2026-09-04 audit (D1-D3), each with its spec
+amendment as the first step.**
+
+- **D1 — merged books no longer conflate pagination axes.** `page_totals`
+  and `rescaled_events` rescale every merged row's events onto the
+  *canonical* row's page count in SQL (the canonical page count is bound as
+  a parameter; the per-row `book` JOIN is gone). Previously the `page_stat`
+  view rescaled each row against its own `pages`, so merged rows recorded
+  under different paginations summed positions from two different axes into
+  one bucket. Zero-`total_pages` rows drop out exactly as they did in the
+  view (the division yields NULL and the fan-out predicate rejects them).
+- **D2 — an unknown page count hides page-derived stats instead of
+  printing confident zeros.** `Book::pages` is now `Option<i64>`; a book
+  whose page count KOReader never learned hides unique pages, rescaled
+  positions, completions, capped totals, and the per-page strip, while its
+  time-derived stats keep rendering. `unique_pages_read` and
+  `rescaled_last_page` keep `i64` signatures; the `Option` is unwrapped at
+  the loader boundary.
+- **D3 — library-wide aggregations key on the full work identity.**
+  `forgotten_books`, `finished_timeline`, and the Recap's started/finished
+  sets now key on `library::group_key`'s `(title, authors)` instead of the
+  trimmed title alone, so two different works sharing a title no longer
+  collide (and the Recap's completion rate stops undercounting). The
+  title-keyed sites *inside* series/author buckets are correct and
+  untouched; the Jingo one-work-two-files case has a test proving the fix
+  doesn't overshoot.
+
+Suite 112 green across the workspace; clippy `-D warnings`, fmt, and
+pyright strict all clean.
+
 # Patchnotes
 
 ## v2.1.1 — 2026-08-09

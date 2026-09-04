@@ -76,6 +76,20 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
   not a progress measure. It under-counts any book partly read outside
   KOReader (e.g. before a mid-book KOReader install), where a leading
   span is simply absent.
+- **Rescale axis (view-parity path)**: every aggregate that mirrors the
+  `page_stat` view (capped totals, the per-page strip, rescaled positions)
+  rescales all of a merged book's events onto the *canonical* row's page
+  count — the most-recently-opened row's — never onto each stored row's
+  own. Rescaling per row would sum positions from two different pagination
+  axes into one bucket whenever a metadata edit changed the page count
+  between opens.
+- **Unknown page count**: KOReader's `book.pages` is nullable, and nothing
+  downstream can distinguish "0 pages" from "page count unknown". A book
+  with an unknown page count *hides its page-derived stats* (unique pages,
+  rescaled positions, `page_stat`-derived capped totals and per-page
+  strips) rather than printing confident zeros; time-derived stats render
+  as usual. This is the "a stat that needs a file the user has not
+  provided stays hidden" principle applied to metadata.
 - **Furthest position reached**: the maximum span upper bound, i.e. the
   deepest fractional position any event reached. This is the *progress*
   measure ("how far through the book you got"), and unlike coverage it is

@@ -79,7 +79,9 @@ fn measure_multi_year_load_and_render() {
         black_box(
             events
                 .last()
-                .map(|e| metrics::rescaled_last_page(e.page, e.total_pages, book.pages))
+                .map(|e| {
+                    metrics::rescaled_last_page(e.page, e.total_pages, book.pages.expect("pages"))
+                })
                 .unwrap_or(0),
         );
         total_rows += page_totals.len() as i64;

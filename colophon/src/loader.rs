@@ -47,14 +47,17 @@ pub fn load_snapshot(path: &Path, sidecar_dir: Option<&Path>) -> Result<LibraryS
         );
         // Last read page on the current axis: the latest raw event rescaled
         // like the view would, avoiding a second scan of the fanned-out
-        // view just for this one number.
-        let last_page = events
-            .last()
-            .map(|e| metrics::rescaled_last_page(e.page, e.total_pages, book.pages))
-            .unwrap_or(0);
+        // view just for this one number. Unknown page count: last_page
+        // stays None and page-derived stats hide downstream (spec.md
+        // "Unknown page count").
+        let last_page = book.pages.and_then(|cp| {
+            events
+                .last()
+                .map(|e| metrics::rescaled_last_page(e.page, e.total_pages, cp))
+        });
 
         entries.push(LibraryEntry {
-            unique_pages: metrics::unique_pages_read(coverage, book.pages),
+            unique_pages: book.pages.map(|p| metrics::unique_pages_read(coverage, p)),
             events,
             page_totals,
             capped_secs,
@@ -173,8 +176,11 @@ mod tests {
         assert!(!staging.exists(), "staging dir cleaned after promote");
         assert!(!snap.entries.is_empty());
         for entry in &snap.entries {
-            assert!(entry.unique_pages >= 0);
-            assert!(entry.unique_pages <= entry.book.pages.max(1));
+            match (entry.unique_pages, entry.book.pages) {
+                (Some(u), Some(p)) => assert!(u <= p.max(1)),
+                (None, None) => {}
+                got => panic!("unique/pages mismatch: {got:?}"),
+            }
         }
         // The source was only ever fs-copied, never opened or written.
         assert_eq!(

@@ -72,8 +72,12 @@ impl BookRow {
             // Title/authors live on the group header; disambiguate the
             // copies by layout and file identity instead.
             let md5_short: String = book.md5.as_deref().unwrap_or("?").chars().take(8).collect();
+            let pages_text = book
+                .pages
+                .map(|p| format!("{p} pages"))
+                .unwrap_or_else(|| "unknown pages".into());
             imp.title_label
-                .set_text(&format!("{} pages \u{b7} {md5_short}", book.pages));
+                .set_text(&format!("{pages_text} \u{b7} {md5_short}"));
             imp.title_label.remove_css_class("heading");
             imp.authors_label.set_visible(false);
             self.add_css_class("group-member");
@@ -85,11 +89,16 @@ impl BookRow {
             imp.authors_label.set_text(authors);
         }
 
+        // Unknown page count: the "N of M pages" segment drops out rather
+        // than printing "0 of 0" against an unknown denominator.
+        let pages_segment = match (entry.unique_pages, book.pages) {
+            (Some(u), Some(p)) => format!(" \u{b7} {u}/{p} pages"),
+            _ => String::new(),
+        };
         imp.stats_label.set_text(&format!(
-            "{} \u{b7} {}/{} pages \u{b7} {}",
+            "{}{} \u{b7} {}",
             humanize_secs(book.total_read_time),
-            entry.unique_pages,
-            book.pages,
+            pages_segment,
             relative_date(book.last_open, chrono::Local::now()),
         ));
     }

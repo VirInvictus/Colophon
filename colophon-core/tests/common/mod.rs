@@ -99,7 +99,7 @@ const SCHEMA: &str = "
 pub struct FixtureBook<'a> {
     pub title: &'a str,
     pub authors: &'a str,
-    pub pages: i64,
+    pub pages: Option<i64>,
     pub md5: Option<&'a str>,
     pub last_open: i64,
     pub total_read_time: i64,
@@ -111,7 +111,7 @@ impl Default for FixtureBook<'_> {
         Self {
             title: "A Book",
             authors: "An Author",
-            pages: 100,
+            pages: Some(100),
             md5: Some("00000000000000000000000000000000"),
             last_open: 0,
             total_read_time: 0,

@@ -315,9 +315,15 @@ impl BookPage {
 /// coverage trails the furthest position, some of the book was read before
 /// KOReader was tracking; the bar shows that gap and this names it.
 fn progress_caption(p: &stats::Progress) -> String {
-    let logged = format!("{} of {} pages logged", p.unique_pages, p.pages);
-    let cov_pct = if p.pages > 0 {
-        (p.unique_pages as f64 / p.pages as f64 * 100.0).round()
+    // Unknown page count: the bar alone renders; an "N of M" line against an
+    // unknown denominator would be a confident zero (spec.md "Unknown page
+    // count").
+    let Some((unique, pages)) = p.unique_pages.zip(p.pages) else {
+        return "Page count unknown: coverage shown, pages hidden.".into();
+    };
+    let logged = format!("{unique} of {pages} pages logged");
+    let cov_pct = if pages > 0 {
+        (unique as f64 / pages as f64 * 100.0).round()
     } else {
         0.0
     };

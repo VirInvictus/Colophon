@@ -14,7 +14,7 @@ the live file on your device.
   <img src="docs/screenshots/per-book.png" alt="Colophon's per-book view: reading stats table with the pace-through-the-book and reading-speed charts">
 </p>
 
-**Status:** v2.1.0. Ingestion, the app shell, the full widget catalogue,
+**Status:** v2.2.0. Ingestion, the app shell, the full widget catalogue,
 per-book sidecar reconciliation, eight themes, device auto-pull, and Meson +
 Flatpak packaging are all shipped. 2.0.0 replaced the GNOME design language
 with Colophon's own: libadwaita is gone, the look is flat, square, and

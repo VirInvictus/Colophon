@@ -329,7 +329,7 @@ pub fn forgotten_books<Tz: TimeZone>(
         last_read: NaiveDate,
         author: String,
     }
-    let mut by_title: HashMap<String, Acc> = HashMap::new();
+    let mut by_work: HashMap<(String, String), Acc> = HashMap::new();
     for entry in entries {
         let Some(last_read) = entry
             .events
@@ -340,8 +340,8 @@ pub fn forgotten_books<Tz: TimeZone>(
             continue;
         };
         let finished = entry.is_finished();
-        let title = entry.book.title.trim().to_string();
-        let acc = by_title.entry(title).or_insert(Acc {
+        let key = crate::library::group_key(&entry.book);
+        let acc = by_work.entry(key).or_insert(Acc {
             finished: false,
             last_read,
             author: entry.book.authors.clone(),
@@ -352,13 +352,14 @@ pub fn forgotten_books<Tz: TimeZone>(
             acc.author = entry.book.authors.clone();
         }
     }
-    let mut out: Vec<ForgottenBook> = by_title
+    let mut out: Vec<ForgottenBook> = by_work
         .into_iter()
         .filter(|(_, a)| !a.finished)
-        .filter_map(|(title, a)| {
+        .filter_map(|(key, a)| {
             let days_since = (today - a.last_read).num_days();
             (days_since > FORGOTTEN_DAYS).then_some(ForgottenBook {
-                title,
+                // The work's title alone; the author is already on the book.
+                title: key.0,
                 author: a.author,
                 last_read: a.last_read,
                 days_since,
@@ -391,7 +392,7 @@ pub struct FinishedBook {
 /// "Completions timeline"). Whole-history. Files of one work collapse to the
 /// most recent finish.
 pub fn finished_timeline<Tz: TimeZone>(entries: &[Rc<LibraryEntry>], tz: &Tz) -> Vec<FinishedBook> {
-    let mut by_title: HashMap<String, FinishedBook> = HashMap::new();
+    let mut by_work: HashMap<(String, String), FinishedBook> = HashMap::new();
     for entry in entries {
         if !entry.is_finished() {
             continue;
@@ -407,16 +408,16 @@ pub fn finished_timeline<Tz: TimeZone>(entries: &[Rc<LibraryEntry>], tz: &Tz) ->
         let Some(finish_date) = completion_end.or(last_read) else {
             continue;
         };
-        let title = entry.book.title.trim().to_string();
+        let key = crate::library::group_key(&entry.book);
         let candidate = FinishedBook {
-            title: title.clone(),
+            title: entry.book.title.trim().to_string(),
             author: entry.book.authors.clone(),
             finish_date,
             total_secs: entry.book.total_read_time,
             from_completion: completion_end.is_some(),
         };
-        by_title
-            .entry(title)
+        by_work
+            .entry(key)
             .and_modify(|f| {
                 if finish_date > f.finish_date {
                     *f = candidate.clone();
@@ -424,7 +425,7 @@ pub fn finished_timeline<Tz: TimeZone>(entries: &[Rc<LibraryEntry>], tz: &Tz) ->
             })
             .or_insert(candidate);
     }
-    let mut out: Vec<FinishedBook> = by_title.into_values().collect();
+    let mut out: Vec<FinishedBook> = by_work.into_values().collect();
     out.sort_by(|a, b| {
         b.finish_date
             .cmp(&a.finish_date)
@@ -504,15 +505,15 @@ pub fn overview_base<Tz: TimeZone>(
     // recap's session count.
     let all_sessions = session_summary(&all_events, tz);
     let records = personal_records(&all_sessions, &daily);
-    let finished_works: std::collections::HashSet<String> = entries
+    let finished_works: std::collections::HashSet<(String, String)> = entries
         .iter()
         .filter(|e| e.is_finished())
-        .map(|e| e.book.title.trim().to_string())
+        .map(|e| crate::library::group_key(&e.book))
         .collect();
-    let started_works: std::collections::HashSet<String> = entries
+    let started_works: std::collections::HashSet<(String, String)> = entries
         .iter()
         .filter(|e| !e.events.is_empty())
-        .map(|e| e.book.title.trim().to_string())
+        .map(|e| crate::library::group_key(&e.book))
         .collect();
     let recap = Recap {
         books_started: started_works.len(),
@@ -584,7 +585,9 @@ pub fn overview_windowed<Tz: TimeZone>(
             continue;
         }
         books += 1;
-        unique_pages += metrics::unique_pages_read(metrics::coverage(&events), entry.book.pages);
+        if let Some(pages) = entry.book.pages {
+            unique_pages += metrics::unique_pages_read(metrics::coverage(&events), pages);
+        }
     }
 
     // Denominator span for the weekday averages: the window's own calendar
@@ -960,7 +963,7 @@ pub fn page_activity(entry: &LibraryEntry) -> PageActivity {
     };
 
     PageActivity {
-        pages: entry.book.pages,
+        pages: entry.book.pages.unwrap_or(0),
         per_page,
         cap_secs,
     }
@@ -979,9 +982,10 @@ pub struct Progress {
     pub spans: Vec<(f64, f64)>,
     pub furthest: f64,
     pub finished: bool,
-    /// Interval-union unique pages logged, out of `pages`.
-    pub unique_pages: i64,
-    pub pages: i64,
+    /// Interval-union unique pages logged, out of `pages`. `None` when the
+    /// book's page count is unknown (the stat hides rather than zeroing).
+    pub unique_pages: Option<i64>,
+    pub pages: Option<i64>,
 }
 
 pub fn progress(entry: &LibraryEntry) -> Progress {
@@ -998,11 +1002,11 @@ pub fn progress(entry: &LibraryEntry) -> Progress {
 
 /// Inferred read-throughs for one book (spec.md "Completion").
 pub fn book_completions(entry: &LibraryEntry) -> Vec<colophon_core::Completion> {
-    metrics::completions(
-        &entry.events,
-        entry.book.pages,
-        &metrics::CompletionConfig::default(),
-    )
+    // Completions are page-derived: an unknown page count hides them.
+    let Some(pages) = entry.book.pages else {
+        return Vec::new();
+    };
+    metrics::completions(&entry.events, pages, &metrics::CompletionConfig::default())
 }
 
 pub struct BookDetail {
@@ -1054,8 +1058,11 @@ pub fn book_detail<Tz: TimeZone>(entry: &LibraryEntry, tz: &Tz, today: NaiveDate
 
     // KOReader's time-left/finish-date math (main.lua:1641-1643), capped
     // numbers throughout, so Colophon never contradicts the device.
-    let pages_left = (book.pages - entry.last_page).max(0);
-    let est_secs_left = avg_secs_per_page.map(|avg| (pages_left as f64 * avg) as i64);
+    let pages_left = book
+        .pages
+        .and_then(|pages| entry.last_page.map(|lp| (pages - lp).max(0)));
+    let est_secs_left =
+        pages_left.and_then(|left| avg_secs_per_page.map(|avg| (left as f64 * avg) as i64));
     let est_finish = est_secs_left.and_then(|left| {
         if days_reading == 0 || entry.capped_secs == 0 {
             return None;
@@ -1180,16 +1187,39 @@ mod tests {
     }
 
     fn entry(events: Vec<PageEvent>) -> Rc<LibraryEntry> {
+        titled_entry(events, "T", "A")
+    }
+
+    #[expect(dead_code, reason = "retained for future D3 variant tests")]
+    fn events_for(title: &str) -> Vec<PageEvent> {
+        // Deterministic filler reads; the D3 tests only exercise grouping.
+        let n = if title.contains('B') || title.ends_with('B') {
+            2
+        } else {
+            3
+        };
+        (1..=n)
+            .map(|p| PageEvent {
+                book_id: 1,
+                page: p,
+                start_time: p * 1000,
+                duration: 600,
+                total_pages: 100,
+            })
+            .collect()
+    }
+
+    fn titled_entry(events: Vec<PageEvent>, title: &str, authors: &str) -> Rc<LibraryEntry> {
         let total: i64 = events.iter().map(|e| e.duration).sum();
         Rc::new(LibraryEntry {
             book: Book {
                 id: 1,
                 all_ids: vec![1],
-                title: "T".into(),
-                authors: "A".into(),
+                title: title.into(),
+                authors: authors.into(),
                 notes: 0,
                 highlights: 0,
-                pages: 100,
+                pages: Some(100),
                 series: None,
                 language: None,
                 md5: None,
@@ -1197,12 +1227,12 @@ mod tests {
                 total_read_pages: 0,
                 last_open: 0,
             },
-            unique_pages: 0,
+            unique_pages: Some(0),
             events,
             page_totals: Vec::new(),
             capped_secs: total,
             view_pages: 50,
-            last_page: 50,
+            last_page: Some(50),
             declared_status: None,
             annotations: Vec::new(),
         })
@@ -1796,7 +1826,7 @@ mod tests {
             .map(|p| ev(p, ts(2026, 6, 1, 8) + p * 60, 60))
             .collect();
         let mut e = entry(events);
-        Rc::get_mut(&mut e).unwrap().unique_pages = 41;
+        Rc::get_mut(&mut e).unwrap().unique_pages = Some(41);
         let p = progress(&e);
         assert!(p.finished);
         assert!((p.furthest - 1.0).abs() < 1e-9);
@@ -1835,10 +1865,10 @@ mod tests {
         let e = Rc::new(LibraryEntry {
             capped_secs: 0,
             view_pages: 0,
-            last_page: 0,
+            last_page: Some(0),
             events: Vec::new(),
             page_totals: Vec::new(),
-            unique_pages: 0,
+            unique_pages: Some(0),
             book: entry(Vec::new()).book.clone(),
             declared_status: None,
             annotations: Vec::new(),
@@ -1848,5 +1878,58 @@ mod tests {
         assert_eq!(d.avg_secs_per_page, None);
         assert_eq!(d.est_finish, None);
         assert_eq!(d.sessions, 0);
+    }
+    fn today() -> NaiveDate {
+        NaiveDate::from_ymd_opt(2026, 9, 4).unwrap()
+    }
+
+    /// A work with a configurable title/author and finished state. Finished:
+    /// a full 100-page read-through, recent. Abandoned: two pages, ancient.
+    fn titled_work(title: &str, author: &str, finished: bool, old: bool) -> Rc<LibraryEntry> {
+        let pages: Vec<i64> = if finished {
+            (1..=100).collect()
+        } else {
+            vec![1, 2]
+        };
+        let base = if old { 0 } else { 20_000_000 };
+        let events: Vec<PageEvent> = pages
+            .iter()
+            .enumerate()
+            .map(|(i, p)| PageEvent {
+                book_id: 1,
+                page: *p,
+                start_time: base + i as i64 * 86_400,
+                duration: 600,
+                total_pages: 100,
+            })
+            .collect();
+        titled_entry(events, title, author)
+    }
+
+    #[test]
+    fn same_title_different_authors_survive_as_separate_works() {
+        let entries = vec![
+            titled_work("Same Title", "Author A", true, false),
+            titled_work("Same Title", "Author B", false, true),
+        ];
+        let forgotten = forgotten_books(&entries, &Utc, today());
+        assert_eq!(forgotten.len(), 1, "the abandoned work must survive");
+        assert_eq!(forgotten[0].author, "Author B");
+
+        let tl = finished_timeline(&entries, &Utc);
+        assert_eq!(tl.len(), 1, "the finished work must survive");
+        assert_eq!(tl[0].author, "Author A");
+    }
+
+    #[test]
+    fn one_work_two_files_still_collapses() {
+        // The Jingo case: same title AND author, two files. Grouping
+        // collapses them; a finished copy keeps the work off the list.
+        let entries = vec![
+            titled_work("Jingo", "Terry Pratchett", true, false),
+            titled_work("Jingo", "Terry Pratchett", false, true),
+        ];
+        let forgotten = forgotten_books(&entries, &Utc, today());
+        assert_eq!(forgotten.len(), 0);
     }
 }

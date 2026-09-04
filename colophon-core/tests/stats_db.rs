@@ -50,7 +50,7 @@ fn books_reads_rows_and_defaults_nulls() {
         &FixtureBook {
             title: "Novel One",
             authors: "Author One",
-            pages: 866,
+            pages: Some(866),
             md5: Some("aaaa0000aaaa0000aaaa0000aaaa0000"),
             last_open: 1_000,
             total_read_time: 36_047,
@@ -138,7 +138,7 @@ fn different_md5s_stay_separate_books() {
         &FixtureBook {
             title: "Novel Two",
             md5: Some("cccc2222cccc2222cccc2222cccc2222"),
-            pages: 567,
+            pages: Some(567),
             ..Default::default()
         },
     );
@@ -147,7 +147,7 @@ fn different_md5s_stay_separate_books() {
         &FixtureBook {
             title: "Novel Two",
             md5: Some("bbbb1111bbbb1111bbbb1111bbbb1111"),
-            pages: 644,
+            pages: Some(644),
             ..Default::default()
         },
     );
@@ -165,7 +165,7 @@ fn rescaled_view_matches_koreader_semantics() {
     let id = common::insert_book(
         &path,
         &FixtureBook {
-            pages: 200,
+            pages: Some(200),
             ..Default::default()
         },
     );
@@ -197,7 +197,7 @@ fn page_totals_and_last_page_agree_with_the_materialized_view() {
     let id = common::insert_book(
         &path,
         &FixtureBook {
-            pages: 200,
+            pages: Some(200),
             ..Default::default()
         },
     );
@@ -229,7 +229,7 @@ fn page_totals_and_last_page_agree_with_the_materialized_view() {
     let raw = db.events(book).unwrap();
     let last = raw
         .last()
-        .map(|e| metrics::rescaled_last_page(e.page, e.total_pages, book.pages))
+        .map(|e| metrics::rescaled_last_page(e.page, e.total_pages, book.pages.expect("pages")))
         .unwrap_or(0);
 
     assert_eq!((capped, pages), (ref_capped, ref_pages));
@@ -288,4 +288,108 @@ fn snapshot_copies_and_folds_wal() {
 
     // And the copy is self-contained: no WAL sidecar left behind.
     assert!(!copied.with_extension("sqlite3-wal").exists());
+}
+
+// --- Audit 2026-09-04: D1/D2/D3 regression fixtures --------------------------
+
+#[test]
+fn d1_two_paginations_do_not_merge_axes() {
+    // One md5, two book rows whose page counts differ (300 and 350). The old
+    // view-based GROUP BY summed positions from both pagination axes into
+    // one bucket; the canonical-axis rescale keeps every event on the
+    // canonical (350-page) axis.
+    let dir = common::TempDir::new();
+    let path = common::create_db(dir.path());
+    let old_id = common::insert_book(
+        &path,
+        &common::FixtureBook {
+            title: "Old Title", // a metadata edit creates the second row
+            md5: Some("same"),
+            pages: Some(300),
+            last_open: 1_000,
+            ..Default::default()
+        },
+    );
+    let new_id = common::insert_book(
+        &path,
+        &common::FixtureBook {
+            title: "New Title",
+            md5: Some("same"),
+            pages: Some(350),
+            last_open: 2_000, // canonical: most recently opened
+            ..Default::default()
+        },
+    );
+    let conn = Connection::open(&path).unwrap();
+    // The old row's page 30 was page 30 of 300 = 10% in; on the 350-page
+    // axis that is page 35. The new row's page 70 is page 70 of 350.
+    conn.execute(
+        "INSERT INTO page_stat_data VALUES (?1, 30, 1000, 60, 300)",
+        rusqlite::params![old_id],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO page_stat_data VALUES (?1, 70, 2000, 60, 350)",
+        rusqlite::params![new_id],
+    )
+    .unwrap();
+    drop(conn);
+
+    let db = StatsDb::open(&path).unwrap();
+    let books = db.books().unwrap();
+    assert_eq!(books.len(), 1);
+    let book = &books[0];
+    assert_eq!(book.all_ids.len(), 2);
+
+    let totals = db.page_totals(book).unwrap();
+    let pages: Vec<i64> = totals.iter().map(|p| p.page).collect();
+    // The old row's page 30 was 10% into a 300-page axis; rescaled onto the
+    // canonical 350-page axis it fans across pages 34-35 (the view's own
+    // fan-out arithmetic). No phantom page 30 from the other axis.
+    assert_eq!(
+        pages,
+        vec![34, 35, 70],
+        "axes merged or miscounted: {pages:?}"
+    );
+
+    // rescaled_events maps the same way, ordered by time.
+    let events = db.rescaled_events(book).unwrap();
+    let event_pages: Vec<i64> = events.iter().map(|e| e.page).collect();
+    assert_eq!(event_pages, vec![34, 35, 70]);
+}
+
+#[test]
+fn d2_unknown_pages_hides_page_derived_stats() {
+    // A NULL-pages book (KOReader's book.pages is nullable): the page-
+    // derived aggregates come back empty rather than confident zeros, and
+    // the raw events survive for the time-derived stats.
+    let dir = common::TempDir::new();
+    let path = common::create_db(dir.path());
+    let id = common::insert_book(
+        &path,
+        &common::FixtureBook {
+            pages: None,
+            total_read_time: 3_600,
+            ..Default::default()
+        },
+    );
+    let conn = Connection::open(&path).unwrap();
+    conn.execute(
+        "INSERT INTO page_stat_data VALUES (?1, 5, 1000, 60, 200)",
+        rusqlite::params![id],
+    )
+    .unwrap();
+    drop(conn);
+
+    let db = StatsDb::open(&path).unwrap();
+    let books = db.books().unwrap();
+    assert_eq!(books.len(), 1);
+    assert!(books[0].pages.is_none());
+
+    // Page-derived: hidden.
+    assert!(db.page_totals(&books[0]).unwrap().is_empty());
+    assert!(db.rescaled_events(&books[0]).unwrap().is_empty());
+
+    // Time-derived: intact.
+    assert_eq!(db.events(&books[0]).unwrap().len(), 1);
 }

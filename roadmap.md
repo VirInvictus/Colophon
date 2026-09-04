@@ -720,7 +720,7 @@ definition lands in `spec.md` before the code moves. Each needs that spec
 amendment as its first step. The live bugs from the same sweep were fixed
 and are in `patchnotes.md`.
 
-- [ ] **D1 — Merged books conflate two page axes.** `StatsDb::books`
+- [x] **D1 — Merged books conflate two page axes.** `StatsDb::books` *(Fixed v2.2.0: canonical-axis rescale in SQL — the canonical page count is bound as a parameter and the per-row book JOIN dropped. Fixture: one md5, two rows, pages 300/350; the old row's page 30 fans to canonical pages 34-35, no phantom 30.)*
       (`colophon-core/src/db.rs:210`, `merge_by_md5`) merges KOReader `book`
       rows sharing an md5, keeping every underlying row id in
       `Book::all_ids`. `page_totals` (`db.rs:143`) then queries the
@@ -755,7 +755,7 @@ and are in `patchnotes.md`.
       verbatim KOReader DDL, so the fixture is a few rows, not a new
       harness.
 
-- [ ] **D2 — A NULL `pages` silently reads as zero and zeroes a book's
+- [x] **D2 — A NULL `pages` silently reads as zero and zeroes a book's *(Fixed v2.2.0: `Book::pages` is `Option<i64>`; an unknown count hides unique pages, rescaled positions, completions, and page-derived totals, while time-derived stats keep rendering. Spec amended first.)*
       stats.** KOReader's `book` table declares `pages integer` with no
       `NOT NULL` (`RESEARCH.md` §1; unlike `page_stat_data`'s `page` /
       `duration` / `total_pages`, which are all `NOT NULL DEFAULT 0`).
@@ -782,7 +782,7 @@ and are in `patchnotes.md`.
       was known but only its downstream invariant was defended, not the
       number itself.
 
-- [ ] **D3 — Three library-wide aggregations dedup on title alone.**
+- [x] **D3 — Three library-wide aggregations dedup on title alone.** *(Fixed v2.2.0: all three key on `library::group_key`'s `(title, authors)`; the title-keyed sites inside series/author buckets are correct and untouched, with the Jingo collapse asserted.)*
       `colophon/src/library.rs:68` defines a work as `(title, authors)` and
       `grouped()` uses it; `spec.md`'s "Book identity" says the same. Three
       places in `stats.rs` do not follow it and key on the trimmed title

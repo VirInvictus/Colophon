@@ -77,7 +77,9 @@ pub fn furthest_position(events: &[PageEvent]) -> f64 {
         .unwrap_or(0.0)
 }
 
-/// `coverage` scaled to a concrete page count, rounded.
+/// `coverage` scaled to a concrete page count, rounded. The caller decides
+/// whether the page count is known (`Book::pages` is `Option`); an unknown
+/// count hides the stat rather than feeding a confident zero here.
 pub fn unique_pages_read(coverage: f64, pages: i64) -> i64 {
     (coverage * pages as f64).round() as i64
 }

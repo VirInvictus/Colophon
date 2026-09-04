@@ -36,8 +36,10 @@ pub struct Book {
     pub notes: i64,
     /// Count of highlights, not content.
     pub highlights: i64,
-    /// Page count under the *current* rendering (font size etc.).
-    pub pages: i64,
+    /// Page count under the *current* rendering (font size etc.). `None`
+    /// when KOReader never learned it (`book.pages` is nullable): page-
+    /// derived stats hide for such a book rather than print zeros.
+    pub pages: Option<i64>,
     pub series: Option<String>,
     pub language: Option<String>,
     /// KOReader's partial-MD5 content hash; the stable book identity.

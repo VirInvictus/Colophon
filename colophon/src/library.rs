@@ -18,7 +18,7 @@ use crate::stats::FINISHED_THRESHOLD;
 pub struct LibraryEntry {
     pub book: Book,
     /// Interval-union unique pages read, out of `book.pages`.
-    pub unique_pages: i64,
+    pub unique_pages: Option<i64>,
     /// Raw page-turn events (time axis), chronological.
     pub events: Vec<PageEvent>,
     /// Per current-axis page aggregates from the `page_stat` view (one row
@@ -31,7 +31,7 @@ pub struct LibraryEntry {
     /// recently read page.
     pub capped_secs: i64,
     pub view_pages: i64,
-    pub last_page: i64,
+    pub last_page: Option<i64>,
     /// User-declared status from the book's `.sdr` sidecar, when the user has
     /// provided one for this book; `None` otherwise.
     pub declared_status: Option<ReadStatus>,
@@ -65,7 +65,7 @@ impl LibraryGroup {
     }
 }
 
-fn group_key(book: &Book) -> (String, String) {
+pub(crate) fn group_key(book: &Book) -> (String, String) {
     (book.title.trim().to_owned(), book.authors.trim().to_owned())
 }
 
@@ -143,7 +143,7 @@ mod tests {
                 authors: authors.into(),
                 notes: 0,
                 highlights: 0,
-                pages: 100,
+                pages: Some(100),
                 series: None,
                 language: None,
                 md5: Some(md5.into()),
@@ -151,12 +151,12 @@ mod tests {
                 total_read_pages: 0,
                 last_open,
             },
-            unique_pages: 0,
+            unique_pages: Some(0),
             events: Vec::new(),
             page_totals: Vec::new(),
             capped_secs: 0,
             view_pages: 0,
-            last_page: 0,
+            last_page: Some(0),
             declared_status: None,
             annotations: Vec::new(),
         })
