@@ -13,7 +13,7 @@ it exists: every KOReader stats tool Brandon has found is a web dashboard or
 a self-hosted Docker instance, and he doesn't want that. See `README.md` and
 `spec.md`.
 
-## Where this stands right now (prose written 2026-07-16 at v2.1.0; current release v2.1.1)
+## Where this stands right now (prose written 2026-07-16 at v2.1.0; current release v2.2.0)
 
 **Shipped 2.1.** Phases 0 through 4.6 plus Phase 7 (device auto-pull,
 v1.1.0) and Phase 6 (the de-adwaita migration, v2.0.0) are complete. Two
@@ -21,7 +21,9 @@ releases followed the migration: **v2.0.1** scoped the focus ring to
 discrete interactive controls (`button`/`entry`/`switch`/`scale`
 `:focus-visible`), ending the accent flash a bare modifier press used to
 fire across every widget in the focus chain; **v2.1.0** added the
-speed-by-hour chart and the cumulative reading curve. The
+speed-by-hour chart and the cumulative reading curve. **v2.2.0**
+(2026-09-04) closed the three latent defects the 2026-08-09 sweep had
+carried, as D1-D3. The
 spec is fully built and the app is the portfolio's de-adwaita pilot, the
 template for Atrium/Conservatory/Viaduct/Framework. Scaffolding was
 Sonnet's, everything since is Fable's. The Phase 6e polish tail (tiling
@@ -35,15 +37,15 @@ Phase 6f opened later for packaging: the Flatpak moved to the GNOME 50
 runtime and the build was verified for real (2026-07-23), leaving one open
 item, vendoring the cargo sources so the build works offline for Flathub.
 
-**Read `roadmap.md`'s "Known defects" section before touching the metric
-layer.** The 2026-08-09 sweep fixed five live bugs and left three latent
-ones recorded there with their triggers and fix shapes: merged books
+**Read `roadmap.md`'s "Known defects" section for the metric layer's
+history before touching it.** The 2026-08-09 sweep fixed five live bugs and
+carried three latent ones with their triggers and fix shapes: merged books
 conflating two page axes (`db.rs` `page_totals`/`rescaled_events`), a NULL
 `pages` silently zeroing a book's page-derived stats, and three
 library-wide aggregations in `stats.rs` deduping on title alone where
 `library.rs::group_key`'s `(title, authors)` is the project's definition of
-a work. None reproduces on the current sample database, which is why they
-are carried rather than guessed at.
+a work. v2.2.0 closed all three; the section stays as the record of what
+moved and why.
 
 Architecture worth knowing before you touch code:
 

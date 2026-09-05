@@ -389,12 +389,13 @@ Still open:
       prorated on-pace line), stats-DB-feasible. **Deliberately declined at
       research time** (Colophon is a stats *viewer*, not a tracker); listed
       only so the decision is on the record. Re-raise on request.
-- [ ] `.sdr` highlight/note *content*: sandboxed-Lua parsing (KoShelf's
-      `mlua` + `StdLib::NONE` pattern), joined via `partial_md5_checksum`
-      = `book.md5`. Unlocks a highlight browser, annotation markers with
-      text, and the sidecar `summary.status` user-declared finished flag
-      to cross-check inferred completions. Sidecar sample now in hand
-      (2026-07-05); remaining gate is just the `mlua` dependency ask.
+- [ ] `.sdr` highlight *browser*: browsing parsed highlight/note content
+      in the UI. *(Re-scoped 2026-09-05: most of this box shipped and the
+      old text understated it. The `mlua` dependency ask cleared (vendored,
+      `Cargo.toml`), the sandboxed sidecar parser ships
+      (`colophon-core/src/sidecar.rs`), the declared-finished
+      reconciliation shipped v0.15.0, per-book sidecar attach v0.17.0, and
+      annotation markers v0.19.0. What remains is the browser itself.)*
 - [ ] Vocabulary-builder widgets ("words looked up per book", lookup
       timeline). Schema already documented (RESEARCH §2); Brandon's
       `vocabulary_builder.sqlite3` is empty, so parked until the feature
@@ -705,7 +706,10 @@ is not on the table. This is a *version* bump inside the GNOME runtime.
       Shared shape with Atrium's Phase 9 task and with Viaduct, which has the
       same manifest gap. Only blocks Flathub submission; local builds work.
 
-## Known defects — carried, not yet fixed (2026-08-09 sweep)
+## Known defects — carried 2026-08-09, closed in v2.2.0 (D1-D3)
+
+*(All three closed in v2.2.0; the text below is the 2026-08-09 record,
+kept for what moved and why.)*
 
 Three latent correctness bugs found in the 2026-08-09 full-repo sweep and
 deliberately **not** fixed in that pass. All three are latent rather than
