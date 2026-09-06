@@ -706,11 +706,20 @@ is not on the table. This is a *version* bump inside the GNOME runtime.
       Atrium tracks that same gap as its own Phase 9 task; Colophon needs it
       before any Flathub submission.
 
-- [ ] **Vendor the cargo sources for an offline Flathub build.** Generate
+- [x] **Vendor the cargo sources for an offline Flathub build.** Generate
       `cargo-sources.json` via flatpak-builder-tools'
       `flatpak-cargo-generator.py` and drop the `--share=network` build arg.
       Shared shape with Atrium's Phase 9 task and with Viaduct, which has the
       same manifest gap. Only blocks Flathub submission; local builds work.
+      *(Done 2026-09-06 as v2.3.1: upstream generator vendored at
+      `scripts/flatpak-cargo-generator.py`, 127 crates from `Cargo.lock`
+      into `generated-sources.json`, manifest includes it in the module
+      sources, `--share=network` deleted. Verified for real: a local
+      `flatpak-builder` run against the GNOME 50 manifest succeeded and the
+      built binary runs (`--run ... colophon --help` exits 0); the build
+      sandbox has no network, so cargo demonstrably resolved everything
+      from the vendored sources. App-id unchanged pending the
+      org-vs-io.github split decision.)*
 
 ## Known defects — carried 2026-08-09, closed in v2.2.0 (D1-D3)
 

@@ -133,7 +133,10 @@ meson install -C build
 
 A Flatpak manifest (`org.virinvictus.Colophon.json`) builds it against the
 GNOME 50 runtime (which is where GTK4 ships; the app no longer uses
-libadwaita) with a read-only host sandbox.
+libadwaita) with a read-only host sandbox. Crate dependencies are vendored
+(`generated-sources.json`), so the build needs no network access; after
+changing dependencies, regenerate it with
+`uv run scripts/flatpak-cargo-generator.py Cargo.lock -o generated-sources.json`.
 
 ## License
 

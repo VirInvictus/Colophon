@@ -32,6 +32,11 @@
   </developer>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2.3.1" date="2026-09-06">
+      <description translate="no">
+        <p>Packaging: all crate dependencies are vendored into the Flatpak build, so it needs no network access (verified with a local offline build). Nothing about the app itself changed.</p>
+      </description>
+    </release>
     <release version="2.3.0" date="2026-09-06">
       <description translate="no">
         <p>Night owls can set when their reading day starts (Preferences). Reading done in the small hours after midnight counts toward the previous day, so one late-night sitting reads as one day in totals, streaks, heatmaps, and time windows; clock hours never move.</p>

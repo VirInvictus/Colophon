@@ -13,7 +13,7 @@ it exists: every KOReader stats tool Brandon has found is a web dashboard or
 a self-hosted Docker instance, and he doesn't want that. See `README.md` and
 `spec.md`.
 
-## Where this stands right now (prose written 2026-07-16 at v2.1.0; current release v2.3.0)
+## Where this stands right now (prose written 2026-07-16 at v2.1.0; current release v2.3.1)
 
 **Shipped 2.1.** Phases 0 through 4.6 plus Phase 7 (device auto-pull,
 v1.1.0) and Phase 6 (the de-adwaita migration, v2.0.0) are complete. Two
@@ -77,6 +77,11 @@ Architecture worth knowing before you touch code:
   `window.ui`).
 - **Packaging**: Meson wrapper + `.desktop` + AppStream metainfo + Flatpak
   (`org.virinvictus.Colophon.json`, GNOME 50, `--filesystem=host:ro`).
+  Crate sources are vendored (`generated-sources.json`, regen:
+  `uv run scripts/flatpak-cargo-generator.py Cargo.lock -o
+  generated-sources.json`), so the build needs no network; regen is part of
+  any dependency change. Flathub remains blocked only on the workspace-wide
+  app-id split decision.
 
 Standing rules that still bind post-1.0: every new widget's metric lands in
 `spec.md` first; ask before adding any dependency; Colophon reads only

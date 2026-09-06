@@ -18,7 +18,7 @@
 project(
   'colophon',
   'rust',
-  version: '2.3.0',
+  version: '2.3.1',
   meson_version: '>= 0.59.0',
   license: 'MIT',
 )

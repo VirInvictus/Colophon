@@ -1,5 +1,18 @@
 # Patchnotes
 
+## v2.3.1 (2026-09-06)
+
+- **The Flatpak build is offline-capable.** Every crate dependency is now
+  vendored into the build (`generated-sources.json`, generated from
+  `Cargo.lock`), so the build sandbox needs no network access and the
+  `--share=network` build-time escape hatch is gone. Verified with a real
+  local `flatpak-builder` run: the app builds and runs under the GNOME 50
+  runtime with no network. This closes the one gap between the manifest and
+  a Flathub submission (the app-id question is a separate, workspace-wide
+  decision). Nothing about the app itself changed.
+
+Suite 117 green across the workspace; clippy `-D warnings` and fmt clean.
+
 ## v2.3.0 (2026-09-06)
 
 For night owls: the reading day can start when yours does.
