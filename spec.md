@@ -48,9 +48,22 @@ timezone.
 These definitions are pinned so Colophon's numbers reconcile with the
 device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
 
-- **Day**: local-timezone calendar day (`date(start_time, 'unixepoch',
-  'localtime')` semantics). A configurable "day starts at HH:MM" shift
-  (KOReader and KoShelf both offer one) is a later option, off by default.
+- **Day (logical reading day)**: the local-timezone day an event belongs
+  to under the configured day start: `date(start_time - offset,
+  'unixepoch', 'localtime')` semantics, where offset is the minute past
+  midnight the reading day begins (KOReader and KoShelf both offer one;
+  off by default, 0 = the plain calendar day,
+  `date(start_time, 'unixepoch', 'localtime')`). A day start of e.g.
+  04:00 folds the small hours 00:00-03:59 into the previous logical day,
+  so one late-night sitting reads as one day. The shift moves every
+  day-keyed bucket and every displayed date: daily totals, streaks and
+  their today-or-yesterday rule, the year heatmap and monthly bars,
+  speed buckets, window cutoffs and period comparisons, and finish and
+  last-read dates ("today" in every such rule is the logical today). It
+  does not move hour-of-day attribution: the when-do-I-read heatmap's
+  weekday rows follow the logical day but its hour columns, speed by
+  hour, and session start hours stay real clock hours. Raw timestamps,
+  session splitting, and capped/uncapped totals are untouched.
 - **Session**: per-book run of `page_stat_data` rows where each row starts
   no more than 300 s after the previous row's end
   (`start_time > prev.start_time + prev.duration + 300` opens a new one).

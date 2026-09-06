@@ -1,5 +1,23 @@
 # Patchnotes
 
+## v2.3.0 (2026-09-06)
+
+For night owls: the reading day can start when yours does.
+
+- **A configurable day start.** Preferences gains a "Reading day" group:
+  pick the minute past midnight your reading day begins (arrows step 30
+  minutes, or type HH:MM; the default 00:00 is the plain calendar day).
+  With a 04:00 day start, reading done between midnight and 04:00 counts
+  toward the previous day, so one late-night sitting reads as one day
+  everywhere a day appears: daily totals, streaks, the year heatmap,
+  monthly bars, speed buckets, the 30/90/365-day windows, and every
+  displayed date, including "today" in the streak rules. The change
+  applies live. What never moves: the clock hours. The when-do-I-read
+  heatmap still shows the real hour you read, and speed by hour and
+  session starts stay on the clock.
+
+Suite 117 green across the workspace; clippy `-D warnings` and fmt clean.
+
 ## v2.2.0 (2026-09-04)
 
 **Data-quality fixes from the 2026-09-04 audit (D1-D3), each with its spec

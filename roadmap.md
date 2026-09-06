@@ -400,9 +400,15 @@ Still open:
       timeline). Schema already documented (RESEARCH §2); Brandon's
       `vocabulary_builder.sqlite3` is empty, so parked until the feature
       sees real use.
-- [ ] "Day starts at HH:MM" shift for night owls (KOReader and KoShelf
+- [x] "Day starts at HH:MM" shift for night owls (KOReader and KoShelf
       both offer one; Colophon's day bucketing is already
       timezone-generic, so this is a small `TimeConfig`-style addition).
+      *(Shipped v2.3.0, 2026-09-06: spec "Day" amended first to define
+      the logical reading day; core `DayStart` + `logical_date` plumbed
+      through `daily_totals`, `hourly_profile`'s weekday, `speed_series`,
+      and every app-side date derivation; GSettings
+      `day-start-minutes` + a Preferences HH:MM spin row that applies
+      live. Hour-of-day attribution stays real clock.)*
 - [ ] Multi-device merge, only if a second KOReader device ever exists:
       KoInsight's `(md5, device, page, start_time)` upsert is the
       reference design; same-device re-imports are naturally idempotent

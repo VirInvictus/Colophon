@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{Datelike, Duration, NaiveDate, TimeZone};
 
-use crate::metrics::days::local_date;
+use crate::metrics::days::{DayStart, logical_date};
 use crate::model::{PageEvent, SpeedPoint};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,11 +30,13 @@ impl Bucket {
 
 /// Speed per bucket over any set of events, keyed by the bucket's first
 /// day. Buckets with reading time but zero pages (possible in theory with
-/// corrupt rows) report 0.0 pages/hour.
+/// corrupt rows) report 0.0 pages/hour. Days are logical days (spec.md
+/// "Day").
 pub fn speed_series<Tz: TimeZone>(
     events: &[PageEvent],
     tz: &Tz,
     bucket: Bucket,
+    day_start: DayStart,
 ) -> BTreeMap<NaiveDate, SpeedPoint> {
     let mut acc: BTreeMap<NaiveDate, (i64, BTreeSet<(i64, i64)>)> = BTreeMap::new();
 
@@ -42,7 +44,7 @@ pub fn speed_series<Tz: TimeZone>(
         if event.duration <= 0 {
             continue;
         }
-        let key = bucket.start_of(local_date(event.start_time, tz));
+        let key = bucket.start_of(logical_date(event.start_time, tz, day_start));
         let (seconds, pages) = acc.entry(key).or_default();
         *seconds += event.duration;
         pages.insert((event.book_id, event.page));
@@ -138,7 +140,7 @@ mod tests {
         let events: Vec<_> = (1..=30)
             .map(|p| ev(p, ts(2026, 7, 1, 12) + p * 60, 60))
             .collect();
-        let series = speed_series(&events, &Utc, Bucket::Day);
+        let series = speed_series(&events, &Utc, Bucket::Day, DayStart::MIDNIGHT);
         let point = series[&date("2026-07-01")];
         assert_eq!(point.pages, 30);
         assert_eq!(point.seconds, 1800);
@@ -148,7 +150,12 @@ mod tests {
     #[test]
     fn weeks_key_on_monday() {
         // 2026-07-01 is a Wednesday; its week starts Monday 2026-06-29.
-        let series = speed_series(&[ev(1, ts(2026, 7, 1, 12), 60)], &Utc, Bucket::Week);
+        let series = speed_series(
+            &[ev(1, ts(2026, 7, 1, 12), 60)],
+            &Utc,
+            Bucket::Week,
+            DayStart::MIDNIGHT,
+        );
         assert!(series.contains_key(&date("2026-06-29")));
     }
 
@@ -158,7 +165,7 @@ mod tests {
             ev(1, ts(2026, 7, 1, 12), 60),
             ev(2, ts(2026, 7, 30, 12), 60),
         ];
-        let series = speed_series(&events, &Utc, Bucket::Month);
+        let series = speed_series(&events, &Utc, Bucket::Month, DayStart::MIDNIGHT);
         assert_eq!(series.len(), 1);
         assert_eq!(series[&date("2026-07-01")].pages, 2);
     }
@@ -166,10 +173,19 @@ mod tests {
     #[test]
     fn rereads_count_once_per_bucket() {
         let events = vec![ev(1, ts(2026, 7, 1, 12), 60), ev(1, ts(2026, 7, 1, 13), 60)];
-        let series = speed_series(&events, &Utc, Bucket::Day);
+        let series = speed_series(&events, &Utc, Bucket::Day, DayStart::MIDNIGHT);
         let point = series[&date("2026-07-01")];
         assert_eq!(point.pages, 1);
         assert_eq!(point.seconds, 120);
+    }
+
+    #[test]
+    fn speed_series_honours_the_day_start() {
+        // 01:00 on 2026-07-03 belongs to 2026-07-02 under a 04:00 day start.
+        let events = vec![ev(1, ts(2026, 7, 3, 1), 60)];
+        let series = speed_series(&events, &Utc, Bucket::Day, DayStart(4 * 60));
+        assert!(series.contains_key(&date("2026-07-02")));
+        assert_eq!(series[&date("2026-07-02")].seconds, 60);
     }
 
     #[test]

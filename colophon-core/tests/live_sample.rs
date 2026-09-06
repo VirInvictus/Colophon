@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 
 use chrono::Utc;
-use colophon_core::metrics::{self, Bucket};
+use colophon_core::metrics::{self, Bucket, DayStart};
 use colophon_core::model::DEFAULT_SESSION_GAP_SECS;
 use colophon_core::{EXPECTED_SCHEMA_VERSION, StatsDb};
 
@@ -67,11 +67,11 @@ fn live_sample_reconciles() {
     assert_eq!(all.len(), total_events);
 
     // Whole-history derived metrics must at least compute sanely.
-    let totals = metrics::daily_totals(&all, &Utc);
+    let totals = metrics::daily_totals(&all, &Utc, DayStart::MIDNIGHT);
     assert!(!totals.is_empty());
     let days = totals.keys().copied().collect();
     let today = *totals.keys().last().unwrap();
     let streaks = metrics::streaks(&days, today);
     assert!(streaks.longest.is_some());
-    assert!(!metrics::speed_series(&all, &Utc, Bucket::Day).is_empty());
+    assert!(!metrics::speed_series(&all, &Utc, Bucket::Day, DayStart::MIDNIGHT).is_empty());
 }

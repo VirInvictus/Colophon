@@ -434,6 +434,18 @@ impl ColophonWindow {
         self.refresh_content();
     }
 
+    /// Persist a new reading-day start (minutes past midnight; spec.md
+    /// "Day"), then rebuild everything keyed on the old day buckets: the
+    /// cached whole-history aggregates are dropped and the visible page
+    /// re-renders under the new logical days.
+    pub fn apply_day_start(&self, minutes: u16) {
+        if let Some(s) = settings::settings() {
+            let _ = s.set_int(settings::KEY_DAY_START_MINUTES, i32::from(minutes));
+        }
+        self.imp().overview_base.replace(None);
+        self.refresh_content();
+    }
+
     /// Takes a user-provided `.sdr` sidecar for the book with `md5`, copies
     /// it into the app's own cache, remembers where it came from (so
     /// auto-pull can keep it fresh), and reloads so the declared status
@@ -555,7 +567,12 @@ impl ColophonWindow {
     fn refresh_content(&self) {
         let imp = self.imp();
         let entries = self.filtered_entries();
-        let today = Local::now().date_naive();
+        // The logical reading day (spec.md "Day"): every day-keyed number
+        // below is bucketed under the configured day start, and "today"
+        // means the logical today.
+        let day_start = settings::day_start();
+        let now = Local::now().timestamp();
+        let today = colophon_core::metrics::logical_date(now, &Local, day_start);
 
         // Test the *filtered* set: with the junk filter on and every book
         // below the threshold there is nothing to show, and rendering the
@@ -581,13 +598,17 @@ impl ColophonWindow {
                 // otherwise build them once. Window toggles hit the cache.
                 let mut cache = imp.overview_base.borrow_mut();
                 if cache.as_ref().is_none_or(|(day, _)| *day != today) {
-                    *cache = Some((today, stats::overview_base(&entries, &Local, today)));
+                    *cache = Some((
+                        today,
+                        stats::overview_base(&entries, &Local, day_start, today),
+                    ));
                 }
                 let (_, base) = cache.as_ref().expect("just populated");
                 let overview = stats::overview_windowed(
                     base,
                     &entries,
                     &Local,
+                    day_start,
                     today,
                     imp.overview_page.window_days(),
                 );
@@ -601,7 +622,7 @@ impl ColophonWindow {
                     imp.content_stack.set_visible_child_name("placeholder");
                     return;
                 };
-                let detail = stats::book_detail(entry, &Local, today);
+                let detail = stats::book_detail(entry, &Local, day_start, today);
                 imp.book_page.set_book(entry, &detail);
 
                 // Speed trend: this book against the library baseline,
@@ -613,11 +634,11 @@ impl ColophonWindow {
                     .collect();
                 let first_day = all_events
                     .iter()
-                    .map(|e| colophon_core::metrics::local_date(e.start_time, &Local))
+                    .map(|e| colophon_core::metrics::logical_date(e.start_time, &Local, day_start))
                     .min();
                 let bucket = stats::speed_bucket_for(first_day, today);
                 let to_points = |events: &[colophon_core::PageEvent]| {
-                    colophon_core::metrics::speed_series(events, &Local, bucket)
+                    colophon_core::metrics::speed_series(events, &Local, bucket, day_start)
                         .iter()
                         .map(|(date, point)| crate::charts::line::speed_point(*date, point))
                         .collect::<Vec<_>>()

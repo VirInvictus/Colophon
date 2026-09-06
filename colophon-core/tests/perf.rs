@@ -21,7 +21,7 @@ use std::time::Instant;
 
 use chrono::Utc;
 use colophon_core::StatsDb;
-use colophon_core::metrics::{self, Bucket};
+use colophon_core::metrics::{self, Bucket, DayStart};
 use colophon_core::model::{
     DEFAULT_SESSION_GAP_SECS, KOREADER_DEFAULT_MAX_SEC, PageEvent, PageTotal, RescaledEvent,
 };
@@ -127,7 +127,7 @@ fn measure_multi_year_load_and_render() {
     let all: Vec<PageEvent> = per_book_events.iter().flatten().copied().collect();
     let flatten_ms = ms(t);
     let t = Instant::now();
-    let daily = metrics::daily_totals(&all, &Utc);
+    let daily = metrics::daily_totals(&all, &Utc, DayStart::MIDNIGHT);
     let daily_ms = ms(t);
     let base_ms = flatten_ms + daily_ms;
     let day_count = daily.len();
@@ -144,8 +144,13 @@ fn measure_multi_year_load_and_render() {
                 .collect(),
             None => all.clone(),
         };
-        black_box(metrics::speed_series(&windowed, &Utc, Bucket::Week));
-        black_box(metrics::hourly_profile(&windowed, &Utc));
+        black_box(metrics::speed_series(
+            &windowed,
+            &Utc,
+            Bucket::Week,
+            DayStart::MIDNIGHT,
+        ));
+        black_box(metrics::hourly_profile(&windowed, &Utc, DayStart::MIDNIGHT));
         black_box(metrics::sessions(&windowed, DEFAULT_SESSION_GAP_SECS));
     };
 
@@ -160,10 +165,15 @@ fn measure_multi_year_load_and_render() {
 
     // Per-step breakdown (all-time) for context.
     let t = Instant::now();
-    black_box(metrics::speed_series(&all, &Utc, Bucket::Week));
+    black_box(metrics::speed_series(
+        &all,
+        &Utc,
+        Bucket::Week,
+        DayStart::MIDNIGHT,
+    ));
     let speed_ms = ms(t);
     let t = Instant::now();
-    black_box(metrics::hourly_profile(&all, &Utc));
+    black_box(metrics::hourly_profile(&all, &Utc, DayStart::MIDNIGHT));
     let hourly_ms = ms(t);
     let t = Instant::now();
     black_box(metrics::sessions(&all, DEFAULT_SESSION_GAP_SECS));

@@ -12,7 +12,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
 use chrono::{Datelike, Duration, NaiveDate, TimeZone};
-use colophon_core::metrics::{self, Bucket, local_date};
+use colophon_core::metrics::{self, Bucket, DayStart, logical_date};
 use colophon_core::model::{DayTotal, PageEvent, SpeedPoint, Streaks};
 
 use crate::library::LibraryEntry;
@@ -322,6 +322,7 @@ const FORGOTTEN_DAYS: i64 = 30;
 pub fn forgotten_books<Tz: TimeZone>(
     entries: &[Rc<LibraryEntry>],
     tz: &Tz,
+    day_start: DayStart,
     today: NaiveDate,
 ) -> Vec<ForgottenBook> {
     struct Acc {
@@ -334,7 +335,7 @@ pub fn forgotten_books<Tz: TimeZone>(
         let Some(last_read) = entry
             .events
             .iter()
-            .map(|e| local_date(e.start_time, tz))
+            .map(|e| logical_date(e.start_time, tz, day_start))
             .max()
         else {
             continue;
@@ -391,7 +392,11 @@ pub struct FinishedBook {
 /// Finished works with their finish dates, most-recent first (spec.md
 /// "Completions timeline"). Whole-history. Files of one work collapse to the
 /// most recent finish.
-pub fn finished_timeline<Tz: TimeZone>(entries: &[Rc<LibraryEntry>], tz: &Tz) -> Vec<FinishedBook> {
+pub fn finished_timeline<Tz: TimeZone>(
+    entries: &[Rc<LibraryEntry>],
+    tz: &Tz,
+    day_start: DayStart,
+) -> Vec<FinishedBook> {
     let mut by_work: HashMap<(String, String), FinishedBook> = HashMap::new();
     for entry in entries {
         if !entry.is_finished() {
@@ -399,11 +404,11 @@ pub fn finished_timeline<Tz: TimeZone>(entries: &[Rc<LibraryEntry>], tz: &Tz) ->
         }
         let completion_end = book_completions(entry)
             .last()
-            .map(|c| local_date(c.end_time, tz));
+            .map(|c| logical_date(c.end_time, tz, day_start));
         let last_read = entry
             .events
             .iter()
-            .map(|e| local_date(e.start_time, tz))
+            .map(|e| logical_date(e.start_time, tz, day_start))
             .max();
         let Some(finish_date) = completion_end.or(last_read) else {
             continue;
@@ -490,20 +495,21 @@ pub struct OverviewBase {
 pub fn overview_base<Tz: TimeZone>(
     entries: &[Rc<LibraryEntry>],
     tz: &Tz,
+    day_start: DayStart,
     today: NaiveDate,
 ) -> OverviewBase {
     let all_events: Vec<PageEvent> = entries
         .iter()
         .flat_map(|e| e.events.iter().copied())
         .collect();
-    let daily = metrics::daily_totals(&all_events, tz);
+    let daily = metrics::daily_totals(&all_events, tz, day_start);
     let days = daily.keys().copied().collect();
     let streaks = metrics::streaks(&days, today);
     let monthly = monthly_totals(&daily, today);
     let cumulative = cumulative_time(&daily);
     // One whole-history session pass, shared by the records card and the
     // recap's session count.
-    let all_sessions = session_summary(&all_events, tz);
+    let all_sessions = session_summary(&all_events, tz, day_start);
     let records = personal_records(&all_sessions, &daily);
     let finished_works: std::collections::HashSet<(String, String)> = entries
         .iter()
@@ -532,9 +538,9 @@ pub fn overview_base<Tz: TimeZone>(
         daily,
         streaks,
         records,
-        forgotten: forgotten_books(entries, tz, today),
+        forgotten: forgotten_books(entries, tz, day_start, today),
         recap,
-        finished_books: finished_timeline(entries, tz),
+        finished_books: finished_timeline(entries, tz, day_start),
         monthly,
         cumulative,
         series: series_breakdown(entries),
@@ -545,7 +551,7 @@ pub fn overview_base<Tz: TimeZone>(
 /// Computes the overview from a cached [`OverviewBase`]. `window_days =
 /// None` means all-time; `Some(n)` scopes the totals tiles and the
 /// behaviour charts (hourly, speed, sessions, weekday) to the last `n`
-/// *calendar* days ending today (not "last n days with data",
+/// *logical* days ending today (not "last n days with data",
 /// Kodashboard's KPI bug). The whole-history sections (streaks, year
 /// heatmap, monthly) come straight from the base: windowing a streak or a
 /// year grid would just lie.
@@ -553,12 +559,13 @@ pub fn overview_windowed<Tz: TimeZone>(
     base: &OverviewBase,
     entries: &[Rc<LibraryEntry>],
     tz: &Tz,
+    day_start: DayStart,
     today: NaiveDate,
     window_days: Option<i64>,
 ) -> Overview {
     let cutoff = window_days.map(|n| today - Duration::days(n - 1));
     let in_window =
-        |e: &PageEvent| cutoff.is_none_or(|c| metrics::local_date(e.start_time, tz) >= c);
+        |e: &PageEvent| cutoff.is_none_or(|c| logical_date(e.start_time, tz, day_start) >= c);
     let windowed: Vec<PageEvent> = base
         .all_events
         .iter()
@@ -603,7 +610,7 @@ pub fn overview_windowed<Tz: TimeZone>(
     };
 
     let speed_bucket = speed_bucket_for(windowed_daily.keys().next().copied(), today);
-    let speed = metrics::speed_series(&windowed, tz, speed_bucket)
+    let speed = metrics::speed_series(&windowed, tz, speed_bucket, day_start)
         .into_iter()
         .collect();
 
@@ -617,7 +624,7 @@ pub fn overview_windowed<Tz: TimeZone>(
             .all_events
             .iter()
             .filter(|e| {
-                let d = metrics::local_date(e.start_time, tz);
+                let d = logical_date(e.start_time, tz, day_start);
                 d >= prev_start && d <= prev_end
             })
             .map(|e| e.duration)
@@ -639,13 +646,13 @@ pub fn overview_windowed<Tz: TimeZone>(
             .max_by_key(|(_, t)| t.seconds)
             .map(|(d, t)| (*d, t.seconds)),
         weekday_avg_secs: weekday_averages(&windowed_daily, weekday_since, today),
-        hourly: metrics::hourly_profile(&windowed, tz),
+        hourly: metrics::hourly_profile(&windowed, tz, day_start),
         monthly: base.monthly.clone(),
         speed,
         speed_bucket,
         speed_by_hour: metrics::speed_by_hour(&windowed, tz),
         cumulative: base.cumulative.clone(),
-        sessions: session_summary(&windowed, tz),
+        sessions: session_summary(&windowed, tz, day_start),
         daily: base.daily.clone(),
         streaks: base.streaks,
         series: base.series.clone(),
@@ -715,7 +722,11 @@ fn next_month(month: NaiveDate) -> NaiveDate {
     }
 }
 
-pub fn session_summary<Tz: TimeZone>(events: &[PageEvent], tz: &Tz) -> SessionSummary {
+pub fn session_summary<Tz: TimeZone>(
+    events: &[PageEvent],
+    tz: &Tz,
+    day_start: DayStart,
+) -> SessionSummary {
     let sessions = metrics::sessions(events, colophon_core::model::DEFAULT_SESSION_GAP_SECS);
     if sessions.is_empty() {
         return SessionSummary::default();
@@ -759,7 +770,7 @@ pub fn session_summary<Tz: TimeZone>(events: &[PageEvent], tz: &Tz) -> SessionSu
             .single()
             .expect("epoch timestamp maps to exactly one instant");
         starts_by_hour[chrono::Timelike::hour(&local) as usize] += 1;
-        active_days.insert(local.date_naive());
+        active_days.insert(logical_date(session.start_time, tz, day_start));
     }
     let per_active_day = sessions.len() as f64 / active_days.len().max(1) as f64;
 
@@ -768,7 +779,7 @@ pub fn session_summary<Tz: TimeZone>(events: &[PageEvent], tz: &Tz) -> SessionSu
         median_secs: lengths[lengths.len() / 2],
         typical_secs,
         longest_secs: longest.seconds,
-        longest_date: Some(metrics::local_date(longest.start_time, tz)),
+        longest_date: Some(logical_date(longest.start_time, tz, day_start)),
         histogram,
         starts_by_hour,
         per_active_day,
@@ -1042,14 +1053,19 @@ pub struct Momentum {
     pub detail: String,
 }
 
-pub fn book_detail<Tz: TimeZone>(entry: &LibraryEntry, tz: &Tz, today: NaiveDate) -> BookDetail {
+pub fn book_detail<Tz: TimeZone>(
+    entry: &LibraryEntry,
+    tz: &Tz,
+    day_start: DayStart,
+    today: NaiveDate,
+) -> BookDetail {
     let book = &entry.book;
     let events = &entry.events;
 
     let dates: std::collections::BTreeSet<NaiveDate> = events
         .iter()
         .filter(|e| e.duration > 0)
-        .map(|e| local_date(e.start_time, tz))
+        .map(|e| logical_date(e.start_time, tz, day_start))
         .collect();
     let days_reading = dates.len();
 
@@ -1078,7 +1094,7 @@ pub fn book_detail<Tz: TimeZone>(entry: &LibraryEntry, tz: &Tz, today: NaiveDate
         _ => "low",
     });
 
-    let momentum = reading_momentum(events, tz, today);
+    let momentum = reading_momentum(events, tz, day_start, today);
 
     BookDetail {
         total_secs: book.total_read_time,
@@ -1109,6 +1125,7 @@ pub fn book_detail<Tz: TimeZone>(entry: &LibraryEntry, tz: &Tz, today: NaiveDate
 fn reading_momentum<Tz: TimeZone>(
     events: &[PageEvent],
     tz: &Tz,
+    day_start: DayStart,
     today: NaiveDate,
 ) -> Option<Momentum> {
     let last_start = today - Duration::days(6);
@@ -1118,7 +1135,7 @@ fn reading_momentum<Tz: TimeZone>(
         events
             .iter()
             .filter(|e| {
-                let d = local_date(e.start_time, tz);
+                let d = logical_date(e.start_time, tz, day_start);
                 d >= lo && d <= hi
             })
             .map(|e| e.duration)
@@ -1182,8 +1199,8 @@ mod tests {
         today: NaiveDate,
         window_days: Option<i64>,
     ) -> Overview {
-        let base = overview_base(entries, tz, today);
-        overview_windowed(&base, entries, tz, today, window_days)
+        let base = overview_base(entries, tz, DayStart::MIDNIGHT, today);
+        overview_windowed(&base, entries, tz, DayStart::MIDNIGHT, today, window_days)
     }
 
     fn entry(events: Vec<PageEvent>) -> Rc<LibraryEntry> {
@@ -1355,7 +1372,7 @@ mod tests {
                 events.push(ev(i + 1, ts(2026, 7, day, 10) + i * 60, 60));
             }
         }
-        let summary = session_summary(&events, &Utc);
+        let summary = session_summary(&events, &Utc, DayStart::MIDNIGHT);
         assert_eq!(summary.count, 3);
         assert_eq!(summary.median_secs, 20 * 60);
         // Most reading time is in the 90-min session, so that is the typical.
@@ -1377,7 +1394,7 @@ mod tests {
                 events.push(ev(i + 1, ts(2026, 6, d, 8) + i * 60, 60));
             }
         }
-        let s = session_summary(&events, &Utc);
+        let s = session_summary(&events, &Utc, DayStart::MIDNIGHT);
         // The plain median is dragged to the tiny end (would read "Sipper")...
         assert_eq!(s.median_secs, 60);
         // ...but the time-weighted typical reflects the real 20-minute reads.
@@ -1436,7 +1453,7 @@ mod tests {
             ev(3, ts(2026, 7, 2, 10), 60),
         ];
         events.sort_by_key(|e| e.start_time);
-        let summary = session_summary(&events, &Utc);
+        let summary = session_summary(&events, &Utc, DayStart::MIDNIGHT);
         assert_eq!(summary.count, 3);
         assert_eq!(summary.starts_by_hour[10], 2);
         assert_eq!(summary.starts_by_hour[21], 1);
@@ -1460,6 +1477,42 @@ mod tests {
     }
 
     #[test]
+    fn day_start_moves_the_bucket_boundary_everywhere() {
+        // One sitting spanning midnight: 2026-07-01 23:30 and 2026-07-02
+        // 00:30. Under a 04:00 day start both events share the logical
+        // day 2026-07-01, which moves the daily map, the windowed
+        // overview, and the book's last-read date together; midnight
+        // keeps the plain two-day split.
+        let events = vec![
+            ev(1, ts(2026, 7, 1, 23) + 1800, 600),
+            ev(2, ts(2026, 7, 2, 0) + 1800, 600),
+        ];
+        let entries = vec![entry(events)];
+        let day_start = DayStart(4 * 60);
+
+        let base = overview_base(&entries, &Utc, day_start, date("2026-07-02"));
+        assert_eq!(base.daily.len(), 1);
+        assert!(base.daily.contains_key(&date("2026-07-01")));
+
+        let overview = overview_windowed(
+            &base,
+            &entries,
+            &Utc,
+            day_start,
+            date("2026-07-02"),
+            Some(30),
+        );
+        assert_eq!(overview.total_secs, 1200);
+        assert_eq!(overview.active_days, 1);
+
+        let detail = book_detail(&entries[0], &Utc, day_start, date("2026-07-02"));
+        assert_eq!(detail.last_date, Some(date("2026-07-01")));
+
+        let base_midnight = overview_base(&entries, &Utc, DayStart::MIDNIGHT, date("2026-07-02"));
+        assert_eq!(base_midnight.daily.len(), 2);
+    }
+
+    #[test]
     fn book_detail_uses_koreader_estimate_math() {
         // 50 view-pages read in 5000 s capped over one day; avg_time =
         // 100 s/page; 50 pages left => 5000 s left; per-day = 5000 =>
@@ -1468,7 +1521,7 @@ mod tests {
             .map(|p| ev(p, ts(2026, 7, 3, 8) + p * 100, 100))
             .collect();
         let e = entry(events);
-        let d = book_detail(&e, &Utc, date("2026-07-03"));
+        let d = book_detail(&e, &Utc, DayStart::MIDNIGHT, date("2026-07-03"));
         assert_eq!(d.days_reading, 1);
         assert_eq!(d.avg_secs_per_page, Some(100.0));
         assert_eq!(d.est_secs_left, Some(5000));
@@ -1657,8 +1710,8 @@ mod tests {
         for p in 6..=20 {
             events.push(ev(p, ts(2026, 6, 2, 8) + (p - 6) * 130, 120));
         }
-        let daily = metrics::daily_totals(&events, &Utc);
-        let sessions = session_summary(&events, &Utc);
+        let daily = metrics::daily_totals(&events, &Utc, DayStart::MIDNIGHT);
+        let sessions = session_summary(&events, &Utc, DayStart::MIDNIGHT);
         let records = personal_records(&sessions, &daily);
         assert_eq!(records.biggest_day_date, Some(date("2026-06-02")));
         assert_eq!(records.biggest_day_secs, 1800);
@@ -1687,7 +1740,7 @@ mod tests {
             mk("TwoFile", 1, 40),  // old copy of a work,
             mk("TwoFile", 25, 30), // recent copy dates the work -> not forgotten
         ];
-        let forgotten = forgotten_books(&entries, &Utc, today);
+        let forgotten = forgotten_books(&entries, &Utc, DayStart::MIDNIGHT, today);
         assert_eq!(
             forgotten
                 .iter()
@@ -1772,7 +1825,7 @@ mod tests {
             mk("Late", 20, 100), // read to the end on Jul 20 -> finished
             mk("WIP", 10, 40),   // unfinished -> excluded
         ];
-        let tl = finished_timeline(&entries, &Utc);
+        let tl = finished_timeline(&entries, &Utc, DayStart::MIDNIGHT);
         assert_eq!(
             tl.iter().map(|f| f.title.as_str()).collect::<Vec<_>>(),
             ["Late", "Early"] // most-recent finish first
@@ -1787,7 +1840,9 @@ mod tests {
         // A page turn of `secs` on a given July day. Last 7d = Jul 14..20,
         // previous 7d = Jul 7..13.
         let day = |d: u32, secs: i64| ev(1, ts(2026, 7, d, 8), secs);
-        let label = |events: &[PageEvent]| reading_momentum(events, &Utc, today).map(|m| m.label);
+        let label = |events: &[PageEvent]| {
+            reading_momentum(events, &Utc, DayStart::MIDNIGHT, today).map(|m| m.label)
+        };
         assert_eq!(label(&[day(15, 200), day(9, 100)]), Some("Picking up"));
         assert_eq!(label(&[day(15, 100), day(9, 300)]), Some("Slowing down"));
         assert_eq!(label(&[day(15, 100), day(9, 100)]), Some("Holding steady"));
@@ -1802,7 +1857,7 @@ mod tests {
             let events: Vec<_> = (1..=n)
                 .map(|d| ev(d, ts(2026, 7, d as u32, 8), 60))
                 .collect();
-            book_detail(&entry(events), &Utc, date("2026-07-20")).est_confidence
+            book_detail(&entry(events), &Utc, DayStart::MIDNIGHT, date("2026-07-20")).est_confidence
         };
         assert_eq!(conf(2), Some("low"));
         assert_eq!(conf(3), Some("medium"));
@@ -1873,7 +1928,7 @@ mod tests {
             declared_status: None,
             annotations: Vec::new(),
         });
-        let d = book_detail(&e, &Utc, date("2026-07-03"));
+        let d = book_detail(&e, &Utc, DayStart::MIDNIGHT, date("2026-07-03"));
         assert_eq!(d.days_reading, 0);
         assert_eq!(d.avg_secs_per_page, None);
         assert_eq!(d.est_finish, None);
@@ -1912,11 +1967,11 @@ mod tests {
             titled_work("Same Title", "Author A", true, false),
             titled_work("Same Title", "Author B", false, true),
         ];
-        let forgotten = forgotten_books(&entries, &Utc, today());
+        let forgotten = forgotten_books(&entries, &Utc, DayStart::MIDNIGHT, today());
         assert_eq!(forgotten.len(), 1, "the abandoned work must survive");
         assert_eq!(forgotten[0].author, "Author B");
 
-        let tl = finished_timeline(&entries, &Utc);
+        let tl = finished_timeline(&entries, &Utc, DayStart::MIDNIGHT);
         assert_eq!(tl.len(), 1, "the finished work must survive");
         assert_eq!(tl[0].author, "Author A");
     }
@@ -1929,7 +1984,7 @@ mod tests {
             titled_work("Jingo", "Terry Pratchett", true, false),
             titled_work("Jingo", "Terry Pratchett", false, true),
         ];
-        let forgotten = forgotten_books(&entries, &Utc, today());
+        let forgotten = forgotten_books(&entries, &Utc, DayStart::MIDNIGHT, today());
         assert_eq!(forgotten.len(), 0);
     }
 }

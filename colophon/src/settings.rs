@@ -11,6 +11,7 @@ use gtk::prelude::*;
 pub const KEY_JUNK_FILTER: &str = "junk-filter";
 pub const KEY_SOURCE_PATH: &str = "source-path";
 pub const KEY_THEME: &str = "theme";
+pub const KEY_DAY_START_MINUTES: &str = "day-start-minutes";
 pub const KEY_WINDOW_WIDTH: &str = "window-width";
 pub const KEY_WINDOW_HEIGHT: &str = "window-height";
 pub const KEY_WINDOW_MAXIMIZED: &str = "window-maximized";
@@ -49,4 +50,14 @@ pub fn theme() -> String {
         .map(|s| s.string(KEY_THEME).to_string())
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| crate::theme::SYSTEM_ID.to_string())
+}
+
+/// The configured reading-day start (spec.md "Day"): the minute past
+/// midnight the reading day begins, 0 = the calendar day. Clamped to
+/// 0..=1439; 0 when unset or schema-less.
+pub fn day_start() -> colophon_core::metrics::DayStart {
+    let minutes = settings()
+        .map(|s| s.int(KEY_DAY_START_MINUTES).clamp(0, 1439))
+        .unwrap_or(0);
+    colophon_core::metrics::DayStart(minutes as u16)
 }

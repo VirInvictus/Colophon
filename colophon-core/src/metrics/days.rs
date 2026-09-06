@@ -21,8 +21,41 @@ pub fn local_date<Tz: TimeZone>(ts: i64, tz: &Tz) -> NaiveDate {
         .date_naive()
 }
 
-/// Per-day aggregates over any set of events, keyed by local date.
-pub fn daily_totals<Tz: TimeZone>(events: &[PageEvent], tz: &Tz) -> BTreeMap<NaiveDate, DayTotal> {
+/// The minute past midnight a reading day starts (0 = the calendar day,
+/// 240 = 04:00). Values above 23:59 clamp down: a day cannot start twice.
+/// Spec.md "Day (logical reading day)".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DayStart(pub u16);
+
+impl DayStart {
+    pub const MIDNIGHT: DayStart = DayStart(0);
+
+    fn seconds(self) -> i64 {
+        i64::from(self.0.min(1439)) * 60
+    }
+}
+
+impl Default for DayStart {
+    fn default() -> Self {
+        Self::MIDNIGHT
+    }
+}
+
+/// The logical reading day a timestamp falls on: the local calendar date
+/// of the timestamp shifted back by the day-start offset, so the small
+/// hours before the day start belong to the previous logical day.
+/// [`DayStart::MIDNIGHT`] reproduces [`local_date`].
+pub fn logical_date<Tz: TimeZone>(ts: i64, tz: &Tz, day_start: DayStart) -> NaiveDate {
+    local_date(ts - day_start.seconds(), tz)
+}
+
+/// Per-day aggregates over any set of events, keyed by logical date
+/// (spec.md "Day": the calendar day under the configured day start).
+pub fn daily_totals<Tz: TimeZone>(
+    events: &[PageEvent],
+    tz: &Tz,
+    day_start: DayStart,
+) -> BTreeMap<NaiveDate, DayTotal> {
     // Accumulator per day: running totals plus the distinct (book, page)
     // and book sets that become the `pages`/`books` counts.
     type Acc = (DayTotal, BTreeSet<(i64, i64)>, BTreeSet<i64>);
@@ -32,7 +65,7 @@ pub fn daily_totals<Tz: TimeZone>(events: &[PageEvent], tz: &Tz) -> BTreeMap<Nai
         if event.duration <= 0 {
             continue;
         }
-        let date = local_date(event.start_time, tz);
+        let date = logical_date(event.start_time, tz, day_start);
         let (total, pages, books) = days.entry(date).or_default();
         total.seconds += event.duration;
         total.events += 1;
@@ -52,8 +85,14 @@ pub fn daily_totals<Tz: TimeZone>(events: &[PageEvent], tz: &Tz) -> BTreeMap<Nai
 /// Weekday x hour-of-day reading profile: seconds per (weekday, hour)
 /// cell, weekday-major with Monday = 0. Each event's whole duration is
 /// attributed to its start hour, matching KOReader's own per-day
-/// histograms (spec.md Tier A "When-do-I-read heatmap").
-pub fn hourly_profile<Tz: TimeZone>(events: &[PageEvent], tz: &Tz) -> [[i64; 24]; 7] {
+/// histograms (spec.md Tier A "When-do-I-read heatmap"). The weekday row
+/// follows the logical day (spec.md "Day"); the hour column stays the
+/// real clock hour.
+pub fn hourly_profile<Tz: TimeZone>(
+    events: &[PageEvent],
+    tz: &Tz,
+    day_start: DayStart,
+) -> [[i64; 24]; 7] {
     let mut grid = [[0i64; 24]; 7];
     for event in events {
         if event.duration <= 0 {
@@ -63,7 +102,9 @@ pub fn hourly_profile<Tz: TimeZone>(events: &[PageEvent], tz: &Tz) -> [[i64; 24]
             .timestamp_opt(event.start_time, 0)
             .single()
             .expect("epoch timestamp maps to exactly one instant");
-        let weekday = local.date_naive().weekday().num_days_from_monday() as usize;
+        let weekday = logical_date(event.start_time, tz, day_start)
+            .weekday()
+            .num_days_from_monday() as usize;
         let hour = chrono::Timelike::hour(&local) as usize;
         grid[weekday][hour] += event.duration;
     }
@@ -145,7 +186,7 @@ mod tests {
                 total_pages: 100,
             },
         ];
-        let grid = hourly_profile(&events, &Utc);
+        let grid = hourly_profile(&events, &Utc, DayStart::MIDNIGHT);
         assert_eq!(grid[3][21], 180);
         assert_eq!(grid[3][22], 0);
         assert_eq!(grid.iter().flatten().sum::<i64>(), 180);
@@ -166,9 +207,9 @@ mod tests {
             total_pages: 100,
         }];
         let toronto = chrono::FixedOffset::west_opt(4 * 3600).unwrap();
-        let grid = hourly_profile(&events, &toronto);
+        let grid = hourly_profile(&events, &toronto, DayStart::MIDNIGHT);
         assert_eq!(grid[3][21], 60); // Thursday 21:00 local
-        assert_eq!(hourly_profile(&events, &Utc)[4][1], 60); // Friday 01:00 UTC
+        assert_eq!(hourly_profile(&events, &Utc, DayStart::MIDNIGHT)[4][1], 60); // Friday 01:00 UTC
     }
 
     #[test]
@@ -181,6 +222,66 @@ mod tests {
         assert_eq!(local_date(ts, &Utc), d("2026-07-03"));
         let toronto = chrono::FixedOffset::west_opt(4 * 3600).unwrap();
         assert_eq!(local_date(ts, &toronto), d("2026-07-02"));
+    }
+
+    #[test]
+    fn logical_date_shifts_small_hours_into_the_previous_day() {
+        // Under a 04:00 day start, 01:00 belongs to the previous day and
+        // 04:00 starts the new one; midnight reproduces the plain date.
+        let early = Utc
+            .with_ymd_and_hms(2026, 7, 3, 1, 0, 0)
+            .unwrap()
+            .timestamp();
+        let at_start = Utc
+            .with_ymd_and_hms(2026, 7, 3, 4, 0, 0)
+            .unwrap()
+            .timestamp();
+        let day_start = DayStart(4 * 60);
+        assert_eq!(logical_date(early, &Utc, day_start), d("2026-07-02"));
+        assert_eq!(logical_date(at_start, &Utc, day_start), d("2026-07-03"));
+        assert_eq!(
+            logical_date(early, &Utc, DayStart::MIDNIGHT),
+            local_date(early, &Utc)
+        );
+    }
+
+    #[test]
+    fn daily_totals_honour_the_day_start() {
+        // 00:30 on 2026-07-02 counts as 2026-07-01 under a 04:00 day start.
+        let ts = Utc
+            .with_ymd_and_hms(2026, 7, 2, 0, 30, 0)
+            .unwrap()
+            .timestamp();
+        let events = vec![PageEvent {
+            book_id: 1,
+            page: 1,
+            start_time: ts,
+            duration: 60,
+            total_pages: 100,
+        }];
+        let totals = daily_totals(&events, &Utc, DayStart(4 * 60));
+        assert_eq!(totals.len(), 1);
+        assert!(totals.contains_key(&d("2026-07-01")));
+    }
+
+    #[test]
+    fn hourly_profile_shifts_the_weekday_but_keeps_real_hours() {
+        // 01:00 UTC Friday is the 04:00 day start's Thursday, at the real
+        // 01:00 column.
+        let ts = Utc
+            .with_ymd_and_hms(2026, 7, 3, 1, 0, 0)
+            .unwrap()
+            .timestamp();
+        let events = vec![PageEvent {
+            book_id: 1,
+            page: 1,
+            start_time: ts,
+            duration: 60,
+            total_pages: 100,
+        }];
+        let grid = hourly_profile(&events, &Utc, DayStart(4 * 60));
+        assert_eq!(grid[3][1], 60); // Thursday (weekday 3), hour 1
+        assert_eq!(grid[4][1], 0);
     }
 
     #[test]
@@ -220,7 +321,7 @@ mod tests {
                 total_pages: 100,
             },
         ];
-        let totals = daily_totals(&events, &Utc);
+        let totals = daily_totals(&events, &Utc, DayStart::MIDNIGHT);
         assert_eq!(totals.len(), 2);
         let first = totals[&d("2026-07-01")];
         assert_eq!(first.seconds, 100);

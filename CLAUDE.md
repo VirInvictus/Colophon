@@ -13,7 +13,7 @@ it exists: every KOReader stats tool Brandon has found is a web dashboard or
 a self-hosted Docker instance, and he doesn't want that. See `README.md` and
 `spec.md`.
 
-## Where this stands right now (prose written 2026-07-16 at v2.1.0; current release v2.2.0)
+## Where this stands right now (prose written 2026-07-16 at v2.1.0; current release v2.3.0)
 
 **Shipped 2.1.** Phases 0 through 4.6 plus Phase 7 (device auto-pull,
 v1.1.0) and Phase 6 (the de-adwaita migration, v2.0.0) are complete. Two
@@ -23,7 +23,10 @@ discrete interactive controls (`button`/`entry`/`switch`/`scale`
 fire across every widget in the focus chain; **v2.1.0** added the
 speed-by-hour chart and the cumulative reading curve. **v2.2.0**
 (2026-09-04) closed the three latent defects the 2026-08-09 sweep had
-carried, as D1-D3. The
+carried, as D1-D3. **v2.3.0** (2026-09-06) shipped the Phase 5 day-start
+shift: spec "Day" defines the logical reading day, core `DayStart` plumbs
+through every day-bucketed metric, and the `day-start-minutes` GSettings
+key gets a Preferences row. The
 spec is fully built and the app is the portfolio's de-adwaita pilot, the
 template for Atrium/Conservatory/Viaduct/Framework. Scaffolding was
 Sonnet's, everything since is Fable's. The Phase 6e polish tail (tiling

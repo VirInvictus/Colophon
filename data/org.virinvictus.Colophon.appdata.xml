@@ -32,6 +32,11 @@
   </developer>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2.3.0" date="2026-09-06">
+      <description translate="no">
+        <p>Night owls can set when their reading day starts (Preferences). Reading done in the small hours after midnight counts toward the previous day, so one late-night sitting reads as one day in totals, streaks, heatmaps, and time windows; clock hours never move.</p>
+      </description>
+    </release>
     <release version="2.2.0" date="2026-09-04">
       <description translate="no">
         <p>Data-quality fixes from the audit: merged books no longer conflate pagination axes, unknown page counts hide page-derived stats instead of printing zeros, and library-wide aggregations key on the full work identity.</p>
