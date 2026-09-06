@@ -1,5 +1,22 @@
 # Patchnotes
 
+## v2.4.0 (2026-09-06)
+
+Your margins, readable.
+
+- **The annotations browser.** A book whose sidecar you have provided now
+  lists its highlights, notes, and bookmarks on the book page, in book
+  order. Each entry names what it is and where it falls (as a percent of
+  the book), shows the device-captured excerpt wrapped to full width, and
+  your own note beneath it in the dim style; bookmarks, which carry no
+  text, list as their position alone. KOReader stores annotations in the
+  order you made them, so Colophon orders them by where they fall in the
+  book instead. Books without a provided sidecar show nothing new, as
+  always. The activity-strip markers and the counts on the stat cards are
+  unchanged.
+
+Suite 119 green across the workspace; clippy `-D warnings` and fmt clean.
+
 ## v2.3.1 (2026-09-06)
 
 - **The Flatpak build is offline-capable.** Every crate dependency is now

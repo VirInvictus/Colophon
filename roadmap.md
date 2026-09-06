@@ -389,13 +389,20 @@ Still open:
       prorated on-pace line), stats-DB-feasible. **Deliberately declined at
       research time** (Colophon is a stats *viewer*, not a tracker); listed
       only so the decision is on the record. Re-raise on request.
-- [ ] `.sdr` highlight *browser*: browsing parsed highlight/note content
+- [x] `.sdr` highlight *browser*: browsing parsed highlight/note content
       in the UI. *(Re-scoped 2026-09-05: most of this box shipped and the
       old text understated it. The `mlua` dependency ask cleared (vendored,
       `Cargo.toml`), the sandboxed sidecar parser ships
       (`colophon-core/src/sidecar.rs`), the declared-finished
       reconciliation shipped v0.15.0, per-book sidecar attach v0.17.0, and
       annotation markers v0.19.0. What remains is the browser itself.)*
+      *(Shipped v2.4.0, 2026-09-06: spec "Annotation browser" defined the
+      surface first; `sidecar::Annotation` now carries the page, excerpt,
+      and note it was already reading for classification,
+      `stats::annotations_in_book_order` fixes the ordering, and the book
+      page lists entries (kind, rescaled position, wrapped excerpt, dim
+      note) hidden without a provided sidecar. Brandon's hands-on
+      confirmation with the real sample is roadmap 629.)*
 - [ ] Vocabulary-builder widgets ("words looked up per book", lookup
       timeline). Schema already documented (RESEARCH §2); Brandon's
       `vocabulary_builder.sqlite3` is empty, so parked until the feature

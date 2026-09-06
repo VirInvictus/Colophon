@@ -1053,6 +1053,22 @@ pub struct Momentum {
     pub detail: String,
 }
 
+/// Browser order for a book's sidecar annotations (spec.md "Annotation
+/// browser"): book order by rescaled position, ties broken by the
+/// sidecar's own page. KOReader stores annotations in creation order, so
+/// the sort is load-bearing, not cosmetic.
+pub fn annotations_in_book_order(
+    annotations: &[colophon_core::sidecar::Annotation],
+) -> Vec<colophon_core::sidecar::Annotation> {
+    let mut out = annotations.to_vec();
+    out.sort_by(|a, b| {
+        a.position
+            .total_cmp(&b.position)
+            .then_with(|| a.pageno.cmp(&b.pageno))
+    });
+    out
+}
+
 pub fn book_detail<Tz: TimeZone>(
     entry: &LibraryEntry,
     tz: &Tz,
@@ -1510,6 +1526,31 @@ mod tests {
 
         let base_midnight = overview_base(&entries, &Utc, DayStart::MIDNIGHT, date("2026-07-02"));
         assert_eq!(base_midnight.daily.len(), 2);
+    }
+
+    #[test]
+    fn annotations_list_in_book_order_not_creation_order() {
+        use colophon_core::sidecar::{Annotation, AnnotationKind};
+        let mk = |position: f64, pageno: i64, kind: AnnotationKind| Annotation {
+            kind,
+            position,
+            pageno,
+            text: None,
+            note: None,
+        };
+        // The sidecar stores creation order: a bookmark added late sits
+        // behind pages of later highlights.
+        let annos = vec![
+            mk(0.6, 120, AnnotationKind::Highlight),
+            mk(0.2, 40, AnnotationKind::Bookmark),
+            mk(0.4, 80, AnnotationKind::Note),
+        ];
+        let ordered = annotations_in_book_order(&annos);
+        let positions: Vec<f64> = ordered.iter().map(|a| a.position).collect();
+        assert_eq!(positions, vec![0.2, 0.4, 0.6]);
+        assert_eq!(ordered[0].kind, AnnotationKind::Bookmark);
+        // No annotations: nothing to list, the section stays hidden.
+        assert!(annotations_in_book_order(&[]).is_empty());
     }
 
     #[test]

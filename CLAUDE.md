@@ -13,7 +13,7 @@ it exists: every KOReader stats tool Brandon has found is a web dashboard or
 a self-hosted Docker instance, and he doesn't want that. See `README.md` and
 `spec.md`.
 
-## Where this stands right now (prose written 2026-07-16 at v2.1.0; current release v2.3.1)
+## Where this stands right now (prose written 2026-07-16 at v2.1.0; current release v2.4.0)
 
 **Shipped 2.1.** Phases 0 through 4.6 plus Phase 7 (device auto-pull,
 v1.1.0) and Phase 6 (the de-adwaita migration, v2.0.0) are complete. Two
@@ -26,7 +26,12 @@ speed-by-hour chart and the cumulative reading curve. **v2.2.0**
 carried, as D1-D3. **v2.3.0** (2026-09-06) shipped the Phase 5 day-start
 shift: spec "Day" defines the logical reading day, core `DayStart` plumbs
 through every day-bucketed metric, and the `day-start-minutes` GSettings
-key gets a Preferences row. The
+key gets a Preferences row. **v2.3.1** (2026-09-06) vendored the Flatpak
+cargo sources (`generated-sources.json` + `scripts/
+flatpak-cargo-generator.py`), closing the offline-build gap. **v2.4.0**
+(2026-09-06) shipped the annotation browser: `sidecar::Annotation` now
+carries page/excerpt/note and the book page lists them per spec
+"Annotation browser". The
 spec is fully built and the app is the portfolio's de-adwaita pilot, the
 template for Atrium/Conservatory/Viaduct/Framework. Scaffolding was
 Sonnet's, everything since is Fable's. The Phase 6e polish tail (tiling

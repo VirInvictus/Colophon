@@ -153,6 +153,16 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
   same rescale idea as `page_stat`). Kind by KOReader's rule: a bookmark has
   no drawer, a note carries a `note`, otherwise a highlight. Absent a
   sidecar for the book, no markers.
+- **Annotation browser (per book)**: the content view over the same
+  sidecar annotations the markers place. Shown on the book page when the
+  provided sidecar carries annotations; hidden entirely otherwise (the
+  data-provision principle). Entries list in book order, by rescaled
+  position (the sidecar stores them in creation order, not page order).
+  Each entry names its kind with its rescaled position as a percent of
+  the book, shows the device-captured excerpt as wrapped text, and the
+  user's note beneath it in the dim style; a bookmark carries only its
+  kind and position. Text is the sidecar's own, lossily UTF-8-repaired
+  at parse time and never otherwise altered.
 - **Book identity**: `book.md5`. Rows sharing an md5 (metadata edits) are
   merged at ingest. Same-title/author books with different md5s (two
   files of the same work, confirmed in the sample data) are *grouped for
@@ -311,10 +321,9 @@ Nothing below exists in KOReader or any of the four tools.
 
 ### Tier C — deferred until the data or a dependency justifies it
 
-- Highlight/note content browser. The `.sdr` sidecar parser and its `mlua`
-  dependency landed with the finished-status reconciliation (v0.15.0); this
-  now needs only the `annotations` array read out and a browser UI (counts
-  only until then).
+- Highlight/note content browser: shipped as the "Annotation browser"
+  definition (derived-metric definitions), promoted out of this tier; only
+  position markers and counts existed before.
 - Vocabulary-builder widgets (Brandon's `vocabulary_builder.sqlite3` is
   empty; revisit if the feature gets used).
 - Language rollups (schema supports it; Brandon's library is

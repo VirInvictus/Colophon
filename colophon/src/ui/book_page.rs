@@ -45,6 +45,10 @@ mod imp {
         pub completions_title: TemplateChild<gtk::Label>,
         #[template_child]
         pub completion_rows: TemplateChild<gtk::ListBox>,
+        #[template_child]
+        pub annotations_title: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub annotation_rows: TemplateChild<gtk::ListBox>,
     }
 
     #[glib::object_subclass]
@@ -275,6 +279,18 @@ impl BookPage {
                 Some(&dates),
             ));
         }
+
+        // The annotation browser (spec.md "Annotation browser"): the
+        // sidecar's highlights, notes, and bookmarks in book order, with
+        // their content. Hidden entirely without a provided sidecar.
+        let annotations = stats::annotations_in_book_order(&entry.annotations);
+        let has_annotations = !annotations.is_empty();
+        imp.annotations_title.set_visible(has_annotations);
+        imp.annotation_rows.set_visible(has_annotations);
+        imp.annotation_rows.remove_all();
+        for annotation in &annotations {
+            imp.annotation_rows.append(&annotation_row(annotation));
+        }
     }
 
     /// The book's speed trend over the library baseline. Both series
@@ -352,4 +368,53 @@ fn date_range(start: Option<NaiveDate>, last: Option<NaiveDate>) -> Option<Strin
         (Some(s), _) => Some(format!("started {}", short_date(s))),
         _ => None,
     }
+}
+
+/// One annotation-browser row (spec.md "Annotation browser"): kind and
+/// rescaled position as the small dim heading, the device-captured
+/// excerpt as wrapped body text, the user's note dim beneath it. A
+/// bookmark has no text, so only the heading renders for it.
+fn annotation_row(a: &colophon_core::sidecar::Annotation) -> gtk::ListBoxRow {
+    let kind = match a.kind {
+        colophon_core::sidecar::AnnotationKind::Highlight => "Highlight",
+        colophon_core::sidecar::AnnotationKind::Note => "Note",
+        colophon_core::sidecar::AnnotationKind::Bookmark => "Bookmark",
+    };
+    let content = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(4)
+        .margin_top(10)
+        .margin_bottom(10)
+        .margin_start(12)
+        .margin_end(12)
+        .build();
+    let heading = gtk::Label::builder()
+        .label(format!("{kind} \u{b7} {:.0}%", a.position * 100.0))
+        .xalign(0.0)
+        .css_classes(["caption", "dim-label"])
+        .build();
+    content.append(&heading);
+    if let Some(text) = a.text.as_deref().filter(|t| !t.is_empty()) {
+        let excerpt = gtk::Label::builder()
+            .label(text)
+            .xalign(0.0)
+            .wrap(true)
+            .wrap_mode(gtk::pango::WrapMode::WordChar)
+            .build();
+        content.append(&excerpt);
+    }
+    if let Some(note) = a.note.as_deref().filter(|n| !n.is_empty()) {
+        let note_label = gtk::Label::builder()
+            .label(note)
+            .xalign(0.0)
+            .wrap(true)
+            .wrap_mode(gtk::pango::WrapMode::WordChar)
+            .css_classes(["dim-label"])
+            .build();
+        content.append(&note_label);
+    }
+    gtk::ListBoxRow::builder()
+        .activatable(false)
+        .child(&content)
+        .build()
 }

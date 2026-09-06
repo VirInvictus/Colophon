@@ -51,14 +51,22 @@ pub enum AnnotationKind {
     Note,
 }
 
-/// One annotation, reduced to what a position marker needs: its kind and its
-/// fractional position through the book (rescaled off the sidecar's own page
-/// count, so it lands correctly on whatever the current pagination is).
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// One annotation: its kind, its fractional position through the book
+/// (rescaled off the sidecar's own page count, so it lands correctly on
+/// whatever the current pagination is), and the content the annotation
+/// browser shows. `text` is the device-captured excerpt, `note` the
+/// user's note; a bookmark carries neither.
+#[derive(Debug, Clone, PartialEq)]
 pub struct Annotation {
     pub kind: AnnotationKind,
     /// Position in `[0, 1]` through the book.
     pub position: f64,
+    /// The page in the sidecar's own pagination.
+    pub pageno: i64,
+    /// The highlighted excerpt, when the device captured one.
+    pub text: Option<String>,
+    /// The user's note attached to the annotation.
+    pub note: Option<String>,
 }
 
 /// The fields Colophon reads from a sidecar. All optional: sidecars vary by
@@ -122,15 +130,21 @@ fn parse_annotations(arr: Table, doc_pages: i64) -> mlua::Result<Vec<Annotation>
         let text = a.get::<Option<String>>("text")?;
         let drawer = a.get::<Option<String>>("drawer")?;
         // getBookmarkType precedence: note wins, then highlight, else bookmark.
-        let kind = if note.is_some_and(|n| !n.is_empty()) {
+        let kind = if note.as_deref().is_some_and(|n| !n.is_empty()) {
             AnnotationKind::Note
-        } else if drawer.is_some() || text.is_some_and(|t| !t.is_empty()) {
+        } else if drawer.is_some() || text.as_deref().is_some_and(|t| !t.is_empty()) {
             AnnotationKind::Highlight
         } else {
             AnnotationKind::Bookmark
         };
         let position = (pageno as f64 / doc_pages as f64).clamp(0.0, 1.0);
-        out.push(Annotation { kind, position });
+        out.push(Annotation {
+            kind,
+            position,
+            pageno,
+            text,
+            note,
+        });
     }
     Ok(out)
 }
@@ -222,6 +236,32 @@ mod tests {
         assert!((meta.annotations[0].position - 0.5).abs() < 1e-9);
         assert_eq!(meta.annotations[1].kind, AnnotationKind::Note);
         assert_eq!(meta.annotations[2].kind, AnnotationKind::Bookmark);
+    }
+
+    #[test]
+    fn annotations_carry_their_content_through() {
+        // The browser shows the excerpt and note verbatim, and the page
+        // the sidecar recorded, alongside the rescaled position.
+        let chunk = br#"
+            return {
+                ["doc_pages"] = 200,
+                ["annotations"] = {
+                    { ["pageno"] = 50, ["drawer"] = "lighten", ["text"] = "the excerpt" },
+                    { ["pageno"] = 80, ["text"] = "another", ["note"] = "why I marked it" },
+                    { ["pageno"] = 10 },
+                },
+            }
+        "#;
+        let meta = parse_sidecar_bytes(chunk).unwrap();
+        assert_eq!(meta.annotations[0].text.as_deref(), Some("the excerpt"));
+        assert_eq!(meta.annotations[0].note, None);
+        assert_eq!(meta.annotations[0].pageno, 50);
+        assert_eq!(meta.annotations[1].note.as_deref(), Some("why I marked it"));
+        assert_eq!(meta.annotations[1].pageno, 80);
+        assert_eq!(meta.annotations[2].text, None);
+        assert_eq!(meta.annotations[2].note, None);
+        assert_eq!(meta.annotations[2].pageno, 10);
+        assert!((meta.annotations[0].position - 0.25).abs() < 1e-9);
     }
 
     #[test]

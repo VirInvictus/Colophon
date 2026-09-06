@@ -32,6 +32,11 @@
   </developer>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2.4.0" date="2026-09-06">
+      <description translate="no">
+        <p>Books with a provided sidecar now list their highlights, notes, and bookmarks on the book page, in book order, with the highlighted text and your notes readable in full.</p>
+      </description>
+    </release>
     <release version="2.3.1" date="2026-09-06">
       <description translate="no">
         <p>Packaging: all crate dependencies are vendored into the Flatpak build, so it needs no network access (verified with a local offline build). Nothing about the app itself changed.</p>
