@@ -1,4 +1,6 @@
-# v2.2.0 (2026-09-04)
+# Patchnotes
+
+## v2.2.0 (2026-09-04)
 
 **Data-quality fixes from the 2026-09-04 audit (D1-D3), each with its spec
 amendment as the first step.**
@@ -27,10 +29,7 @@ amendment as the first step.**
   untouched; the Jingo one-work-two-files case has a test proving the fix
   doesn't overshoot.
 
-Suite 112 green across the workspace; clippy `-D warnings`, fmt, and
-pyright strict all clean.
-
-# Patchnotes
+Suite 112 green across the workspace; clippy `-D warnings` and fmt clean.
 
 ## v2.1.1 — 2026-08-09
 
