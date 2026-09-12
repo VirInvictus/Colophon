@@ -375,6 +375,7 @@ deps, on-contract):
 Still open:
 
 - [ ] **Word-count axis (the big one; needs a scope decision).** Tome's
+  *(DECIDED 2026-09-12 (Brandon): GO, with a new scoped zip/epub dependency for the counter; reads stay explicit-path, so the never-discovers rule holds and the library-files grant rides this decision.)*
       largest capability delta (`RESEARCH.md` §5.5): true words-per-minute
       (pagination-independent, unlike Colophon's pages/hour), lifetime
       words-read, and a book-length distribution — and it unlocks two more
@@ -725,9 +726,9 @@ is not on the table. This is a *version* bump inside the GNOME runtime.
       `flatpak-builder` run against the GNOME 50 manifest succeeded and the
       built binary runs (`--run ... colophon --help` exits 0); the build
       sandbox has no network, so cargo demonstrably resolved everything
-      from the vendored sources. App-id unchanged pending the
-      org-vs-io.github split decision.)*
-
+      from the vendored sources. App-id migrates to
+      io.github.virinvictus.Colophon per the 2026-09-12 workspace decision
+      (Brandon); the rename and the Flathub prep ride the next Colophon lane.
 ## Known defects — carried 2026-08-09, closed in v2.2.0 (D1-D3)
 
 *(All three closed in v2.2.0; the text below is the 2026-08-09 record,
