@@ -840,3 +840,29 @@ and are in `patchnotes.md`.
       the *opposite* case (one work, two files, one author) and must keep
       collapsing to one — worth an assertion so the fix doesn't overshoot.
 
+
+## New findings 2026-09-12 (six-lens full audit; detail: audit/FULL-AUDIT-2026-09-12.md, Wave 24)
+
+- [ ] **The v2.2.0 leave-recorded call lives only in a commit message:**
+      add one parenthetical to the Known-defects block ("the pushed
+      v2.2.0 tag keeps its recorded message as history; no force-push,
+      decided 2026-09-12") so the decision survives outside git log.
+- [ ] **CLAUDE.md staleness (sync in the word-count lane's first
+      commit):** CLAUDE.md:40-42 still says the word-count axis needs a
+      decision (it was GO'd 2026-09-12, roadmap Phase 5); CLAUDE.md:88-89
+      still says Flathub is blocked on the app-id split (decided).
+- [ ] **Rename-lane riders:** DBusActivatable=true with no D-Bus service
+      file installed (drop the key or install the .service); scan_sidecars
+      is public API unused by the app (#[cfg(test)] or delete); restore
+      the blank line before ## Known defects.
+- [ ] **Blitz candidates:** the word-count lane (spec amendment first;
+      the scoped zip/epub dep regenerates generated-sources.json;
+      explicit-path provision reuses the sidecar/remembered-origin
+      pattern; deliverables: WPM, lifetime words, length distribution,
+      Length+Pace axes); the app-id rename (~12 sites + the GSettings
+      path reset note); the hands-on pass closes Phase 6e.
+- [ ] **GitHub presentation (workspace batch):** description truncated
+      mid-word at the 350 cap (replacement drafted); zero Releases -
+      `gh release create v2.4.0 --notes-from-tag` (tag messages carry
+      full notes; repeat for v2.3.x/v2.2.0); topics swap (drop
+      gtk4-no-libadwaita-since-v200/mit/rust-2024; add gtk/reading).
