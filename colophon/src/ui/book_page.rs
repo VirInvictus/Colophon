@@ -4,6 +4,7 @@
 //! the estimates run on capped avg_time.
 
 use chrono::NaiveDate;
+use colophon_core::metrics::DayStart;
 use gtk::glib;
 use gtk::prelude::*;
 use gtk::subclass::prelude::*;
@@ -127,7 +128,7 @@ impl BookPage {
         );
     }
 
-    pub fn set_book(&self, entry: &LibraryEntry, detail: &BookDetail) {
+    pub fn set_book(&self, entry: &LibraryEntry, detail: &BookDetail, day_start: DayStart) {
         let imp = self.imp();
         let book = &entry.book;
 
@@ -255,15 +256,20 @@ impl BookPage {
         imp.completion_rows.set_visible(has_completions);
         imp.completion_rows.remove_all();
         for (i, completion) in completions.iter().enumerate() {
-            let start = chrono::DateTime::from_timestamp(completion.start_time, 0)
-                .map(|d| short_date(d.with_timezone(&chrono::Local).date_naive()));
-            let end = chrono::DateTime::from_timestamp(completion.end_time, 0)
-                .map(|d| short_date(d.with_timezone(&chrono::Local).date_naive()));
-            let dates = match (start, end) {
-                (Some(s), Some(e)) if s != e => format!("{s} \u{2013} {e}"),
-                (Some(s), _) => s,
-                _ => String::new(),
-            };
+            // Logical days (spec.md "Day"): under a non-midnight day start
+            // a finish just after midnight belongs to the previous reading
+            // day, and the row must say so.
+            let start = colophon_core::metrics::logical_date(
+                completion.start_time,
+                &chrono::Local,
+                day_start,
+            );
+            let end = colophon_core::metrics::logical_date(
+                completion.end_time,
+                &chrono::Local,
+                day_start,
+            );
+            let dates = crate::fmt::date_span(start, end);
             let span_days = ((completion.end_time - completion.start_time) / 86_400).max(0) + 1;
             let value = format!(
                 "{} \u{b7} {} sessions \u{b7} {:.0} pages/hour \u{b7} {:.0} pages/day \u{b7} {:.0}% covered",

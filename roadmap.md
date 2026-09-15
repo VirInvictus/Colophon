@@ -641,12 +641,19 @@ the migration as its verification pass (2026-07-10, v2.0.0).
       the owned sheet contains no `font-family`, enforced by a unit test
       since 6c.
 - [ ] **Hands-on confirmation pass (Brandon, keyboard in hand):** real
-      keypresses for F9 / Escape / Ctrl+question / F8-resize, heatmap
+      keypresses for F9 / Escape / Ctrl+question, heatmap
       tooltips and the book page on a genuine quarter tile, a theme
       live-flip from Preferences, a sidecar attach, and a GNOME-session
       sanity check. Everything scriptable was verified live during the
       migration (D-Bus-driven actions, screenshots across three palettes,
       single-instance re-summon, refresh toast).
+- [ ] **Keyboard sidebar resize (optional, not scheduled).** The
+      shortcuts window advertised "F8, then arrows" but no accelerator
+      ever existed, and GTK 4.22's paned handle is not Tab-reachable
+      (verified live 2026-09-15: a full Tab cycle never focuses the
+      divider). The false row is dropped; actually wiring keyboard
+      resize means an action that focuses the paned handle, verified by
+      the hands-on pass.
 - [x] **Accent focus-flash on a bare modifier press (found via Conservatory,
       2026-07-12).** `theme.rs`'s `*:focus-visible { outline: 1px solid
       var(--c-accent) }` is universal: pressing a bare modifier (e.g. a

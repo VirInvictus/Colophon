@@ -237,22 +237,37 @@ impl ColophonWindow {
     /// source path transitions absent → present (the device got mounted).
     /// Spec "Device auto-pull".
     fn watch_mounts(&self) {
-        let imp = self.imp();
-        imp.device_present
-            .set(settings::source_path().is_some_and(|p| p.exists()));
+        self.probe_device_present();
         let monitor = gio::UnixMountMonitor::get();
         monitor.connect_mounts_changed(glib::clone!(
             #[weak(rename_to = window)]
             self,
             move |_| {
-                let present = settings::source_path().is_some_and(|p| p.exists());
+                window.probe_device_present();
+            }
+        ));
+        self.imp().mount_monitor.replace(Some(monitor));
+    }
+
+    /// Whether the remembered source path currently exists, probed off the
+    /// main thread: the path can live on a FUSE/sshfs mount, where a bare
+    /// `exists()` blocks for as long as the mount hangs, and this runs at
+    /// startup and on every mount-table change. An absent → present
+    /// transition triggers the auto-pull.
+    fn probe_device_present(&self) {
+        let weak = self.downgrade();
+        glib::spawn_future_local(async move {
+            let present =
+                gio::spawn_blocking(move || settings::source_path().is_some_and(|p| p.exists()))
+                    .await
+                    .unwrap_or(false);
+            if let Some(window) = weak.upgrade() {
                 let was = window.imp().device_present.replace(present);
                 if present && !was {
                     window.auto_pull();
                 }
             }
-        ));
-        imp.mount_monitor.replace(Some(monitor));
+        });
     }
 
     /// Re-copy attached sidecars from their remembered origins, then
@@ -265,12 +280,21 @@ impl ColophonWindow {
         let Some(source) = settings::source_path() else {
             return;
         };
-        if !source.exists() {
-            return;
-        }
         let sidecar_dir = paths::sidecar_dir();
         let weak = self.downgrade();
         glib::spawn_future_local(async move {
+            // Same off-main-thread rule as `probe_device_present`: the
+            // source can sit on a hung mount, and this runs on the UI
+            // thread's executor.
+            let readable = gio::spawn_blocking({
+                let source = source.clone();
+                move || source.exists()
+            })
+            .await
+            .unwrap_or(false);
+            if !readable {
+                return;
+            }
             let refreshed = gio::spawn_blocking(move || autopull::refresh_sidecars(&sidecar_dir))
                 .await
                 .unwrap_or(0);
@@ -623,7 +647,7 @@ impl ColophonWindow {
                     return;
                 };
                 let detail = stats::book_detail(entry, &Local, day_start, today);
-                imp.book_page.set_book(entry, &detail);
+                imp.book_page.set_book(entry, &detail, day_start);
 
                 // Speed trend: this book against the library baseline,
                 // bucketed by the library's full span so the series stay

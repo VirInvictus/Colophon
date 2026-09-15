@@ -10,7 +10,6 @@ const SHORTCUTS: &[(&str, &str)] = &[
     ("Import a statistics database", "Ctrl+O"),
     ("Refresh from the last source", "Ctrl+R or F5"),
     ("Show or hide the library sidebar", "F9"),
-    ("Resize the sidebar by keyboard", "F8, then arrows"),
     ("Back to the library list", "Esc"),
     ("Preferences", "Ctrl+Comma"),
     ("Keyboard shortcuts", "Ctrl+? or F1"),

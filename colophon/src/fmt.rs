@@ -51,6 +51,16 @@ pub fn short_date(date: chrono::NaiveDate) -> String {
     )
 }
 
+/// A read-through's calendar span: "Jul 3 – Jul 19", or the single date
+/// when both ends fall on the same day.
+pub fn date_span(start: chrono::NaiveDate, end: chrono::NaiveDate) -> String {
+    if start == end {
+        short_date(start)
+    } else {
+        format!("{} \u{2013} {}", short_date(start), short_date(end))
+    }
+}
+
 /// Hour-of-day (0..=23) as a friendly clock label: "midnight", "noon",
 /// "7 AM", "10 PM".
 pub fn hour_label(hour: u32) -> String {
@@ -102,6 +112,14 @@ mod tests {
         assert_eq!(hour_label(7), "7 AM");
         assert_eq!(hour_label(12), "noon");
         assert_eq!(hour_label(22), "10 PM");
+    }
+
+    #[test]
+    fn date_spans_collapse_to_one_day() {
+        let a: chrono::NaiveDate = "2026-07-03".parse().unwrap();
+        let b: chrono::NaiveDate = "2026-07-19".parse().unwrap();
+        assert_eq!(date_span(a, b), "Jul 3 2026 \u{2013} Jul 19 2026");
+        assert_eq!(date_span(a, a), "Jul 3 2026");
     }
 
     #[test]
