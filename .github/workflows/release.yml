@@ -16,6 +16,12 @@ jobs:
     name: Create the GitHub Release from the tag
     runs-on: ubuntu-latest
     steps:
+      # actions/checkout v5.0.0. Needed because `--notes-from-tag` reads
+      # the annotated tag object from the local git, not the API.
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          fetch-depth: 0
+
       - name: gh release create --notes-from-tag
         env:
           GH_TOKEN: ${{ github.token }}
