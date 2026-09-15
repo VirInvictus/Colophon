@@ -144,23 +144,20 @@ impl StatsDb {
         let Some(canon) = book.pages else {
             return Ok(Vec::new());
         };
+        // Group by the rescale expression, not an alias: the fanned-out
+        // rows still carry the raw `page` column, and SQLite resolves a
+        // bare GROUP BY name to the input column before the alias. The
+        // span division happens per fanned row, before the sum.
         let sql = format!(
-            "SELECT page, SUM(duration) AS secs, SUM(duration > 0) AS reads FROM (
-                 SELECT first_page + idx - 1 AS page,
-                        start_time,
-                        duration / (last_page - first_page + 1) AS duration
-                 FROM (
-                     SELECT page, total_pages, start_time, duration,
-                            ((page - 1) * ?1) / total_pages + 1 AS first_page,
-                            max(((page - 1) * ?1) / total_pages + 1,
-                                (page * ?1) / total_pages) AS last_page
-                     FROM page_stat_data
-                     WHERE id_book IN ({})
-                 )
-                 JOIN (SELECT number AS idx FROM numbers)
-                      ON idx <= (last_page - first_page + 1)
-             ) GROUP BY page ORDER BY page",
-            id_list(book)
+            "SELECT first_page + idx - 1 AS page,
+                    SUM(duration / (last_page - first_page + 1)) AS secs,
+                    SUM(duration > 0) AS reads
+             {}
+             GROUP BY first_page + idx - 1 ORDER BY page",
+            rescale_from(
+                "page, total_pages, start_time, duration",
+                &format!("WHERE id_book IN ({})", id_list(book)),
+            )
         );
         let mut stmt = self.conn.prepare(&sql)?;
         let rows = stmt
@@ -187,21 +184,18 @@ impl StatsDb {
         let Some(canon) = book.pages else {
             return Ok(Vec::new());
         };
-        let sql = "SELECT id_book, first_page + idx - 1 AS page, start_time,
+        let sql = format!(
+            "SELECT id_book, first_page + idx - 1 AS page, start_time,
                     duration / (last_page - first_page + 1) AS duration
-             FROM (
-                 SELECT id_book, page, total_pages, start_time, duration,
-                        ((page - 1) * ?1) / total_pages + 1 AS first_page,
-                        max(((page - 1) * ?1) / total_pages + 1,
-                            (page * ?1) / total_pages) AS last_page
-                 FROM page_stat_data
-                 WHERE id_book = ?2
-             )
-             JOIN (SELECT number AS idx FROM numbers)
-                  ON idx <= (last_page - first_page + 1)
-             ORDER BY start_time";
+             {}
+             ORDER BY start_time",
+            rescale_from(
+                "id_book, page, total_pages, start_time, duration",
+                "WHERE id_book = ?2"
+            )
+        );
         let mut out = Vec::new();
-        let mut stmt = self.conn.prepare(sql)?;
+        let mut stmt = self.conn.prepare(&sql)?;
         for id in &book.all_ids {
             let rows = stmt
                 .query_map(rusqlite::params![canon, id], |row| {
@@ -229,6 +223,33 @@ fn id_list(book: &Book) -> String {
         .map(|id| id.to_string())
         .collect::<Vec<_>>()
         .join(",")
+}
+
+/// The D1 canonical-rescale body shared by `page_totals` and
+/// `rescaled_events`, so the repo's most delicate query exists in exactly
+/// one place. Fans every raw row of the merged book out through the
+/// `numbers` tally onto the canonical page count (`?1`), the one axis;
+/// `inner_cols` picks up `id_book` for the callers that need it and
+/// `where_clause` scopes the book's row ids (`= ?2` or `IN (...)`).
+/// Zero-`total_pages` rows drop out here, exactly as they did in the old
+/// view (the division yields NULL and the fan-out predicate rejects).
+/// Callers project the rescaled page and divide `duration` by the span
+/// (`last_page - first_page + 1`) themselves; a caller that aggregates
+/// must group by the expression, never by the `page` name, which still
+/// resolves to the raw column inside the fan-out.
+fn rescale_from(inner_cols: &str, where_clause: &str) -> String {
+    format!(
+        "FROM (
+             SELECT {inner_cols},
+                    ((page - 1) * ?1) / total_pages + 1 AS first_page,
+                    max(((page - 1) * ?1) / total_pages + 1,
+                        (page * ?1) / total_pages) AS last_page
+             FROM page_stat_data
+             {where_clause}
+         )
+         JOIN (SELECT number AS idx FROM numbers)
+              ON idx <= (last_page - first_page + 1)"
+    )
 }
 
 fn event_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PageEvent> {
