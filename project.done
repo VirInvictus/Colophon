@@ -1,0 +1,64 @@
+# Colophon — project.done
+
+Completed: 2026-09-15 (THE FINAL BLITZ).
+
+## What shipped
+
+The final audit's ranked list, executed top-down, plus every gate
+answer Brandon gave during the blitz:
+
+- **v2.4.1, the hardening release.** The corrupt-database timestamp
+  panic guard (events bound once in load_snapshot), staged imports
+  validated by a full load before promote (with the end-to-end
+  promote-refuses test; rusqlite as an approved dev-dependency), the
+  year-heatmap tooltip books count, off-main-thread source-path
+  probes, day-start-aware read-through dates, and the false F8
+  shortcuts row dropped. Under it: the ten-site D1 comment-drift
+  family synced, the D1 rescale SQL deduplicated into one body, the
+  CLAUDE.md sync (word-count GO, app-id decision, 6e remainder, house
+  file pointer), the spec/README/RESEARCH truth fixes, the em-dash
+  sweep across the working document set, MSRV 1.85, SHA-pinned CI on
+  a versioned Fedora 44 container, the cargo-deny advisory gate,
+  SECURITY.md, dependabot (actions-only), a justfile, .gitattributes,
+  the recorded no-pin toolchain decision, and the approved removals
+  (scan_sidecars, all_events; rescaled_events kept and marked
+  baseline-only; DBusActivatable dropped).
+- **v2.5.0, the feature train.** The year heatmap's year pager
+  (replacing the silent 52-week rolling window), the per-year recap
+  variant, and the cross-book annotation browser.
+- **v2.6.0, the word-count axis.** EPUBs provisioned on the sidecar
+  pattern (explicit path, partial-MD5 verified, cached, origin
+  remembered for auto-pull), words in book / words read / true WPM on
+  the book page, lifetime words and the length distribution on the
+  overview, and the Length and Pace personality traits. The granted
+  zip dependency rides with its vendored crates.
+- **GitHub side.** Releases created for v2.2.0 through v2.4.0, the
+  truncated description replaced (319 chars), topics swapped, and
+  release.yml cutting Releases from tags automatically (proven on
+  v2.5.0 and v2.6.0). The social preview is composed from logo.svg at
+  ~/Pictures/colophon-social-preview.png for a one-drag manual upload
+  (GitHub has no API for it).
+- The live sample was refreshed from the device (Brandon mounted the
+  Kindle), which surfaced KOReader's cached-total drift (23 s on
+  Jingo), recorded as a dated RESEARCH amendment.
+
+Suite 134 tests green (+1 ignored perf harness); clippy -D warnings,
+fmt clean, CI (fmt/clippy/advisories/test) green on every pushed
+commit. Tags v2.4.1/v2.5.0/v2.6.0 cut verbatim from their patchnotes
+entries and verified with git cat-file before pushing.
+
+## Reopen conditions (recorded future work, not open work)
+
+- The app-id rename + Flathub prep train (decided: io.github.
+  virinvictus.Colophon) and the S-sized wins (rollup click-through
+  navigation, library search) keep their recorded places.
+- Flathub submission follows the word-count lane, in a screenshot
+  session with Brandon; the metainfo screenshot slots and a full
+  offline flatpak-builder re-verification ride that session.
+- Phase 6e hands-on confirmation pass (Brandon, keyboard in hand).
+- Estimate-accuracy card: recorded as the next Tier A candidate.
+- Declined and recorded (do not re-raise): export PNG/CSV,
+  dragon-themer integration / custom palettes, reading goals.
+- README screenshot refresh (predates v2.5.0) and the social-preview
+  upload ride the next visual session.
+- Keyboard sidebar resize stays optional (roadmap 6e box).
