@@ -1,5 +1,5 @@
 //! A simple vertical bar chart: labels below, values above, the maximum
-//! bar highlighted (spec.md Tier B #11 wants the weekday/monthly
+//! bar highlighted (spec.md Tier B #14 wants the weekday/monthly
 //! distributions; this widget serves both).
 
 use std::cell::RefCell;

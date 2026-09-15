@@ -167,9 +167,9 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
   merged at ingest. Same-title/author books with different md5s (two
   files of the same work, confirmed in the sample data) are *grouped for
   display only*, never merged in data.
-- **Junk filter**: books below a minimum total read time (default 5
-  minutes, configurable) are hidden from library-wide widgets by default;
-  they remain queryable.
+- **Junk filter**: books below a minimum total read time (fixed at 5
+  minutes; the threshold is a compile-time constant, not a setting) are
+  hidden from library-wide widgets by default; they remain queryable.
 - **Rollups (series, author)**: whole-library groupings, window-independent
   (they use `book.total_read_time`, KOReader's cached all-time per-book
   total, so a time-window selection never touches them). *Series* groups by
@@ -265,9 +265,12 @@ Nothing below exists in KOReader or any of the four tools.
 2. **When-do-I-read heatmap.** Weekday x hour-of-day grid (7x24), whole
    history or windowed, cell intensity = total time. The aggregate profile
    KOReader only shows one day at a time.
-3. **Session analytics.** Session-length histogram, sessions-per-day,
-   start-time patterns, records (longest session, most sessions in a day),
-   average session by weekday.
+3. **Session analytics.** Session-length histogram, sessions per active
+   day, and start-time patterns as a starts-by-hour chart, with caption
+   records (count, median, longest, dated). *Amended 2026-09-15 to the
+   shipped scope: the originally listed "most sessions in a day" and
+   "average session by weekday" were never built; all-time bests live on
+   the Records card (Tier B #16) and the weekday bars are Tier B #14.*
 4. **Book velocity.** For one book: time spent per page position (via the
    `page_stat` view so the axis is stable), plus pace-per-day through each
    read. Answers "did it drag in the middle".
@@ -292,29 +295,32 @@ Nothing below exists in KOReader or any of the four tools.
 
 ### Tier B — expected furniture (table stakes, done well)
 
-7. **Year heatmap calendar.** GitHub-style day grid, quantized intensity
-   levels (not continuous alpha), tooltips with time + pages + books.
-8. **Streaks.** Current/longest day streak with date ranges.
-9. **Library totals.** Total time, unique pages, books touched, active
-   days, busiest day/month records. Windowed (30/90/365/all).
-10. **Per-book stat cards.** A positional progress span bar (read regions
+*Renumbered 2026-09-15 (10-17; was 7-14): Tier A grew to nine items and
+the two tiers' numbers collided.*
+
+10. **Year heatmap calendar.** GitHub-style day grid, quantized intensity
+    levels (not continuous alpha), tooltips with time + pages + books.
+11. **Streaks.** Current/longest day streak with date ranges.
+12. **Library totals.** Total time, unique pages, books touched, active
+    days, busiest day/month records. Windowed (30/90/365/all).
+13. **Per-book stat cards.** A positional progress span bar (read regions
     filled, unlogged gaps empty, furthest-position marker, Finished marker
     when the end was reached), total time (both capped and uncapped,
     labelled), days reading, avg time/day, avg time/page, est. time left
     and finish date using KOReader's own math (capped avg_time) so the
     numbers match the device, the estimate's confidence, and a reading-
     momentum read when the book is currently active.
-11. **Weekday and monthly distribution bars.** Weekday averages normalized
+14. **Weekday and monthly distribution bars.** Weekday averages normalized
     by weekdays elapsed (not raw sums; KoInsight's mistake), monthly
     totals.
-12. **Rollups.** Series composition and author affinity as whole-library
+15. **Rollups.** Series composition and author affinity as whole-library
     lists (books, finished count, total time), ranked; each hidden when the
     library carries none of that metadata.
-13. **Records and set-aside.** All-time bests (longest session, biggest day,
+16. **Records and set-aside.** All-time bests (longest session, biggest day,
     most pages in a day, each dated) and a list of unfinished books untouched
     for over a month, most-neglected first. Both whole-history, from data
     already loaded.
-14. **Recap and trend.** A whole-history recap card (books finished,
+17. **Recap and trend.** A whole-history recap card (books finished,
     completion rate, total time, longest streak, sessions, most-active
     month) and, on the windowed total time, a period-over-period change
     against the previous equal-length window.
@@ -342,7 +348,7 @@ Nothing below exists in KOReader or any of the four tools.
 Everything that was blocking: schema (RESEARCH §1), pagination-drift
 handling (§1), KOReader's built-in UI (§4), third-party catalogues (§5),
 `.sdr` sidecar location/format/linkage (§7; structure known from source,
-one real sample still to be copied when the Kindle is next mounted).
+a real sample copied 2026-07-05 and the parser shipped on it).
 
 ## Stack
 

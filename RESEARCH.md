@@ -608,6 +608,13 @@ Colophon design decision (group in UI, never merge in data).
 
 ## 7. The `.sdr` sidecar question (answered from source, sample pending)
 
+> **Amendment 2026-09-15:** the pending sample was copied the next day
+> (2026-07-05): `research/samples/Royal Assassin - Robin Hobb (1705).sdr/
+> metadata.epub.lua` (a finished book carrying one highlight) plus the
+> Jingo dup-title sidecar, both gitignored, and the sandboxed parser
+> shipped against them (v0.15.0 onward). The "sample pending" text below
+> is kept as this section's frozen original.
+
 Structure fully documented from KoShelf's parser + Kodashboard's loader;
 no live sample copied yet (Kindle wasn't mounted this pass; grab
 `<book>.sdr/metadata.epub.lua` for one highlighted book next time it is).
@@ -759,3 +766,6 @@ metrics and the ratings block stay blocked on catalogue metadata and
   the Kindle is next mounted; multi-device merge stays out of scope until
   a second device exists (KoInsight's 4-tuple upsert is the reference if
   it ever does).
+- **Amendment 2026-09-15:** the `.sdr` sample was copied 2026-07-05, the
+  day after this dossier was last touched (see the §7 amendment); that
+  loose end is closed. The multi-device line stands as written.

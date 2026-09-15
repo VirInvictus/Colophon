@@ -1,4 +1,4 @@
-//! Per-book stat cards (spec.md Tier B #10). Numbers that KOReader also
+//! Per-book stat cards (spec.md Tier B #13). Numbers that KOReader also
 //! shows use KOReader's math: the headline time is the capped total (the
 //! device's "time spent reading"), with the uncapped sum alongside, and
 //! the estimates run on capped avg_time.

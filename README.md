@@ -78,8 +78,9 @@ stays hidden until you do.
 Eight palettes (Kanagawa Dragon, Wave, and Lotus; Gruvbox Dark and Light;
 Nord; Rosé Pine; Solarized Light) plus a Follow-system mode. One theme drives
 both the window chrome and the hand-drawn charts; switch it live in
-Preferences (Ctrl+comma). The default is Kanagawa Dragon, matching the rest
-of the [Vir Invictus](https://github.com/VirInvictus) portfolio.
+Preferences (Ctrl+comma). The default is Follow-system, which is Kanagawa
+Dragon on a dark system and Kanagawa Lotus on a light one, matching the
+rest of the [Vir Invictus](https://github.com/VirInvictus) portfolio.
 
 ## Reading day
 
