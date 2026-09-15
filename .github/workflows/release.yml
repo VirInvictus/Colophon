@@ -1,0 +1,25 @@
+name: Release
+
+# A pushed v* tag is a release: the GitHub Release is created from the
+# tag's own annotation, so the release notes are the patchnotes entry the
+# tag was cut with and the zero-Releases state cannot recur.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create the GitHub Release from the tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: gh release create --notes-from-tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          # gh rejects `--notes-from-tag` together with a --repo flag; the
+          # GH_REPO env var is the supported way to name the repository.
+        run: gh release create "$GITHUB_REF_NAME" --notes-from-tag

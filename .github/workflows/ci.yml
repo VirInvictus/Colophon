@@ -16,7 +16,9 @@ jobs:
     # the build aborts in gdk4-sys. Fedora carries a new-enough GTK.
     # rusqlite is bundled and mlua vendored, so both compile their C from
     # source and need only a toolchain, not the system -devel packages.
-    container: fedora:latest
+    # Version-pinned on purpose: fedora:latest floats every Fedora release
+    # under a GTK-version-sensitive build. Bump the pin deliberately.
+    container: fedora:44
     steps:
       - name: Install system dependencies
         run: |
@@ -28,14 +30,19 @@ jobs:
             gtk4-devel \
             xorg-x11-server-Xvfb
 
-      - uses: actions/checkout@v5
+      # actions/checkout v5.0.0
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        # dtolnay/rust-toolchain@stable was a mutable branch; the SHA pins
+        # the action's implementation (the toolchain it installs is still
+        # whatever `stable` resolves to at run time).
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
           components: rustfmt, clippy
 
-      - uses: Swatinem/rust-cache@v2
+      # Swatinem/rust-cache v2.8.0
+      - uses: Swatinem/rust-cache@8cbdedb5103daa674dcf46d3590fe06a76645684
 
       - name: cargo fmt --check
         run: cargo fmt --all --check
