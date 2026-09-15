@@ -393,3 +393,49 @@ fn d2_unknown_pages_hides_page_derived_stats() {
     // Time-derived: intact.
     assert_eq!(db.events(&books[0]).unwrap().len(), 1);
 }
+
+#[test]
+fn unloadable_db_passes_books_but_fails_page_totals() {
+    // The class the staged-import validation exists for: book and
+    // page_stat_data exist (so `open` and `books()` pass) but the
+    // `numbers` tally table is missing, which only the page aggregates
+    // need. Loading such a file fails; the app therefore must find that
+    // out by loading, before promoting the file over a good snapshot.
+    let dir = common::TempDir::new();
+    let path = dir.path().join("no-numbers.sqlite3");
+    let conn = Connection::open(&path).unwrap();
+    conn.execute_batch(
+        "CREATE TABLE book (
+             id integer PRIMARY KEY autoincrement,
+             title text, authors text, notes integer, last_open integer,
+             highlights integer, pages integer, series text, language text,
+             md5 text, total_read_time integer, total_read_pages integer
+         );
+         CREATE TABLE page_stat_data (
+             id_book integer,
+             page integer NOT NULL DEFAULT 0,
+             start_time integer NOT NULL DEFAULT 0,
+             duration integer NOT NULL DEFAULT 0,
+             total_pages integer NOT NULL DEFAULT 0
+         );",
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO book (title, authors, pages, md5) VALUES ('B', 'A', 100, 'dddd')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO page_stat_data VALUES (1, 5, 1000, 60, 100)",
+        [],
+    )
+    .unwrap();
+    drop(conn);
+
+    let db = StatsDb::open(&path).unwrap();
+    let books = db.books().unwrap();
+    assert_eq!(books.len(), 1);
+    // Events read fine; the page aggregates are what need `numbers`.
+    assert_eq!(db.events(&books[0]).unwrap().len(), 1);
+    assert!(db.page_totals(&books[0]).is_err());
+}

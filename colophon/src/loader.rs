@@ -143,11 +143,13 @@ fn stage_and_promote(source: &Path, staging_dir: &Path, canonical: &Path) -> Res
     let staged = colophon_core::snapshot(source, staging_dir)
         .context("copying the database (is the device still mounted?)")?;
 
-    // Validate before promoting: open it and actually read the book table.
-    {
-        let db = StatsDb::open(&staged)?;
-        db.books().context("reading the copied database")?;
-    }
+    // Validate before promoting by fully loading the staged copy: the same
+    // load the app would run against it after promotion. A database that
+    // opens but cannot be loaded (a missing `numbers` table for the page
+    // aggregates, say) is refused while the good snapshot is still
+    // untouched. Validation used to stop at the book table, so such a file
+    // was renamed over the good snapshot and only then failed.
+    load_snapshot(&staged, None)?;
 
     if let Some(parent) = canonical.parent() {
         std::fs::create_dir_all(parent)
