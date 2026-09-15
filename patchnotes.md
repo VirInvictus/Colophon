@@ -1,5 +1,28 @@
 # Patchnotes
 
+## v2.5.0 (2026-09-15)
+
+History gets room to breathe: the year calendar pages, the recap can be
+read year by year, and your annotations gather in one place.
+
+- **The year heatmap shows a whole year, and you can page through them.**
+  It used to be a rolling 52-week window, which silently clipped a
+  January the moment the year turned. It now shows one calendar year at
+  a time, with arrows stepping back through the past and forward
+  toward today; the current year is the default.
+- **The recap card reads by year.** Books finished, completion rate,
+  total time, longest streak, sessions, and the most-active month are
+  all available for any single year, with the whole-history recap
+  (now labelled "All time") still the default. The year choice belongs
+  to the card; it never moves the time window above.
+- **An Annotations section on the overview.** Every highlight, note,
+  and bookmark from every sidecar you have provided, listed in book
+  order under its book's name. Selecting an entry opens that book's
+  page. As always with provided files, the section stays hidden until
+  at least one sidecar carries annotations.
+
+Suite 126 green across the workspace; clippy `-D warnings`, fmt clean.
+
 ## v2.4.1 (2026-09-15)
 
 A hardening release from the final audit. No new features, and none of

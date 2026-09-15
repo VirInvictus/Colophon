@@ -556,6 +556,68 @@ pub fn overview_base<Tz: TimeZone>(
 /// Kodashboard's KPI bug). The whole-history sections (streaks, year
 /// heatmap, monthly) come straight from the base: windowing a streak or a
 /// year grid would just lie.
+/// The recap composite scoped to one calendar year (spec.md "Recap,
+/// per-year variant"): a finished work counts to the year of its finish
+/// date, a started work to the year of its first reading day, and time,
+/// sessions, the longest streak, and the most-active month are the
+/// year's own. Reads only the cached base and the entries, so it never
+/// re-opens events; the choice of year belongs to the card alone.
+pub fn recap_for_year<Tz: TimeZone>(
+    base: &OverviewBase,
+    entries: &[Rc<LibraryEntry>],
+    tz: &Tz,
+    day_start: DayStart,
+    year: i32,
+    today: NaiveDate,
+) -> Recap {
+    let events: Vec<PageEvent> = base
+        .all_events
+        .iter()
+        .filter(|e| logical_date(e.start_time, tz, day_start).year() == year)
+        .copied()
+        .collect();
+    let days: std::collections::BTreeSet<NaiveDate> = base
+        .daily
+        .keys()
+        .filter(|d| d.year() == year)
+        .copied()
+        .collect();
+    let sessions = session_summary(&events, tz, day_start);
+    let started_works: std::collections::HashSet<(String, String)> = entries
+        .iter()
+        .filter(|e| {
+            e.events
+                .first()
+                .is_some_and(|first| logical_date(first.start_time, tz, day_start).year() == year)
+        })
+        .map(|e| crate::library::group_key(&e.book))
+        .collect();
+    Recap {
+        books_started: started_works.len(),
+        books_finished: base
+            .finished_books
+            .iter()
+            .filter(|f| f.finish_date.year() == year)
+            .count(),
+        total_secs: days
+            .iter()
+            .filter_map(|d| base.daily.get(d))
+            .map(|t| t.seconds)
+            .sum(),
+        longest_streak_days: metrics::streaks(&days, today)
+            .longest
+            .map(|s| s.days)
+            .unwrap_or(0),
+        sessions: sessions.count,
+        most_active_month: base
+            .monthly
+            .iter()
+            .copied()
+            .filter(|(m, s)| m.year() == year && *s > 0)
+            .max_by_key(|(_, s)| *s),
+    }
+}
+
 pub fn overview_windowed<Tz: TimeZone>(
     base: &OverviewBase,
     entries: &[Rc<LibraryEntry>],
@@ -1058,6 +1120,31 @@ pub struct Momentum {
 /// browser"): book order by rescaled position, ties broken by the
 /// sidecar's own page. KOReader stores annotations in creation order, so
 /// the sort is load-bearing, not cosmetic.
+/// One book's annotations as the cross-book browser shows them (spec.md
+/// "Annotation browser (cross-book)"): the group is the book, the entries
+/// are that book's annotations in book order.
+#[derive(Debug, Clone)]
+pub struct CrossBookAnnotationGroup {
+    pub book_id: i64,
+    pub book_title: String,
+    pub entries: Vec<colophon_core::sidecar::Annotation>,
+}
+
+/// Every annotation from every provided sidecar, grouped by book in
+/// library order (the order the sidebar shows). Hidden upstream when no
+/// provided sidecar carries annotations (the data-provision principle).
+pub fn annotations_across_books(entries: &[Rc<LibraryEntry>]) -> Vec<CrossBookAnnotationGroup> {
+    entries
+        .iter()
+        .filter(|e| !e.annotations.is_empty())
+        .map(|e| CrossBookAnnotationGroup {
+            book_id: e.book.id,
+            book_title: crate::library::display_title(&e.book).to_string(),
+            entries: annotations_in_book_order(&e.annotations),
+        })
+        .collect()
+}
+
 pub fn annotations_in_book_order(
     annotations: &[colophon_core::sidecar::Annotation],
 ) -> Vec<colophon_core::sidecar::Annotation> {
@@ -1850,6 +1937,86 @@ mod tests {
             Some((date("2026-07-01"), (100 + 100 + 40) * 60))
         );
         assert!(recap.sessions >= 1);
+    }
+
+    #[test]
+    fn recap_for_year_scopes_every_number() {
+        let today = date("2026-07-30");
+        let mk = |title: &str, year: i32, month: u32, day: u32, last: i64| {
+            let events: Vec<_> = (1..=last)
+                .map(|p| ev(p, ts(year, month, day, 8) + p, 60))
+                .collect();
+            let mut e = entry(events);
+            Rc::get_mut(&mut e).unwrap().book.title = title.into();
+            e
+        };
+        let entries = vec![
+            mk("DoneThisYear", 2026, 7, 5, 100), // finished in 2026
+            mk("DoneLastYear", 2025, 7, 5, 100), // finished in 2025
+            mk("WIP", 2026, 7, 7, 40),           // started 2026, unfinished
+        ];
+        let base = overview_base(&entries, &Utc, DayStart::MIDNIGHT, today);
+
+        let y2026 = recap_for_year(&base, &entries, &Utc, DayStart::MIDNIGHT, 2026, today);
+        assert_eq!(y2026.books_started, 2);
+        assert_eq!(y2026.books_finished, 1);
+        assert_eq!(y2026.total_secs, (100 + 40) * 60);
+        assert_eq!(
+            y2026.most_active_month,
+            Some((date("2026-07-01"), (100 + 40) * 60))
+        );
+        assert_eq!(y2026.longest_streak_days, 1);
+
+        let y2025 = recap_for_year(&base, &entries, &Utc, DayStart::MIDNIGHT, 2025, today);
+        assert_eq!(y2025.books_started, 1);
+        assert_eq!(y2025.books_finished, 1);
+        assert_eq!(y2025.total_secs, 100 * 60);
+        assert_eq!(
+            y2025.most_active_month,
+            Some((date("2025-07-01"), 100 * 60))
+        );
+
+        // A year with no reading is empty, not zeros-dressed-up.
+        let y2024 = recap_for_year(&base, &entries, &Utc, DayStart::MIDNIGHT, 2024, today);
+        assert!(y2024.is_empty());
+    }
+
+    #[test]
+    fn annotations_group_by_book_in_library_order() {
+        use colophon_core::sidecar::Annotation;
+        let ann = |position: f64| Annotation {
+            kind: colophon_core::sidecar::AnnotationKind::Highlight,
+            position,
+            pageno: 1,
+            text: None,
+            note: None,
+        };
+        let mk = |id: i64, title: &str, mut anns: Vec<Annotation>| {
+            anns.sort_by(|a, b| a.position.total_cmp(&b.position));
+            let mut e = entry(Vec::new());
+            let book = Rc::get_mut(&mut e).unwrap();
+            book.book.id = id;
+            book.book.title = title.into();
+            book.annotations = anns;
+            e
+        };
+        // Library order is the order given: Annotated, Bare, AlsoAnnotated.
+        let entries = vec![
+            mk(1, "Annotated", vec![ann(0.5), ann(0.1)]),
+            mk(2, "Bare", Vec::new()),
+            mk(3, "AlsoAnnotated", vec![ann(0.9)]),
+        ];
+        let groups = annotations_across_books(&entries);
+        assert_eq!(
+            groups
+                .iter()
+                .map(|g| g.book_title.as_str())
+                .collect::<Vec<_>>(),
+            ["Annotated", "AlsoAnnotated"]
+        );
+        // Entries within a book are in book order, not sidecar order.
+        assert_eq!(groups[0].entries.len(), 2);
+        assert!(groups[0].entries[0].position < groups[0].entries[1].position);
     }
 
     #[test]

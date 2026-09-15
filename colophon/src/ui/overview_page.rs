@@ -5,7 +5,7 @@
 
 use std::cell::RefCell;
 
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use gtk::glib;
 use gtk::prelude::*;
 use gtk::subclass::prelude::*;
@@ -17,6 +17,7 @@ use crate::stats::{Overview, SESSION_BUCKETS};
 use crate::ui::rows;
 
 type WindowChangedHandler = Box<dyn Fn()>;
+type BookActivatedHandler = Box<dyn Fn(i64)>;
 
 mod imp {
     use super::*;
@@ -79,6 +80,24 @@ mod imp {
         #[template_child]
         pub forgotten_rows: TemplateChild<gtk::ListBox>,
         #[template_child]
+        pub annotations_title: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub annotation_rows: TemplateChild<gtk::ListBox>,
+        #[template_child]
+        pub activity_title: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub heatmap_year_label: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub heatmap_prev: TemplateChild<gtk::Button>,
+        #[template_child]
+        pub heatmap_next: TemplateChild<gtk::Button>,
+        #[template_child]
+        pub recap_year_label: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub recap_prev: TemplateChild<gtk::Button>,
+        #[template_child]
+        pub recap_next: TemplateChild<gtk::Button>,
+        #[template_child]
         pub win_30: TemplateChild<gtk::ToggleButton>,
         #[template_child]
         pub win_90: TemplateChild<gtk::ToggleButton>,
@@ -87,6 +106,18 @@ mod imp {
         #[template_child]
         pub win_all: TemplateChild<gtk::ToggleButton>,
         pub on_window_changed: RefCell<Option<super::WindowChangedHandler>>,
+        /// Selected heatmap year (`None` = not set yet: the current year).
+        pub heatmap_year: std::cell::Cell<Option<i32>>,
+        /// Selected recap year (`None` = All time, the default).
+        pub recap_year: std::cell::Cell<Option<i32>>,
+        /// The bounds the pagers step within: the first data year and the
+        /// current year, learned at each `set_data`.
+        pub min_year: std::cell::Cell<i32>,
+        pub max_year: std::cell::Cell<i32>,
+        pub on_year_changed: RefCell<Option<super::WindowChangedHandler>>,
+        pub on_annotation_activated: RefCell<Option<super::BookActivatedHandler>>,
+        /// The book id behind each annotation row, in append order.
+        pub annotation_book_ids: RefCell<Vec<i64>>,
     }
 
     #[glib::object_subclass]
@@ -129,6 +160,49 @@ mod imp {
                     }
                 ));
             }
+
+            // The year pagers move their selection by one step and ask
+            // for a refresh; labels and sensitivity update in the next
+            // set_data (spec.md "Year heatmap, year selection" and
+            // "Recap, per-year variant").
+            let wire_pager = |button: &gtk::Button, heatmap: bool, shift: i32| {
+                button.connect_clicked(glib::clone!(
+                    #[weak(rename_to = this)]
+                    page,
+                    move |_| {
+                        let imp = this.imp();
+                        let (min, max) = (imp.min_year.get(), imp.max_year.get());
+                        if heatmap {
+                            let current = imp.heatmap_year.get().unwrap_or(max);
+                            let next = current + shift;
+                            if (min..=max).contains(&next) {
+                                imp.heatmap_year.set(Some(next));
+                            }
+                        } else {
+                            match imp.recap_year.get() {
+                                // All time steps back into the newest year;
+                                // the newest year steps forward to All time.
+                                None if shift < 0 => imp.recap_year.set(Some(max)),
+                                None => {}
+                                Some(y) if shift > 0 && y >= max => imp.recap_year.set(None),
+                                Some(y) => {
+                                    let next = y + shift;
+                                    if next >= min {
+                                        imp.recap_year.set(Some(next));
+                                    }
+                                }
+                            }
+                        }
+                        if let Some(handler) = imp.on_year_changed.borrow().as_ref() {
+                            handler();
+                        }
+                    }
+                ));
+            };
+            wire_pager(&self.heatmap_prev, true, -1);
+            wire_pager(&self.heatmap_next, true, 1);
+            wire_pager(&self.recap_prev, false, -1);
+            wire_pager(&self.recap_next, false, 1);
         }
 
         // Template children are parented to the template widget itself;
@@ -171,7 +245,28 @@ impl OverviewPage {
             .replace(Some(Box::new(handler)));
     }
 
-    pub fn set_data(&self, overview: &Overview, today: NaiveDate) {
+    /// The recap card's selected year (`None` = All time; spec.md
+    /// "Recap, per-year variant").
+    pub fn recap_year(&self) -> Option<i32> {
+        self.imp().recap_year.get()
+    }
+
+    pub fn set_on_year_changed(&self, handler: impl Fn() + 'static) {
+        self.imp().on_year_changed.replace(Some(Box::new(handler)));
+    }
+
+    pub fn set_on_annotation_activated(&self, handler: impl Fn(i64) + 'static) {
+        self.imp()
+            .on_annotation_activated
+            .replace(Some(Box::new(handler)));
+    }
+
+    pub fn set_data(
+        &self,
+        overview: &Overview,
+        today: NaiveDate,
+        year_recap: Option<&crate::stats::Recap>,
+    ) {
         let imp = self.imp();
 
         imp.tiles.remove_all();
@@ -283,8 +378,9 @@ impl OverviewPage {
 
         // Recap (spec.md "Recap"): a whole-history composite, so it stays put
         // (and stays meaningful) even when a shorter window is selected.
+        // The per-year variant swaps the numbers, never the window.
         imp.recap_tiles.remove_all();
-        let recap = &overview.recap;
+        let recap = year_recap.unwrap_or(&overview.recap);
         let has_recap = !recap.is_empty();
         imp.recap_title.set_visible(has_recap);
         imp.recap_tiles.set_visible(has_recap);
@@ -348,7 +444,40 @@ impl OverviewPage {
             ));
         }
 
-        imp.heatmap.set_data(&overview.daily, today);
+        // The year pagers' bounds and labels (spec.md "Year heatmap,
+        // year selection"; "Recap, per-year variant"): the first data
+        // year through the current one. An unset selection is the
+        // current year for the heatmap and All time for the recap.
+        let min_year = overview
+            .daily
+            .keys()
+            .next()
+            .map(|d| d.year())
+            .unwrap_or_else(|| today.year());
+        let max_year = today.year();
+        imp.min_year.set(min_year);
+        imp.max_year.set(max_year);
+        let heat = imp
+            .heatmap_year
+            .get()
+            .unwrap_or(max_year)
+            .clamp(min_year, max_year);
+        imp.heatmap_year.set(Some(heat));
+        imp.heatmap_year_label.set_text(&heat.to_string());
+        imp.heatmap_prev.set_sensitive(heat > min_year);
+        imp.heatmap_next.set_sensitive(heat < max_year);
+        let recap_sel = imp.recap_year.get().map(|y| y.clamp(min_year, max_year));
+        imp.recap_year.set(recap_sel);
+        imp.recap_year_label.set_text(
+            &recap_sel
+                .map(|y| y.to_string())
+                .unwrap_or_else(|| "All time".into()),
+        );
+        imp.recap_prev
+            .set_sensitive(recap_sel.is_none_or(|y| y > min_year));
+        imp.recap_next.set_sensitive(recap_sel.is_some());
+
+        imp.heatmap.set_data(&overview.daily, today, heat);
         imp.hour_heatmap.set_grid(overview.hourly);
 
         imp.speed_title
@@ -539,6 +668,53 @@ impl OverviewPage {
                 &format!("{}d ago", f.days_since),
                 Some(&subtitle),
             ));
+        }
+    }
+
+    /// The cross-book annotation browser (spec.md "Annotation browser
+    /// (cross-book)"): one activatable row per book, then its
+    /// annotations in book order, each carrying the book id so a click
+    /// opens the book's page. Hidden entirely without annotated
+    /// sidecars (the data-provision principle).
+    pub fn set_annotations(&self, groups: &[crate::stats::CrossBookAnnotationGroup]) {
+        let imp = self.imp();
+        imp.annotation_rows.remove_all();
+        imp.annotation_book_ids.borrow_mut().clear();
+        let has = !groups.is_empty();
+        imp.annotations_title.set_visible(has);
+        imp.annotation_rows.set_visible(has);
+        if !has {
+            return;
+        }
+        let mut ids = imp.annotation_book_ids.borrow_mut();
+        for group in groups {
+            ids.push(group.book_id);
+            let book_row = rows::value_row(
+                &group.book_title,
+                &format!("{} annotations", group.entries.len()),
+                None,
+            );
+            book_row.set_activatable(true);
+            imp.annotation_rows.append(&book_row);
+            for a in &group.entries {
+                ids.push(group.book_id);
+                let kind = match a.kind {
+                    colophon_core::sidecar::AnnotationKind::Highlight => "Highlight",
+                    colophon_core::sidecar::AnnotationKind::Note => "Note",
+                    colophon_core::sidecar::AnnotationKind::Bookmark => "Bookmark",
+                };
+                let entry_row = rows::row(
+                    kind,
+                    Some(&format!(
+                        "{}% \u{b7} {}",
+                        (a.position * 100.0).round(),
+                        a.text.as_deref().or(a.note.as_deref()).unwrap_or("")
+                    )),
+                    None,
+                );
+                entry_row.set_activatable(true);
+                imp.annotation_rows.append(&entry_row);
+            }
         }
     }
 }

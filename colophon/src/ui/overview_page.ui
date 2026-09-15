@@ -97,12 +97,37 @@
                   </object>
                 </child>
                 <child>
-                  <object class="GtkLabel" id="recap_title">
-                    <property name="label">Recap</property>
-                    <property name="xalign">0</property>
-                    <style>
-                      <class name="title-4"/>
-                    </style>
+                  <object class="GtkBox">
+                    <property name="spacing">8</property>
+                    <child>
+                      <object class="GtkLabel" id="recap_title">
+                        <property name="label">Recap</property>
+                        <property name="xalign">0</property>
+                        <property name="hexpand">true</property>
+                        <style>
+                          <class name="title-4"/>
+                        </style>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="recap_year_label">
+                        <property name="label">All time</property>
+                        <property name="valign">center</property>
+                        <style>
+                          <class name="dimmed"/>
+                        </style>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="recap_prev">
+                        <property name="label">‹</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="recap_next">
+                        <property name="label">›</property>
+                      </object>
+                    </child>
                   </object>
                 </child>
                 <child>
@@ -133,12 +158,54 @@
                   </object>
                 </child>
                 <child>
-                  <object class="GtkLabel">
-                    <property name="label">Reading activity</property>
+                  <object class="GtkLabel" id="annotations_title">
+                    <property name="label">Annotations</property>
                     <property name="xalign">0</property>
                     <style>
                       <class name="title-4"/>
                     </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkListBox" id="annotation_rows">
+                    <property name="selection-mode">single</property>
+                    <style>
+                      <class name="boxed-list"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkBox">
+                    <property name="spacing">8</property>
+                    <child>
+                      <object class="GtkLabel" id="activity_title">
+                        <property name="label">Reading activity</property>
+                        <property name="xalign">0</property>
+                        <property name="hexpand">true</property>
+                        <style>
+                          <class name="title-4"/>
+                        </style>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="heatmap_year_label">
+                        <property name="label">2026</property>
+                        <property name="valign">center</property>
+                        <style>
+                          <class name="dimmed"/>
+                        </style>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="heatmap_prev">
+                        <property name="label">‹</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="heatmap_next">
+                        <property name="label">›</property>
+                      </object>
+                    </child>
                   </object>
                 </child>
                 <child>

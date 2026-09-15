@@ -32,6 +32,11 @@
   </developer>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2.5.0" date="2026-09-15">
+      <description translate="no">
+        <p>The year heatmap shows one calendar year with arrows to page through past years, the recap card reads by year (All time stays the default), and a new Annotations section lists every highlight, note, and bookmark from your provided sidecars, grouped by book.</p>
+      </description>
+    </release>
     <release version="2.4.1" date="2026-09-15">
       <description translate="no">
         <p>A hardening release: a corrupt or foreign database can no longer crash the app, and a failed import can never touch the good snapshot. The year heatmap tooltip names books, read-through dates follow the configured reading day, and the import path probes network mounts off the UI thread.</p>

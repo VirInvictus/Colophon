@@ -15,8 +15,6 @@ const CELL: f64 = 11.0;
 const GAP: f64 = 3.0;
 const LEFT: f64 = 22.0;
 const TOP: f64 = 18.0;
-const MIN_WEEKS: i64 = 8;
-const MAX_WEEKS: i64 = 52;
 
 #[derive(Default)]
 pub struct Data {
@@ -25,6 +23,9 @@ pub struct Data {
     max_secs: i64,
     /// Monday of the leftmost column.
     grid_start: Option<NaiveDate>,
+    /// The last day the grid covers: the selected year's December 31, so
+    /// padding cells past the year's end stay empty.
+    grid_end: Option<NaiveDate>,
     today: Option<NaiveDate>,
     weeks: i64,
 }
@@ -73,30 +74,35 @@ impl Default for YearHeatmap {
 }
 
 impl YearHeatmap {
-    /// Feeds per-day totals; the grid spans up to a year of Monday-start
-    /// weeks ending at `today`, shrinking (min 8 weeks) for young data.
-    pub fn set_data(&self, daily: &BTreeMap<NaiveDate, colophon_core::DayTotal>, today: NaiveDate) {
+    /// Feeds per-day totals for one calendar year (spec.md "Year heatmap,
+    /// year selection"): the grid spans January through December of
+    /// `year`, Monday-start, up to the 53 weeks a year can span. Days the
+    /// library has no data for render empty; cells past `today` are
+    /// skipped so the current year grows in as the year does.
+    pub fn set_data(
+        &self,
+        daily: &BTreeMap<NaiveDate, colophon_core::DayTotal>,
+        today: NaiveDate,
+        year: i32,
+    ) {
+        let year_start = NaiveDate::from_ymd_opt(year, 1, 1).expect("Jan 1 exists");
+        let year_end = NaiveDate::from_ymd_opt(year, 12, 31).expect("Dec 31 exists");
         let days: BTreeMap<NaiveDate, (i64, u32, u32)> = daily
             .iter()
+            .filter(|(d, _)| d.year() == year)
             .map(|(d, t)| (*d, (t.seconds, t.pages, t.books)))
             .collect();
         let max_secs = days.values().map(|(s, _, _)| *s).max().unwrap_or(0);
 
-        let this_monday = today - Duration::days(today.weekday().num_days_from_monday() as i64);
-        let weeks = match days.keys().next() {
-            Some(first) => {
-                let first_monday =
-                    *first - Duration::days(first.weekday().num_days_from_monday() as i64);
-                ((this_monday - first_monday).num_days() / 7 + 1).clamp(MIN_WEEKS, MAX_WEEKS)
-            }
-            None => MIN_WEEKS,
-        };
-        let grid_start = this_monday - Duration::days((weeks - 1) * 7);
+        let grid_start =
+            year_start - Duration::days(year_start.weekday().num_days_from_monday() as i64);
+        let weeks = (year_end - grid_start).num_days() / 7 + 1;
 
         *self.imp().data.borrow_mut() = Data {
             days,
             max_secs,
             grid_start: Some(grid_start),
+            grid_end: Some(year_end),
             today: Some(today),
             weeks,
         };
@@ -107,7 +113,9 @@ impl YearHeatmap {
 
     fn draw(&self, cr: &gtk::cairo::Context, _w: i32, _h: i32) {
         let data = self.imp().data.borrow();
-        let (Some(grid_start), Some(today)) = (data.grid_start, data.today) else {
+        let (Some(grid_start), Some(grid_end), Some(today)) =
+            (data.grid_start, data.grid_end, data.today)
+        else {
             return;
         };
         let dark = super::is_dark();
@@ -146,7 +154,7 @@ impl YearHeatmap {
 
             for row in 0..7 {
                 let date = week_start + Duration::days(row);
-                if date > today {
+                if date > grid_end || date > today {
                     continue;
                 }
                 let secs = data.days.get(&date).map(|(s, _, _)| *s).unwrap_or(0);
@@ -161,6 +169,7 @@ impl YearHeatmap {
     fn tooltip_at(&self, x: f64, y: f64) -> Option<String> {
         let data = self.imp().data.borrow();
         let grid_start = data.grid_start?;
+        let grid_end = data.grid_end?;
         let today = data.today?;
         let col = ((x - LEFT) / (CELL + GAP)).floor();
         let row = ((y - TOP) / (CELL + GAP)).floor();
@@ -168,7 +177,7 @@ impl YearHeatmap {
             return None;
         }
         let date = grid_start + Duration::days(col as i64 * 7 + row as i64);
-        if date > today {
+        if date > grid_end || date > today {
             return None;
         }
         Some(day_tooltip(

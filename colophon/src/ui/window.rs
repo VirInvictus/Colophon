@@ -111,6 +111,16 @@ mod imp {
                 window,
                 move || window.refresh_content()
             ));
+            self.overview_page.set_on_year_changed(glib::clone!(
+                #[weak]
+                window,
+                move || window.refresh_content()
+            ));
+            self.overview_page.set_on_annotation_activated(glib::clone!(
+                #[weak]
+                window,
+                move |book_id| window.on_select(crate::ui::library_view::Selection::Book(book_id))
+            ));
             window.watch_mounts();
 
             // 6e keyboard pass: Escape anywhere in the main window
@@ -636,8 +646,18 @@ impl ColophonWindow {
                     today,
                     imp.overview_page.window_days(),
                 );
+                // The recap card's year selection (spec.md "Recap,
+                // per-year variant") and the cross-book annotation
+                // browser both derive from the filtered entry set.
+                let year_recap = imp
+                    .overview_page
+                    .recap_year()
+                    .map(|y| stats::recap_for_year(base, &entries, &Local, day_start, y, today));
+                let annotation_groups = stats::annotations_across_books(&entries);
                 drop(cache);
-                imp.overview_page.set_data(&overview, today);
+                imp.overview_page
+                    .set_data(&overview, today, year_recap.as_ref());
+                imp.overview_page.set_annotations(&annotation_groups);
                 imp.content_stack.set_visible_child_name("overview");
                 self.set_content_title("All Books");
             }

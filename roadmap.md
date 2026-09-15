@@ -905,10 +905,10 @@ Slop-reader: no AI-slop in substance anywhere (patchnotes among the best release
 
 ### Final blitz gates (answered 2026-09-15)
 
-- [ ] **Year heatmap pager + per-year recap (v2.5.0, GO'd).** Arrows page
+- [x] **Year heatmap pager + per-year recap (v2.5.0, GO'd).** Arrows page
       the year calendar back through past years instead of the silent
       52-week rolling window; the recap card gains a per-year variant.
-- [ ] **Cross-book annotation browser (v2.5.0, GO'd).** An overview
+- [x] **Cross-book annotation browser (v2.5.0, GO'd).** An overview
       surface listing highlights, notes, and bookmarks across every
       provided sidecar, not only per book.
 - [ ] **Word-count axis (v2.6.0; GO'd 2026-09-12; lane order: fixes
