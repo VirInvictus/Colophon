@@ -3,7 +3,7 @@
 Per-project guidance. Overrides `~/.zcode/AGENTS.md` (the house file;
 `~/.claude/CLAUDE.md` was retired 2026-09-03 with the Claude Code client)
 where the two conflict; read the house file first for the general house
-style (portfolio doc set, git habits, prose style, etc.) — this file only
+style (portfolio doc set, git habits, prose style, etc.); this file only
 covers what's specific to Colophon.
 
 ## What this project is
@@ -119,7 +119,7 @@ matter a lot here)
 
 - **Read-only, always.** Colophon must never open KOReader's live database
   file in place, and must never write anything to a path KOReader owns.
-  Always operate on a copy. This is non-negotiable — it's someone's actual
+  Always operate on a copy. This is non-negotiable: it's someone's actual
   reading history and device state.
 - **No Docker, no web UI, no cloud/self-hosted service.** That's the entire
   reason this project exists instead of using what's already out there.
@@ -130,7 +130,7 @@ matter a lot here)
 Rust 2024, plain GTK4 (v4_16; libadwaita removed in v2.0.0), `rusqlite`
 (read-only opens only). Two-crate workspace (`colophon-core`, `colophon`),
 matching the shape of `Viaduct`/`Conservatory` rather than Atrium's larger
-seven-crate split — this project doesn't need that much separation yet.
+seven-crate split; this project doesn't need that much separation yet.
 Charts are hand-drawn cairo (decided Phase 3; no charting crate).
 
 ## Naming

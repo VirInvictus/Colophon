@@ -11,7 +11,7 @@ commitment, not a brainstorm.
 Colophon is a native GTK4 desktop app that turns KOReader's
 reading-statistics database into attractive graphs and a wide variety of
 statistic widgets. It is a *viewer*, not a KOReader plugin and not a sync
-service — it operates on a local copy of the data.
+service; it operates on a local copy of the data.
 
 ## Philosophy
 
@@ -27,10 +27,10 @@ service — it operates on a local copy of the data.
 - **Breadth over one fixed report.** KOReader's own in-app statistics screen
   already covers the basics (calendar heatmap, per-book totals). Colophon's
   reason to exist is a *wide variety* of widgets/charts pulling different
-  cuts of the same underlying data — the value is in depth and variety, not
+  cuts of the same underlying data; the value is in depth and variety, not
   in re-skinning what KOReader already shows.
 
-## Data model (confirmed — see `RESEARCH.md` §1 for full detail)
+## Data model (confirmed; see `RESEARCH.md` §1 for full detail)
 
 `statistics.sqlite3` (`koreader/settings/statistics.sqlite3` on device) has
 three things that matter: a `book` table (title/authors/series/language/
@@ -92,7 +92,7 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
 - **Rescale axis (view-parity path)**: every aggregate that mirrors the
   `page_stat` view (capped totals, the per-page strip, rescaled positions)
   rescales all of a merged book's events onto the *canonical* row's page
-  count — the most-recently-opened row's — never onto each stored row's
+  count (the most-recently-opened row's), never onto each stored row's
   own. Rescaling per row would sum positions from two different pagination
   axes into one bucket whenever a metadata edit changed the page count
   between opens.
@@ -333,7 +333,7 @@ the two tiers' numbers collided.*
 - Vocabulary-builder widgets (Brandon's `vocabulary_builder.sqlite3` is
   empty; revisit if the feature gets used).
 - Language rollups (schema supports it; Brandon's library is
-  single-language, so it would render dull — revisit if that changes).
+  single-language, so it would render dull; revisit if that changes).
   Series and author rollups have shipped (overview Series section and
   Author affinity), promoted out of this tier.
 - Reference-pages normalization across layouts (KoInsight's manual
@@ -422,5 +422,5 @@ Behaviour:
 - Cloud sync / multi-device merge logic beyond what's already baked into
   the KOReader data itself.
 - Supporting reading-stats formats from other e-reader software (Kobo's
-  native firmware stats, Moon+ Reader, etc.) — KOReader only, unless a
+  native firmware stats, Moon+ Reader, etc.); KOReader only, unless a
   strong case emerges later.

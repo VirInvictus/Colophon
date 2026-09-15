@@ -8,14 +8,14 @@ findings so far.
 
 - [x] Pin down KOReader's real `statistics.sqlite3` schema from source.
       Done 2026-07-03 straight from the device's own plugin source
-      (`research/koreader-plugin-src/statistics.koplugin/main.lua`) — see
+      (`research/koreader-plugin-src/statistics.koplugin/main.lua`); see
       `RESEARCH.md` §1 for the full schema, the `page_stat` rescaling view,
       and the font-size/pagination handling.
 - [x] Get a real sample database. Copied from `/mnt/Kindle` 2026-07-03,
       refreshed 2026-07-05: `research/samples/statistics.sqlite3` (9 books,
       750 page-stat rows as of the refresh, latest event 2026-07-05; Royal
       Assassin now carries its 1 highlight) and
-      `research/samples/vocabulary_builder.sqlite3` (still empty — feature
+      `research/samples/vocabulary_builder.sqlite3` (still empty; feature
       unused so far). Both gitignored.
 - [x] Clone existing third-party KOReader stats tools for reference into
       `~/.gitrepos/.studyrepos/`: `KoInsight`, `KoShelf`, `Kodashboard`,
@@ -31,7 +31,7 @@ findings so far.
       (§5.6). All five reference clones then deleted (re-clonable; upstreams
       in §9). Key delta: a word-count axis and a handful of cheap
       stats-DB-feasible cards (author affinity, personal records, finish
-      estimates) — now phased below.
+      estimates), now phased below.
 - [x] Track down per-book `.sdr` sidecar metadata. Structure, location,
       and the `partial_md5_checksum` ↔ `book.md5` linkage fully documented
       from KoShelf/Kodashboard source (`RESEARCH.md` §7). **Real sample
@@ -212,10 +212,10 @@ Tier B widgets (expected furniture, done correctly):
       every window toggle. Fixes: (a) the view is consumed as a per-page
       `GROUP BY` reduction (`StatsDb::page_totals`) plus a Rust rescale
       for the last page (`metrics::rescaled_last_page`), never the
-      fanned-out rows, parity-locked against the old path — resident set
+      fanned-out rows, parity-locked against the old path; resident set
       27 MB → 19 MB; (b) the overview caches its window-independent
       aggregates (`stats::OverviewBase`) and recomputes only the windowed
-      charts on a window toggle — narrowing a window 20 ms → 3 ms,
+      charts on a window toggle: narrowing a window 20 ms → 3 ms,
       all-time 44 ms → 23 ms. Timezone/DST math stayed in chrono (no SQL
       `localtime`), so the metric functions and their tests are untouched.
       Load time is unchanged (both paths compute the view once); the win
@@ -377,11 +377,11 @@ Still open:
 - [ ] **Word-count axis (the big one; needs a scope decision).** Tome's
       largest capability delta (`RESEARCH.md` §5.5): true words-per-minute
       (pagination-independent, unlike Colophon's pages/hour), lifetime
-      words-read, and a book-length distribution — and it unlocks two more
+      words-read, and a book-length distribution, and it unlocks two more
       reading-personality axes (Length, Pace). **Off Colophon's stats-DB-only
       contract:** word counts come from the EPUB files, not KOReader, so this
       means (a) reaching the library files at all, and (b) an EPUB word
-      counter — either a new dep (`ebooklib`) or a stdlib `zipfile` + regex
+      counter: either a new dep (`ebooklib`) or a stdlib `zipfile` + regex
       path (Tome falls back to exactly that). Both are deliberate go/no-go
       calls, not slip-ins: it changes what Colophon reads. High value if the
       answer is yes.
@@ -757,7 +757,7 @@ definition lands in `spec.md` before the code moves. Each needs that spec
 amendment as its first step. The live bugs from the same sweep were fixed
 and are in `patchnotes.md`.
 
-- [x] **D1 — Merged books conflate two page axes.** `StatsDb::books` *(Fixed v2.2.0: canonical-axis rescale in SQL — the canonical page count is bound as a parameter and the per-row book JOIN dropped. Fixture: one md5, two rows, pages 300/350; the old row's page 30 fans to canonical pages 34-35, no phantom 30.)*
+- [x] **D1 — Merged books conflate two page axes.** `StatsDb::books` *(Fixed v2.2.0: canonical-axis rescale in SQL: the canonical page count is bound as a parameter and the per-row book JOIN dropped. Fixture: one md5, two rows, pages 300/350; the old row's page 30 fans to canonical pages 34-35, no phantom 30.)*
       (`colophon-core/src/db.rs:210`, `merge_by_md5`) merges KOReader `book`
       rows sharing an md5, keeping every underlying row id in
       `Book::all_ids`. `page_totals` (`db.rs:143`) then queries the
@@ -766,8 +766,8 @@ and are in `patchnotes.md`.
       **The trigger:** the view rescales every row against *its own*
       `book.id`'s `pages` column, via `JOIN book ON book.id = id_book`
       (`RESEARCH.md` §1). So when two merged rows recorded different page
-      counts — ordinary after a font-size or margin change between metadata
-      edits — `GROUP BY page` sums positions from two different pagination
+      counts (ordinary after a font-size or margin change between metadata
+      edits), `GROUP BY page` sums positions from two different pagination
       axes into one bucket, while the canonical `Book::pages` is only the
       most-recently-opened row's.
       **Wrong output:** `capped_secs` and `view_pages`
@@ -780,7 +780,7 @@ and are in `patchnotes.md`.
       `db.events()` and normalise each event against its own recorded
       `total_pages`, so they are immune by construction.
       **Fix shape:** rescale per row id against that id's own `pages`, then
-      map onto the canonical axis before aggregating — i.e. do the
+      map onto the canonical axis before aggregating, i.e. do the
       per-axis reduction in Rust rather than letting one SQL `GROUP BY`
       flatten both. Cheaper alternative worth costing first: restrict the
       parity path to the canonical id and treat the older rows' events as
@@ -827,7 +827,7 @@ and are in `patchnotes.md`.
       (`stats.rs:410`), and the Recap's `finished_works` / `started_works`
       sets (`stats.rs:510` and `:515`).
       **The trigger:** two *different* works sharing a title. Most reachable
-      via untitled books — `db.rs:85` turns a NULL title into `""`, so every
+      via untitled books: `db.rs:85` turns a NULL title into `""`, so every
       book whose metadata never resolved collides under one empty key.
       **Wrong output:** `finished_timeline` *replaces* rather than merges
       (`.and_modify(|f| if finish_date > f.finish_date …)`), so the earlier
@@ -836,7 +836,7 @@ and are in `patchnotes.md`.
       titles and then filters finished works out, so a genuinely abandoned
       book disappears from "Set aside"; and the Recap's two sets undercount
       distinct works, skewing `Recap::completion_rate`.
-      **Fix shape:** small and mechanical — key all three on
+      **Fix shape:** small and mechanical: key all three on
       `library::group_key`'s `(title, authors)` instead of the title. Make
       `group_key` `pub(crate)` and reuse it rather than writing a fourth
       copy of the tuple. **Check while doing it:** `stats.rs:108` and `:169`
@@ -848,7 +848,7 @@ and are in `patchnotes.md`.
       `finished_timeline` / `forgotten_books` and that `completion_rate`
       reads 1 of 2 rather than 1 of 1. The Jingo pair in the real sample is
       the *opposite* case (one work, two files, one author) and must keep
-      collapsing to one — worth an assertion so the fix doesn't overshoot.
+      collapsing to one; worth an assertion so the fix doesn't overshoot.
 
 
 ## New findings 2026-09-12 (six-lens full audit; detail: audit/FULL-AUDIT-2026-09-12.md, Wave 24)

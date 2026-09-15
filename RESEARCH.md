@@ -9,20 +9,20 @@ running `statistics.sqlite3` schema `user_version = 20221111`.
 ## 1. The core statistics database
 
 Path on device: `koreader/settings/statistics.sqlite3` (under the KOReader
-install root — on this Kindle that's `/mnt/us/koreader/...`, mounted at
+install root; on this Kindle that's `/mnt/us/koreader/...`, mounted at
 `/mnt/Kindle/koreader/...`). A read-only copy lives at
 `research/samples/statistics.sqlite3` in this repo (gitignored).
 
 Source of truth for the schema: the plugin itself,
 `koreader/plugins/statistics.koplugin/main.lua` (copied into
-`research/koreader-plugin-src/statistics.koplugin/` from the live device —
+`research/koreader-plugin-src/statistics.koplugin/` from the live device;
 this is the actual Lua source running on Brandon's Kindle, not upstream
 GitHub, though it should match `koreader/koreader` upstream closely). The
 schema-creation code is `main.lua:459` (`createDB`) plus the
 `STATISTICS_DB_PAGE_STAT_DATA_SCHEMA` / `STATISTICS_DB_PAGE_STAT_VIEW_SCHEMA`
 constants just above it. There's also a `migrateToDB` codepath and numbered
 `upgradeDBtoNNNNNNNN` migration functions (e.g. `upgradeDBto20201010`) for
-older schema versions — worth reading if we ever need to handle a
+older schema versions; worth reading if we ever need to handle a
 pre-2022 db, but not relevant for Brandon's own data.
 
 ### `book` table
@@ -47,11 +47,11 @@ CREATE UNIQUE INDEX book_title_authors_md5 ON book(title, authors, md5);
 
 **`notes`/`highlights` are counts, not content.** Confirmed by column type
 (`integer`) and by the live sample (values like `0`, `1`, `2`). The actual
-highlight/note *text* lives elsewhere — per-book `.sdr` sidecar metadata
+highlight/note *text* lives elsewhere: per-book `.sdr` sidecar metadata
 (a Lua table, `metadata.epub.lua` or similar, stored alongside the book or
 in a KOReader-managed sidecar dir), not in this database. If Colophon wants
 to surface highlight content (not just counts), that's a second, separate
-data source to parse — out of scope for the core stats work, flag as a
+data source to parse; out of scope for the core stats work, flag as a
 possible later phase.
 
 ### `page_stat_data` table (raw per-page-turn events)
@@ -70,8 +70,8 @@ CREATE INDEX page_stat_data_start_time ON page_stat_data(start_time);
 ```
 
 One row per page-turn event: which book, which page, when, how long, and
-critically **`total_pages` is recorded per-row**, not looked up from `book`
-— this is exactly the font-size/pagination-change handling from `spec.md`'s
+critically **`total_pages` is recorded per-row**, not looked up from `book`:
+this is exactly the font-size/pagination-change handling from `spec.md`'s
 open questions. Because re-flowing text at a different font size changes
 how many "pages" the book has, KOReader stamps the page-count-at-the-time
 onto every event, so historical rows stay internally consistent even if
@@ -111,9 +111,9 @@ reading, session-length distributions).
 
 - 9 books, 695 `page_stat_data` rows.
 - `total_read_time` / `total_read_pages` on `book` are running per-book
-  totals KOReader maintains directly — don't need to be derived by summing
+  totals KOReader maintains directly; don't need to be derived by summing
   `page_stat_data` (though they should reconcile; useful cross-check).
-- Timestamps are plain unix epoch seconds, no timezone stored — convert in
+- Timestamps are plain unix epoch seconds, no timezone stored; convert in
   the local timezone at render time.
 
 > **Amendment 2026-09-15:** the sample was refreshed from the device, and
@@ -131,16 +131,16 @@ reading, session-length distributions).
   Brandon's device is on `20221111`; don't assume every KOReader install is
   on the same version if this ever needs to handle someone else's export.
 - `total_read_pages` is a *cumulative page-turn counter*, not "unique pages
-  read" — re-reading pages (flipping back) increments it too. Don't treat
+  read": re-reading pages (flipping back) increments it too. Don't treat
   it as a progress percentage without also consulting `pages`.
-- Re-reads: nothing in the schema explicitly flags "this was a re-read" —
+- Re-reads: nothing in the schema explicitly flags "this was a re-read":
   it would show up as more `page_stat_data` rows against the same
   `id_book`/`page` combos at a later `start_time`, spread over a
   disconnected time range. Detecting "book read twice" is a derived
   query/heuristic, not a stored fact.
 - Multi-device sync: this schema is purely local to the device it's stored
   on. KOReader's own multi-device story (the "Reading statistics: automatic
-  sync" discussion referenced in the KoInsight docs — see §3) is handled by
+  sync" discussion referenced in the KoInsight docs; see §3) is handled by
   the KOInsight-provided sync-server protocol or manual db merge, not
   anything native to `statistics.sqlite3` itself. If Brandon ever reads on
   more than one device, merging two `statistics.sqlite3` files is a real
@@ -150,7 +150,7 @@ reading, session-length distributions).
 
 Path: `koreader/settings/vocabulary_builder.sqlite3`. Sample copied to
 `research/samples/vocabulary_builder.sqlite3` (currently **empty** on
-Brandon's device — 0 rows — since he hasn't used the vocab/flashcard
+Brandon's device (0 rows) since he hasn't used the vocab/flashcard
 feature).
 
 ```sql
@@ -179,17 +179,17 @@ feature, but shouldn't block v1.
 
 ## 3. Other data sources spotted but not yet pulled
 
-- `koreader/settings/bookinfo_cache.sqlite3` / `PT_bookinfo_cache.sqlite3` —
+- `koreader/settings/bookinfo_cache.sqlite3` / `PT_bookinfo_cache.sqlite3`:
   large (14 MB / 1.1 MB) thumbnail/metadata cache, almost certainly not
   useful for stats (cover art cache, not reading history).
 - `koreader/settings/lookup_history.lua`, `bookshelf.lua`,
-  `hardcoversync_settings.lua` — plain Lua settings files, not sqlite.
+  `hardcoversync_settings.lua`: plain Lua settings files, not sqlite.
   `hardcoversync_settings.lua` implies KOReader has some integration with
-  Hardcover (the Goodreads-alternative book-tracking site) — worth a look
+  Hardcover (the Goodreads-alternative book-tracking site); worth a look
   if Colophon ever wants to cross-reference external ratings/reviews, but
   not pulled or inspected this pass.
 - Per-book `.sdr` sidecar metadata (actual highlight/note *content*, as
-  opposed to the `book.notes`/`book.highlights` counts) — not located or
+  opposed to the `book.notes`/`book.highlights` counts); not located or
   copied this pass. Needed only if Colophon wants highlight content, not
   just counts.
 
@@ -532,7 +532,7 @@ New reference material the first pass missed:
 
 - **Junk / noise filters at the row level.** KoInsight drops any `page_stat`
   row with `duration <= 0`, `total_pages <= 0`, or non-finite values
-  (`upload-service.ts:51-59`) — a data-quality guard independent of
+  (`upload-service.ts:51-59`): a data-quality guard independent of
   Colophon's display-time min-read-time filter. KoShelf's noise filter is
   coarser and per-`(book, logical_date)`: a day-bucket survives if it clears
   `min_time_per_day` (default `30s`) or `min_pages_per_day` (unset), and a
@@ -563,14 +563,14 @@ New reference material the first pass missed:
   counts as the previous day (KoShelf `time_config.rs:64-75`; Tome's
   `reading_day.py` does the same at 04:00). DST fall-back ambiguity resolves
   to the earliest instant (`time_config.rs:111-120`). readingstreak, by
-  contrast, has **no** offset (bare local midnight, `main.lua:147-148`) — a
-  differentiator if Colophon wants the offset.
+  contrast, has **no** offset (bare local midnight, `main.lua:147-148`),
+  a differentiator if Colophon wants the offset.
 - **DST-safe date arithmetic (reusable primitive).** readingstreak does all
   streak day-diffs via the Fliegel–Van Flandern Julian-day formula on parsed
   Y/M/D integers, never `os.time`, so it is immune to DST/timezone
   (`main.lua:151-166`). Its *weekly* window, by contrast, uses
   `days * 86400` second math on `os.time` and is DST-fragile
-  (`time_stats.lua:36,47`) — a cautionary inconsistency. Its week numbering
+  (`time_stats.lua:36,47`): a cautionary inconsistency. Its week numbering
   is hand-rolled and **diverges from ISO 8601** (no W53/W00 or year-boundary
   handling, `main.lua:168-180`); do not copy it for week streaks.
 - **Milestone tiers, and how thin they are.** readingstreak's only
@@ -578,7 +578,7 @@ New reference material the first pass missed:
   `streak_goal` (default 7) congratulated on exact equality
   (`main.lua:238-251`, `streak_calculator.lua:216`). Kodashboard's
   "milestones timeline" is just three fixed points (first open, first
-  annotation, last open; `app.js:2160-2230`) — thinner than the §5.3
+  annotation, last open; `app.js:2160-2230`): thinner than the §5.3
   summary implied, not a rich ladder.
 - **Idle cap.** readingstreak clamps inter-page-turn gaps to
   `MAX_TRACKED_INTERVAL = 45 min` before summing its own live duration
@@ -658,7 +658,7 @@ sidecars)" has a clear answer, converged across three tools:
   **not** using the raw `pageno` (KoInsight
   `plugins/koinsight.koplugin/annotation_reader.lua:93-105`; falls back to
   `doc_pages` when absent). So Colophon's activity strip already has the
-  machinery — its per-page interval rescale — and annotation markers reuse
+  machinery (its per-page interval rescale), and annotation markers reuse
   it; naive `pageno` positioning would misplace them on any reflowed book.
 - **Three-way type classification, agreed by all three sidecar readers.**
   bookmark = no `drawer` field; highlight = has `drawer`/`text`; note = has
@@ -669,7 +669,7 @@ sidecars)" has a clear answer, converged across three tools:
   `annotations-repository.ts:206-213`; Kodashboard `dataloader.lua:399-409`).
 - **`percent_finished` is an authoritative completion fraction** KOReader
   writes to the sidecar directly, independent of Colophon's interval-union
-  detection — a cross-check, and a finished-state signal for books the
+  detection: a cross-check, and a finished-state signal for books the
   heuristic is unsure about.
 
 ### 7.2 Sidecar parsing hardening (when Colophon takes the `mlua` dep)
@@ -695,7 +695,7 @@ KoShelf's parser is the reference for doing this safely:
 - **Fuzzy sidecar↔DB matching**, when the md5 join fails: first sanitize
   the KOReader title (normalize CJK full-width punctuation to ASCII, strip
   z-library / `1lib.sk` noise tokens and `(…)`/`[…]` parentheticals, smart
-  quotes, dashes — Kodashboard `dataloader.lua:59-90`), then a weighted
+  quotes, dashes; Kodashboard `dataloader.lua:59-90`), then a weighted
   scorer (title exact +100 / substring +60, author exact +30, pages +20;
   md5 short-circuits to 999) with an **accept gate of score ≥ 40**
   (`dataloader.lua:92-131,591`). The join key when md5 *is* present is the
@@ -731,12 +731,12 @@ Ranked by value, tagged by data feasibility. The first bucket needs only
 `statistics.sqlite3`, which Colophon already reads, so it is directly
 actionable:
 
-1. **Author affinity** (time + finished per author) — a dimension the
+1. **Author affinity** (time + finished per author): a dimension the
    widget list omits; `book.authors` is already loaded. Cheapest win.
-2. **Personal records** (longest session, biggest day, most pages/day) —
+2. **Personal records** (longest session, biggest day, most pages/day):
    max over structures Colophon already builds. High delight per line.
 3. **Per-book finish estimate + reading momentum** (7d-vs-prior-7d
-   trend, days-to-finish with confidence) — extends the velocity work.
+   trend, days-to-finish with confidence); extends the velocity work.
 4. **Completion / abandonment rate**: started→finished %, using
    Colophon's existing completion heuristic for "finished".
 5. **Year-in-review card**, **period-over-period % delta**, **forgotten
@@ -764,7 +764,7 @@ metrics and the ratings block stay blocked on catalogue metadata and
 - **2026-07-05 additions:** Tome (`bndct-devops/tome`) read and dossiered
   (§5.5) with a ranked steal-list (§8.1); the original four re-swept for
   residual value (§5.6); the parked Phase 3 "annotation markers on the
-  activity strip" question answered (§7.1 — reuse the existing page rescale,
+  activity strip" question answered (§7.1: reuse the existing page rescale,
   three-way type classification). The five reference clones under
   `~/.gitrepos/.studyrepos/` were **deleted after this pass**; everything of
   value is captured here, and each is re-clonable from its upstream if
