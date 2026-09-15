@@ -1,0 +1,4 @@
+# The vendored Flatpak crate-source manifest is machine-generated from
+# Cargo.lock (scripts/flatpak-cargo-generator.py); keep it out of the
+# language bar and mark its diffs as generated noise.
+generated-sources.json linguist-generated

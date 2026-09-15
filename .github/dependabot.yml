@@ -1,0 +1,10 @@
+version: 2
+updates:
+  # GitHub Actions only, and monthly: the workflow pins are SHA-pinned, so
+  # this is the deliberate bump flow. Cargo is deliberately absent: the
+  # committed Cargo.lock and the vendored Flatpak sources are updated by
+  # hand as part of a dependency change, not by a bot.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"

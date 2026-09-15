@@ -1,5 +1,7 @@
 # Colophon
 
+[![CI](https://github.com/VirInvictus/Colophon/actions/workflows/ci.yml/badge.svg)](https://github.com/VirInvictus/Colophon/actions/workflows/ci.yml)
+
 A native Linux desktop (GTK4) statistics viewer for [KOReader](https://koreader.rocks/).
 
 KOReader quietly tracks a surprising amount about how you read: per-page
