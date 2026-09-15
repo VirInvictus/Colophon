@@ -23,6 +23,17 @@ pub struct LibrarySnapshot {
     pub entries: Vec<LibraryEntry>,
 }
 
+/// The epoch window a page turn can honestly fall in (1970-01-01 ..=
+/// 9999-12-31 UTC). KOReader stamps real epoch seconds, so timestamps
+/// outside it only ever come from a corrupt or foreign database: the
+/// extremes are exactly what chrono maps to no instant, which is what
+/// the day/hour bucketing used to panic on. `0` is excluded to match
+/// the app's own reading of the value (`fmt::relative_date` renders it
+/// "never"); negatives predate epoch time and cannot be a page turn.
+fn readable_start_time(ts: i64) -> bool {
+    (1..=253_402_300_799).contains(&ts)
+}
+
 /// Opens the canonical snapshot read-only and computes the per-book
 /// display data: interval-union unique pages from the raw events, plus
 /// the KOReader-parity numbers that must come from the rescaled
@@ -34,6 +45,15 @@ pub fn load_snapshot(path: &Path, sidecar_dir: Option<&Path>) -> Result<LibraryS
     let mut entries = Vec::new();
     for book in db.books()? {
         let events = db.events(&book)?;
+        // The import dialog accepts any *.db, so events can carry corrupt
+        // timestamps. Every day/hour bucket maps them through chrono, which
+        // yields no instant for values past the calendar's edge and used to
+        // panic the render path (`metrics::days`/`speed`). Drop them once,
+        // here, at the single funnel every widget's events flow through.
+        let events: Vec<_> = events
+            .into_iter()
+            .filter(|e| readable_start_time(e.start_time))
+            .collect();
         let coverage = metrics::coverage(&events);
 
         // Capped totals and the activity strip come from the rescaled
@@ -160,6 +180,21 @@ mod tests {
     }
 
     #[test]
+    fn readable_start_time_bounds_the_calendar() {
+        // The extremes a corrupt/foreign db can carry: chrono maps these to
+        // no instant, which used to panic the day/hour bucketing at render.
+        assert!(!readable_start_time(i64::MIN));
+        assert!(!readable_start_time(-1));
+        assert!(!readable_start_time(i64::MAX));
+        assert!(!readable_start_time(253_402_300_800)); // year 10000
+        // Epoch 0 reads as "never" (fmt::relative_date), not a 1970 day.
+        assert!(!readable_start_time(0));
+        assert!(readable_start_time(1));
+        assert!(readable_start_time(1_788_000_000)); // 2026, comfortably
+        assert!(readable_start_time(253_402_300_799)); // 9999-12-31 23:59:59
+    }
+
+    #[test]
     fn import_and_load_round_trip_on_live_sample() {
         let Some(source) = sample() else {
             eprintln!("live sample not present; skipping");
@@ -190,6 +225,15 @@ mod tests {
 
         let reloaded = load_snapshot(&canonical, None).unwrap();
         assert_eq!(reloaded.entries.len(), snap.entries.len());
+
+        // The panic guard: every event that reaches the render path is
+        // inside the calendar window, whatever the db carried.
+        assert!(
+            snap.entries
+                .iter()
+                .flat_map(|e| e.events.iter())
+                .all(|ev| readable_start_time(ev.start_time))
+        );
 
         std::fs::remove_dir_all(&root).ok();
     }
