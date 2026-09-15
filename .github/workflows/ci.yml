@@ -47,7 +47,7 @@ jobs:
       # EmbarkStudios/cargo-deny-action v2 (the cargo-deny authors' own
       # action): RustSec advisories against every locked crate, including
       # the bundled sqlite and vendored lua. Advisories only; see deny.toml.
-      - uses: EmbarkStudios/cargo-deny-action@b66acf5e9fe20f8aba065be86778a8a4c846f902
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25
         with:
           command: check advisories
 
