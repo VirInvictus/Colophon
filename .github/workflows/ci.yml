@@ -35,10 +35,11 @@ jobs:
 
       - name: Install Rust toolchain
         # dtolnay/rust-toolchain@stable was a mutable branch; the SHA pins
-        # the action's implementation (the toolchain it installs is still
-        # whatever `stable` resolves to at run time).
+        # the action's implementation. A SHA ref carries no toolchain of
+        # its own (the branch name used to), so `stable` is named here.
         uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
+          toolchain: stable
           components: rustfmt, clippy
 
       # Swatinem/rust-cache v2.8.0
