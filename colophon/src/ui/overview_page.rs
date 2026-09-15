@@ -1,6 +1,7 @@
 //! The "All Books" surface: library totals, streaks, and the
 //! library-wide charts. Respects the junk filter by construction: the
-//! window hands it the already-filtered entry set via `stats::overview`.
+//! window hands it the already-filtered entry set via
+//! `stats::overview_base`/`overview_windowed`.
 
 use std::cell::RefCell;
 

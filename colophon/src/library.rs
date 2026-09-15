@@ -21,14 +21,15 @@ pub struct LibraryEntry {
     pub unique_pages: Option<i64>,
     /// Raw page-turn events (time axis), chronological.
     pub events: Vec<PageEvent>,
-    /// Per current-axis page aggregates from the `page_stat` view (one row
-    /// per page, not the fanned-out rows); feeds the activity strip. The
-    /// view itself is never materialized in memory.
+    /// Per canonical-axis page aggregates (one row per page, computed in
+    /// SQL from the raw rows; D1 moved this off the `page_stat` view,
+    /// whose per-row axis conflates merged books); feeds the activity
+    /// strip. The view itself is never materialized in memory.
     pub page_totals: Vec<PageTotal>,
-    /// KOReader-parity numbers derived from the `page_stat` view at load
-    /// time (the device's own math runs on the view): capped total
-    /// seconds, distinct pages on the current page axis, and the most
-    /// recently read page.
+    /// KOReader-parity numbers computed at load time with the device's
+    /// own math (recomputed from the raw rows since D1): capped total
+    /// seconds, distinct pages on the canonical page axis, and the most
+    /// recently read page. The field keeps its pre-D1 name.
     pub capped_secs: i64,
     pub view_pages: i64,
     pub last_page: Option<i64>,

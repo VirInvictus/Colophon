@@ -7,8 +7,9 @@
 //!
 //! Layering:
 //! - [`db`] — typed queries over the confirmed schema (RESEARCH.md §1):
-//!   md5-merged books, raw `page_stat_data` events, the rescaled
-//!   `page_stat` view.
+//!   md5-merged books, raw `page_stat_data` events, and the canonical-
+//!   axis page aggregates computed in SQL (D1: the `page_stat` view
+//!   itself is never queried).
 //! - [`metrics`] — pure derived-metric functions implementing `spec.md`'s
 //!   normative definitions (sessions, streaks, coverage, capped totals,
 //!   speed, completion detection).

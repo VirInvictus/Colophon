@@ -1,7 +1,7 @@
-//! The Preferences window. One group for now, the theme picker: a
-//! dropdown of "Follow system" plus every palette in `theme::THEMES`.
-//! Selecting one persists it to GSettings and applies it live via the
-//! window.
+//! The Preferences window: an Appearance group (the theme picker, a
+//! dropdown of "Follow system" plus every palette in `theme::THEMES`)
+//! and a Reading day group (the day-start spin, v2.3.0). Changing either
+//! persists it to GSettings and applies it live via the window.
 
 use gtk::glib;
 use gtk::prelude::*;

@@ -4,9 +4,10 @@
 //! filter applies by simply passing the filtered entry set.
 //!
 //! Device-parity rules (spec.md): the per-book estimates use KOReader's
-//! own math — capped `avg_time` from the rescaled view, time left =
-//! pages left x avg_time, finish date = today + time_left / (capped
-//! time per reading day).
+//! own math: capped `avg_time` (computed from the raw rows onto the
+//! canonical page axis since D1; the `page_stat` view itself is never
+//! queried), time left = pages left x avg_time, finish date = today +
+//! time_left / (capped time per reading day).
 
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
@@ -987,8 +988,8 @@ pub const FINISHED_THRESHOLD: f64 = 0.98;
 /// Per-book reading progress for the positional span bar (spec.md
 /// "Per-book progress display"): the merged read spans, the furthest
 /// position reached, and whether that reached the end. `finished` here is
-/// *inferred*; the `.sdr` declared-finished flag will override it once
-/// sidecars are in scope.
+/// *inferred*; the `.sdr` declared status overrides it when the user has
+/// provided the book's sidecar.
 pub struct Progress {
     pub spans: Vec<(f64, f64)>,
     pub furthest: f64,

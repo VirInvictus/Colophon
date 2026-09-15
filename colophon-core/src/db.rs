@@ -15,8 +15,9 @@ use rusqlite::{Connection, OpenFlags};
 use crate::model::{Book, PageEvent, PageTotal, RescaledEvent};
 
 /// The `PRAGMA user_version` this crate was written against (the schema on
-/// Brandon's device). Older databases exist in the wild; `open` surfaces
-/// the version so callers can warn rather than misread.
+/// Brandon's device). Older databases exist in the wild;
+/// [`StatsDb::schema_version`] surfaces the version so callers can warn
+/// rather than misread.
 pub const EXPECTED_SCHEMA_VERSION: i64 = 20221111;
 
 #[derive(Debug)]

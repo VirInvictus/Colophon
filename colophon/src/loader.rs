@@ -36,9 +36,11 @@ fn readable_start_time(ts: i64) -> bool {
 
 /// Opens the canonical snapshot read-only and computes the per-book
 /// display data: interval-union unique pages from the raw events, plus
-/// the KOReader-parity numbers that must come from the rescaled
-/// `page_stat` view (capped totals, distinct current-axis pages, last
-/// read page) because that is what the device's own queries run on.
+/// the KOReader-parity numbers (capped totals, distinct canonical-axis
+/// pages, last read page). Since D1 those are recomputed in SQL from the
+/// raw rows onto the canonical page count (`StatsDb::page_totals`); the
+/// math mirrors what the device's own queries produce, but the
+/// `page_stat` view itself is never queried.
 pub fn load_snapshot(path: &Path, sidecar_dir: Option<&Path>) -> Result<LibrarySnapshot> {
     let db = StatsDb::open(path)?;
     let schema_version = db.schema_version()?;
@@ -56,20 +58,23 @@ pub fn load_snapshot(path: &Path, sidecar_dir: Option<&Path>) -> Result<LibraryS
             .collect();
         let coverage = metrics::coverage(&events);
 
-        // Capped totals and the activity strip come from the rescaled
-        // `page_stat` view, but as a per-page `GROUP BY` (one row per page)
-        // rather than the fanned-out rows: same numbers, a fraction of the
-        // memory (RESEARCH §1, the view expands each row up to ~1000x).
+        // Capped totals and the activity strip use the same math as the
+        // rescaled `page_stat` view, computed by `page_totals` as a
+        // canonical-axis rescale reduced per page in SQL (D1: the view's
+        // per-row axis conflates merged books, so the view itself is
+        // never queried; and materializing it would fan each row out up
+        // to ~1000x, RESEARCH §1).
         let page_totals = db.page_totals(&book)?;
         let (capped_secs, view_pages) = metrics::capped_seconds(
             page_totals.iter().map(|p| (p.page, p.secs)),
             colophon_core::model::KOREADER_DEFAULT_MAX_SEC,
         );
-        // Last read page on the current axis: the latest raw event rescaled
-        // like the view would, avoiding a second scan of the fanned-out
-        // view just for this one number. Unknown page count: last_page
-        // stays None and page-derived stats hide downstream (spec.md
-        // "Unknown page count").
+        // Last read page on the canonical axis: the latest raw event
+        // rescaled onto the book's current page count, straight from the
+        // raw rows rather than a second fan-out query just for this one
+        // number. Unknown page count: last_page stays None and
+        // page-derived stats hide downstream (spec.md "Unknown page
+        // count").
         let last_page = book.pages.and_then(|cp| {
             events
                 .last()

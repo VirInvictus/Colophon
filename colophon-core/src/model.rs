@@ -74,10 +74,14 @@ pub struct PageEvent {
     pub total_pages: i64,
 }
 
-/// One row of the `page_stat` view: the same events rescaled by KOReader
-/// onto the book's *current* page count, so the page axis is stable across
-/// the book's whole history. Use this for anything page-positional; use
-/// [`PageEvent`] when real timestamps/durations matter.
+/// A page-turn event rescaled onto a merged book's *canonical* page axis
+/// (the most-recently-opened row's page count), so the page axis is
+/// stable across the book's whole history. Colophon computes these in SQL
+/// from the raw rows ([`crate::StatsDb::rescaled_events`]); KOReader's own
+/// `page_stat` view rescales per stored row instead, which conflates
+/// merged books recorded under different paginations (defect D1). Use
+/// this for anything page-positional; use [`PageEvent`] when real
+/// timestamps/durations matter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RescaledEvent {
     pub book_id: i64,
@@ -86,9 +90,11 @@ pub struct RescaledEvent {
     pub duration: i64,
 }
 
-/// One current-axis page's aggregate from the rescaled `page_stat` view:
-/// the `GROUP BY page` reduction that replaces materializing the fanned-out
-/// view row by row. `secs` sums every view row for the page (including
+/// One canonical-axis page's aggregate: the per-page reduction that
+/// replaces materializing the fanned-out rescale row by row. Computed in
+/// SQL from the raw `page_stat_data` rows onto the canonical page count
+/// (see [`crate::StatsDb::page_totals`]; the `page_stat` view itself is
+/// never queried). `secs` sums every rescaled row for the page (including
 /// zero-duration ones, so distinct-page counts match KOReader's capped
 /// query); `reads` counts only the positive-duration rows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
