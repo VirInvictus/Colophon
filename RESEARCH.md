@@ -116,6 +116,15 @@ reading, session-length distributions).
 - Timestamps are plain unix epoch seconds, no timezone stored — convert in
   the local timezone at render time.
 
+> **Amendment 2026-09-15:** the sample was refreshed from the device, and
+> the reconciliation expectation above now carries an asterisk: Jingo's
+> cached `total_read_time` had drifted 23 s behind the sum of its
+> `page_stat_data` durations (30,036 cached vs 30,059 summed; every other
+> book still agrees exactly). The cached total is KOReader's own
+> incrementally-maintained cache and can lag its event log; Colophon's
+> uncapped sums come from the events, so tiny disagreements with the
+> device's headline number are possible on real data.
+
 ### Known gotchas (from reading the migration history, not yet stress-tested)
 
 - Schema has changed over time (`DB_SCHEMA_VERSION`, `PRAGMA user_version`).

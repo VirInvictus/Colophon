@@ -35,13 +35,19 @@ fn live_sample_reconciles() {
         let events = db.events(book).unwrap();
         total_events += events.len();
 
-        // KOReader maintains total_read_time incrementally; it must equal
-        // the raw sum (verified true on the real device, 2026-07-03).
-        assert_eq!(
-            metrics::uncapped_seconds(&events),
-            book.total_read_time,
-            "uncapped total mismatch for {:?}",
-            book.title
+        // KOReader maintains total_read_time incrementally, and the two
+        // agreed exactly on the 2026-07-03 sample. Two months of further
+        // reading drifted Jingo's cached counter 23 s behind its event sum
+        // (2026-09-15 refresh; every other book still agrees exactly), so
+        // the cross-check allows a small slack instead of exact equality:
+        // the device's counter is a cache, and the cache can lag.
+        let uncapped = metrics::uncapped_seconds(&events);
+        let drift = (uncapped - book.total_read_time).abs();
+        assert!(
+            drift <= 60.max(book.total_read_time / 100),
+            "uncapped total drifts too far for {:?}: {uncapped} vs {}",
+            book.title,
+            book.total_read_time
         );
 
         let coverage = metrics::coverage(&events);
