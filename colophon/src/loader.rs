@@ -323,4 +323,53 @@ mod tests {
 
         std::fs::remove_dir_all(&root).ok();
     }
+
+    #[test]
+    fn import_refuses_a_db_that_opens_but_does_not_load() {
+        // The exact class the full-load validation exists for: book and
+        // page_stat_data exist (so the old books()-only validation passed)
+        // but the `numbers` tally table is missing, which only the page
+        // aggregates need. The import must refuse while the good snapshot
+        // is still untouched, not promote and then fail.
+        let root = temp_dir("unloadable-import");
+        let staging = root.join("staging");
+        let canonical = root.join("statistics.sqlite3");
+        std::fs::write(&canonical, b"pretend this is a good snapshot").unwrap();
+
+        let partial = root.join("partial.sqlite3");
+        let conn = rusqlite::Connection::open(&partial).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE book (
+                 id integer PRIMARY KEY autoincrement,
+                 title text, authors text, notes integer, last_open integer,
+                 highlights integer, pages integer, series text, language text,
+                 md5 text, total_read_time integer, total_read_pages integer
+             );
+             CREATE TABLE page_stat_data (
+                 id_book integer,
+                 page integer NOT NULL DEFAULT 0,
+                 start_time integer NOT NULL DEFAULT 0,
+                 duration integer NOT NULL DEFAULT 0,
+                 total_pages integer NOT NULL DEFAULT 0
+             );
+             INSERT INTO book (title, authors, pages, md5)
+                 VALUES ('B', 'A', 100, 'dddd');
+             INSERT INTO page_stat_data VALUES (1, 5, 1000, 60, 100);",
+        )
+        .unwrap();
+        drop(conn);
+
+        assert!(import(&partial, &staging, &canonical, None).is_err());
+        assert_eq!(
+            std::fs::read(&canonical).unwrap(),
+            b"pretend this is a good snapshot",
+            "the good snapshot must survive a refused import"
+        );
+        assert!(
+            !staging.exists(),
+            "staging dir cleaned after a refused import"
+        );
+
+        std::fs::remove_dir_all(&root).ok();
+    }
 }

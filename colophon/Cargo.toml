@@ -11,3 +11,9 @@ colophon-core = { path = "../colophon-core" }
 gtk.workspace = true
 anyhow.workspace = true
 chrono.workspace = true
+
+[dev-dependencies]
+# Test-fixture only: builds corrupt/partial database files for the
+# staged-import tests. Same workspace version the core crate already
+# carries; the lockfile and the vendored Flatpak sources are unchanged.
+rusqlite.workspace = true

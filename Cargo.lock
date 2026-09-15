@@ -127,6 +127,7 @@ dependencies = [
  "chrono",
  "colophon-core",
  "gtk4",
+ "rusqlite",
 ]
 
 [[package]]
