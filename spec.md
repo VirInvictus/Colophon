@@ -252,7 +252,9 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
   the honest outcome for a re-downloaded edition of the same title.
 - **Words in book**: the provided EPUB's text, counted over every
   HTML/XHTML document in the container after removing `<style>` and
-  `<script>` blocks and stripping markup (entities decoded). A word is
+  `<script>` blocks and stripping markup. Character references decode
+  (numeric ones and the common named set); a rarer named entity is
+  dropped rather than left to count as a word. A word is
   a maximal run of alphanumeric characters (Unicode); hyphens and
   apostrophes inside a run keep it one word. This is a viewer-grade
   estimate (pagination- and typesetting-independent by nature), counted
