@@ -1,5 +1,5 @@
 //! GitHub-style year heatmap: Monday-start weeks as columns, quantized
-//! intensity levels (spec.md Tier B #7), tooltip per day.
+//! intensity levels (spec.md Tier B #10), tooltip per day.
 
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
@@ -20,8 +20,8 @@ const MAX_WEEKS: i64 = 52;
 
 #[derive(Default)]
 pub struct Data {
-    /// seconds, distinct pages per day
-    days: BTreeMap<NaiveDate, (i64, u32)>,
+    /// seconds, distinct pages, distinct books per day
+    days: BTreeMap<NaiveDate, (i64, u32, u32)>,
     max_secs: i64,
     /// Monday of the leftmost column.
     grid_start: Option<NaiveDate>,
@@ -76,11 +76,11 @@ impl YearHeatmap {
     /// Feeds per-day totals; the grid spans up to a year of Monday-start
     /// weeks ending at `today`, shrinking (min 8 weeks) for young data.
     pub fn set_data(&self, daily: &BTreeMap<NaiveDate, colophon_core::DayTotal>, today: NaiveDate) {
-        let days: BTreeMap<NaiveDate, (i64, u32)> = daily
+        let days: BTreeMap<NaiveDate, (i64, u32, u32)> = daily
             .iter()
-            .map(|(d, t)| (*d, (t.seconds, t.pages)))
+            .map(|(d, t)| (*d, (t.seconds, t.pages, t.books)))
             .collect();
-        let max_secs = days.values().map(|(s, _)| *s).max().unwrap_or(0);
+        let max_secs = days.values().map(|(s, _, _)| *s).max().unwrap_or(0);
 
         let this_monday = today - Duration::days(today.weekday().num_days_from_monday() as i64);
         let weeks = match days.keys().next() {
@@ -149,7 +149,7 @@ impl YearHeatmap {
                 if date > today {
                     continue;
                 }
-                let secs = data.days.get(&date).map(|(s, _)| *s).unwrap_or(0);
+                let secs = data.days.get(&date).map(|(s, _, _)| *s).unwrap_or(0);
                 let level = super::heat_level(secs, data.max_secs);
                 super::set_source(cr, super::heat(level, dark));
                 cr.rectangle(x, TOP + (CELL + GAP) * row as f64, CELL, CELL);
@@ -171,14 +171,39 @@ impl YearHeatmap {
         if date > today {
             return None;
         }
-        Some(match data.days.get(&date) {
-            Some((secs, pages)) => format!(
-                "{} \u{b7} {} \u{b7} {} pages",
-                short_date(date),
-                humanize_secs(*secs),
-                pages
-            ),
-            None => format!("{} \u{b7} no reading", short_date(date)),
-        })
+        Some(day_tooltip(
+            date,
+            data.days.get(&date).map(|(s, p, b)| (*s, *p, *b)),
+        ))
+    }
+}
+
+/// One day's tooltip line (spec.md Tier B #10: time + pages + books).
+fn day_tooltip(date: NaiveDate, total: Option<(i64, u32, u32)>) -> String {
+    match total {
+        Some((secs, pages, books)) => format!(
+            "{} \u{b7} {} \u{b7} {} pages \u{b7} {} books",
+            short_date(date),
+            humanize_secs(secs),
+            pages,
+            books
+        ),
+        None => format!("{} \u{b7} no reading", short_date(date)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::day_tooltip;
+    use chrono::NaiveDate;
+
+    #[test]
+    fn tooltip_names_time_pages_and_books() {
+        let date: NaiveDate = "2026-07-05".parse().unwrap();
+        assert_eq!(
+            day_tooltip(date, Some((7200, 40, 2))),
+            "Jul 5 2026 \u{b7} 2h \u{b7} 40 pages \u{b7} 2 books"
+        );
+        assert_eq!(day_tooltip(date, None), "Jul 5 2026 \u{b7} no reading");
     }
 }
