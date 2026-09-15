@@ -1,3 +1,8 @@
+# Vendored from flatpak-builder-tools' flatpak-cargo-generator.py
+# (github.com/flatpak/flatpak-builder-tools, MIT) at the time of the
+# first vendoring (v2.3.1); regenerated outputs feed the Flatpak
+# manifest's crate sources. Local edits: none. Regenerate with:
+#   uv run scripts/flatpak-cargo-generator.py Cargo.lock -o generated-sources.json
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.9"

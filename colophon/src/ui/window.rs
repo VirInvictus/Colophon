@@ -291,6 +291,7 @@ impl ColophonWindow {
             return;
         };
         let sidecar_dir = paths::sidecar_dir();
+        let epub_dir = paths::library_dir();
         let weak = self.downgrade();
         glib::spawn_future_local(async move {
             // Same off-main-thread rule as `probe_device_present`: the
@@ -305,13 +306,15 @@ impl ColophonWindow {
             if !readable {
                 return;
             }
-            let refreshed = gio::spawn_blocking(move || autopull::refresh_sidecars(&sidecar_dir))
-                .await
-                .unwrap_or(0);
+            let refreshed = gio::spawn_blocking(move || {
+                autopull::refresh_sidecars(&sidecar_dir) + autopull::refresh_epubs(&epub_dir)
+            })
+            .await
+            .unwrap_or(0);
             let Some(window) = weak.upgrade() else { return };
             if refreshed > 0 {
                 window.show_toast(&format!(
-                    "Refreshed {refreshed} sidecar{} from the device",
+                    "Refreshed {refreshed} provided file{} from the device",
                     if refreshed == 1 { "" } else { "s" }
                 ));
             }
@@ -515,6 +518,51 @@ impl ColophonWindow {
             }
             Err(e) => self.show_toast(&format!("Couldn't save the sidecar: {e}")),
         }
+    }
+
+    /// Takes a user-provided EPUB for the book with `md5`: verifies it
+    /// by KOReader's partial MD5 against the book's own identity, copies
+    /// it into the app-owned library cache, and remembers the origin for
+    /// auto-pull (spec.md "User-provided book files (EPUB)"). A file
+    /// that does not match the book is refused with a toast, which is
+    /// also the honest outcome for a re-downloaded edition of the same
+    /// title. Any problem is a toast, never a crash.
+    pub fn add_epub_for(&self, md5: &str, source: &std::path::Path) {
+        let md5 = md5.to_string();
+        let source = source.to_path_buf();
+        let weak = self.downgrade();
+        glib::spawn_future_local(async move {
+            // The verification walks the whole file: off the main thread.
+            let verified = gio::spawn_blocking({
+                let source = source.clone();
+                let md5 = md5.clone();
+                move || {
+                    colophon_core::wordcount::partial_md5(&source)
+                        .map(|got| got.eq_ignore_ascii_case(&md5))
+                        .unwrap_or(false)
+                }
+            })
+            .await
+            .unwrap_or(false);
+            let Some(window) = weak.upgrade() else { return };
+            if !verified {
+                window.show_toast(
+                    "That file's checksum doesn't match this book (a re-downloaded edition?)",
+                );
+                return;
+            }
+            let dest = paths::epub_for(&md5);
+            let saved = std::fs::create_dir_all(paths::library_dir())
+                .and_then(|_| std::fs::copy(&source, &dest).map(|_| ()));
+            match saved {
+                Ok(()) => {
+                    autopull::remember_origin(&paths::library_dir(), &md5, &source);
+                    window.show_toast("Book file added; word stats are in");
+                    window.startup_load();
+                }
+                Err(e) => window.show_toast(&format!("Couldn't save the book file: {e}")),
+            }
+        });
     }
 
     fn junk_filter_on(&self) -> bool {

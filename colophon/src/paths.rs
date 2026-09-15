@@ -33,3 +33,16 @@ pub fn sidecar_dir() -> PathBuf {
 pub fn sidecar_for(md5: &str) -> PathBuf {
     sidecar_dir().join(format!("{}.lua", md5.to_lowercase()))
 }
+
+/// User-provided EPUBs, one per book, named by the book's md5, plus a
+/// `<md5>.origin` note of where each was attached from (the same shape
+/// as the sidecar cache; spec "User-provided book files (EPUB)"). The
+/// word-count stats come only from these files.
+pub fn library_dir() -> PathBuf {
+    app_data_dir().join("library")
+}
+
+/// The cached EPUB path for a given book md5 (lowercased).
+pub fn epub_for(md5: &str) -> PathBuf {
+    library_dir().join(format!("{}.epub", md5.to_lowercase()))
+}

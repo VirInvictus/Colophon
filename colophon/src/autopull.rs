@@ -63,6 +63,24 @@ pub fn refresh_sidecars(sidecar_dir: &Path) -> usize {
     refreshed
 }
 
+/// Re-copy every cached EPUB whose remembered origin is readable and
+/// still verifies by its own partial MD5 (the same checksum the attach
+/// matched against; spec "User-provided book files (EPUB)").
+pub fn refresh_epubs(library_dir: &Path) -> usize {
+    let mut refreshed = 0;
+    for (md5, origin) in origins(library_dir) {
+        match colophon_core::wordcount::partial_md5(&origin) {
+            Ok(got) if got.eq_ignore_ascii_case(&md5) => {}
+            _ => continue,
+        }
+        let dest = library_dir.join(format!("{md5}.epub"));
+        if fs::copy(&origin, &dest).is_ok() {
+            refreshed += 1;
+        }
+    }
+    refreshed
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

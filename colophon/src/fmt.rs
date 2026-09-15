@@ -51,6 +51,20 @@ pub fn short_date(date: chrono::NaiveDate) -> String {
     )
 }
 
+/// Grouping separators for big counts: 1234567 becomes "1,234,567".
+pub fn thousands(n: u64) -> String {
+    let digits = n.to_string();
+    let head = digits.len().rem_euclid(3);
+    let mut out = String::new();
+    for (i, ch) in digits.chars().enumerate() {
+        if i > 0 && (i - head) % 3 == 0 {
+            out.push(',');
+        }
+        out.push(ch);
+    }
+    out
+}
+
 /// A read-through's calendar span: "Jul 3 – Jul 19", or the single date
 /// when both ends fall on the same day.
 pub fn date_span(start: chrono::NaiveDate, end: chrono::NaiveDate) -> String {
@@ -112,6 +126,14 @@ mod tests {
         assert_eq!(hour_label(7), "7 AM");
         assert_eq!(hour_label(12), "noon");
         assert_eq!(hour_label(22), "10 PM");
+    }
+
+    #[test]
+    fn thousands_groups_from_the_right() {
+        assert_eq!(thousands(0), "0");
+        assert_eq!(thousands(999), "999");
+        assert_eq!(thousands(1_000), "1,000");
+        assert_eq!(thousands(1_234_567), "1,234,567");
     }
 
     #[test]

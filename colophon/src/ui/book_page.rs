@@ -128,6 +128,44 @@ impl BookPage {
         );
     }
 
+    /// Opens a file picker for this book's EPUB and hands it to the
+    /// window to verify, cache, and reload (spec.md "User-provided book
+    /// files (EPUB)"). The user provides the file; Colophon never
+    /// reaches into the device.
+    fn pick_epub(&self, md5: &str) {
+        let Some(window) = self
+            .root()
+            .and_downcast::<crate::ui::window::ColophonWindow>()
+        else {
+            return;
+        };
+        let md5 = md5.to_string();
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some("EPUB"));
+        filter.add_pattern("*.epub");
+        let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&filter);
+        let picker = gtk::FileDialog::builder()
+            .title("Choose this book's EPUB")
+            .filters(&filters)
+            .build();
+        picker.open(
+            Some(&window),
+            gtk::gio::Cancellable::NONE,
+            glib::clone!(
+                #[weak]
+                window,
+                move |result| {
+                    if let Ok(file) = result
+                        && let Some(path) = file.path()
+                    {
+                        window.add_epub_for(&md5, &path);
+                    }
+                }
+            ),
+        );
+    }
+
     pub fn set_book(&self, entry: &LibraryEntry, detail: &BookDetail, day_start: DayStart) {
         let imp = self.imp();
         let book = &entry.book;
@@ -233,6 +271,38 @@ impl BookPage {
             format!("{} \u{b7} {}", book.highlights, book.notes),
             None,
         );
+        // The word axis (spec.md "Words in book", "Words read", "True
+        // WPM"): only with a provided EPUB; the affordance mirrors the
+        // sidecar's.
+        if let Some(words) = detail.words {
+            let mut subtitle = detail.words_read.map(|r| format!("{r} words read"));
+            if let Some(wpm) = detail.wpm {
+                subtitle = Some(format!(
+                    "{} \u{b7} {:.0} WPM",
+                    subtitle.unwrap_or_default(),
+                    wpm
+                ));
+            }
+            add("Words in book", words.to_string(), subtitle);
+        } else if let Some(md5) = book.md5.clone() {
+            let button = gtk::Button::builder()
+                .label("Add EPUB\u{2026}")
+                .valign(gtk::Align::Center)
+                .css_classes(["flat"])
+                .build();
+            button.connect_clicked(glib::clone!(
+                #[weak(rename_to = page)]
+                self,
+                move |_| page.pick_epub(&md5)
+            ));
+            imp.rows.append(&{
+                rows::row(
+                    "Words in book",
+                    Some("from the book's EPUB"),
+                    Some(button.upcast_ref()),
+                )
+            });
+        }
         if detail.revisited_pages > 0 {
             add(
                 "Pages revisited",

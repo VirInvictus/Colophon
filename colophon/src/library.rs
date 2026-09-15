@@ -38,6 +38,10 @@ pub struct LibraryEntry {
     pub declared_status: Option<ReadStatus>,
     /// Annotation position markers from the same sidecar (empty without one).
     pub annotations: Vec<Annotation>,
+    /// Words in the book, from the EPUB the user has provided (spec.md
+    /// "Words in book"); `None` without one, which hides every
+    /// word-count stat for the book.
+    pub word_count: Option<u64>,
 }
 
 impl LibraryEntry {
@@ -160,6 +164,7 @@ mod tests {
             last_page: Some(0),
             declared_status: None,
             annotations: Vec::new(),
+            word_count: None,
         })
     }
 

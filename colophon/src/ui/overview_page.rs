@@ -68,6 +68,10 @@ mod imp {
         #[template_child]
         pub record_tiles: TemplateChild<gtk::FlowBox>,
         #[template_child]
+        pub lengths_title: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub lengths_tiles: TemplateChild<gtk::FlowBox>,
+        #[template_child]
         pub recap_title: TemplateChild<gtk::Label>,
         #[template_child]
         pub recap_tiles: TemplateChild<gtk::FlowBox>,
@@ -224,6 +228,16 @@ glib::wrapper! {
 
 const WEEKDAY_LABELS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+/// The spec's length buckets, in order (<50k, 50-100k, 100-150k,
+/// 150-250k, 250k+ words).
+const LENGTH_BUCKETS: [&str; 5] = [
+    "under 50k words",
+    "50-100k words",
+    "100-150k words",
+    "150-250k words",
+    "250k+ words",
+];
+
 impl OverviewPage {
     /// The selected time window in days (`None` = all time).
     pub fn window_days(&self) -> Option<i64> {
@@ -333,9 +347,16 @@ impl OverviewPage {
                     &profile.weekly_rhythm,
                 ];
                 // Variety is whole-library and only meaningful past a few
-                // authors, so it is present only sometimes (spec.md).
+                // authors, so it is present only sometimes (spec.md). The
+                // Length and Pace axes need provided EPUBs instead.
                 if let Some(variety) = &profile.variety {
                     traits.push(variety);
+                }
+                if let Some(length) = &profile.length {
+                    traits.push(length);
+                }
+                if let Some(pace) = &profile.pace {
+                    traits.push(pace);
                 }
                 for t in traits {
                     imp.profile_tiles.append(&tile(t.label, &t.detail, None));
@@ -374,6 +395,29 @@ impl OverviewPage {
                 "most pages in a day",
                 pages_date.as_deref(),
             ));
+            // Lifetime words (spec.md "Lifetime words read"): whole-
+            // library, shown once a provided EPUB contributes.
+            if overview.lifetime_words > 0 {
+                imp.record_tiles.append(&tile(
+                    &crate::fmt::thousands(overview.lifetime_words),
+                    "lifetime words",
+                    None,
+                ));
+            }
+        }
+
+        // Book lengths (spec.md "Book-length distribution"): the
+        // provided books' word counts bucketed; hidden below three
+        // provided books.
+        imp.lengths_tiles.remove_all();
+        let dist = overview.length_distribution;
+        imp.lengths_title.set_visible(dist.is_some());
+        imp.lengths_tiles.set_visible(dist.is_some());
+        if let Some(buckets) = dist {
+            for (label, count) in LENGTH_BUCKETS.iter().zip(buckets) {
+                imp.lengths_tiles
+                    .append(&tile(&count.to_string(), label, None));
+            }
         }
 
         // Recap (spec.md "Recap"): a whole-history composite, so it stays put

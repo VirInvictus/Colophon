@@ -91,7 +91,23 @@ pub fn load_snapshot(path: &Path, sidecar_dir: Option<&Path>) -> Result<LibraryS
             book,
             declared_status: None,
             annotations: Vec::new(),
+            word_count: None,
         });
+    }
+    // Word counts for the books whose EPUB the user has provided
+    // (spec.md "Words in book"): counted once per load, inside this
+    // function's spawn_blocking. A book without a provided EPUB keeps
+    // `None`, which hides its word-count stats (the data-provision
+    // principle).
+    for entry in &mut entries {
+        if let Some(md5) = &entry.book.md5 {
+            let epub = crate::paths::epub_for(md5);
+            if epub.exists()
+                && let Ok(words) = colophon_core::wordcount::epub_word_count(&epub)
+            {
+                entry.word_count = Some(words);
+            }
+        }
     }
     // Reconcile the inferred "finished" against the device's own declared
     // status, read from the user-provided `.sdr` sidecars: one file per book,

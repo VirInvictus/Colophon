@@ -59,6 +59,19 @@ pub struct Overview {
     pub forgotten: Vec<ForgottenBook>,
     /// Whole-history composite recap (window-independent).
     pub recap: Recap,
+    /// Words read summed over the books whose EPUB is provided (spec.md
+    /// "Lifetime words read"); 0 until any EPUB is provided.
+    pub lifetime_words: u64,
+    /// Provided books' word counts bucketed (<50k, 50-100k, 100-150k,
+    /// 150-250k, 250k+); `None` below three provided books (spec.md
+    /// "Book-length distribution").
+    pub length_distribution: Option<[u32; 5]>,
+    /// Words in book over the finished books with a provided EPUB (the
+    /// Length axis' samples).
+    pub finished_book_words: Vec<u64>,
+    /// True WPM over the same books with at least 300 s of reading (the
+    /// Pace axis' samples).
+    pub finished_book_wpms: Vec<f64>,
     /// Finished works with finish dates, most-recent first (whole-history).
     pub finished_books: Vec<FinishedBook>,
     /// This window against the previous equal-length window; `None` for
@@ -193,6 +206,65 @@ pub fn author_breakdown(entries: &[Rc<LibraryEntry>]) -> Vec<AuthorStat> {
 /// over authors by read time, `None` below three distinct authors where the
 /// index is too sensitive to the count to mean anything. Whole-library, so
 /// unlike the three window traits it does not move with the time window.
+/// Median of a sample, None when empty.
+fn median(values: Vec<f64>) -> Option<f64> {
+    let mut values = values;
+    if values.is_empty() {
+        return None;
+    }
+    values.sort_by(f64::total_cmp);
+    let n = values.len();
+    Some(if n % 2 == 1 {
+        values[n / 2]
+    } else {
+        (values[n / 2 - 1] + values[n / 2]) / 2.0
+    })
+}
+
+/// Length axis (spec.md "Reading personality, Length axis"): short to
+/// long from the median words in book over finished books with provided
+/// EPUBs, calibrated 30k to 150k; suppressed below three such books.
+fn length_trait(samples: &[u64]) -> Option<ProfileTrait> {
+    if samples.len() < 3 {
+        return None;
+    }
+    let median = median(samples.iter().map(|w| *w as f64).collect::<Vec<_>>())?;
+    let pos = ((median - 30_000.0) / 120_000.0).clamp(0.0, 1.0);
+    let label = if pos <= 1.0 / 3.0 {
+        "Short-book reader"
+    } else if pos >= 2.0 / 3.0 {
+        "Long-book reader"
+    } else {
+        "Mid-length reader"
+    };
+    Some(ProfileTrait {
+        label,
+        detail: format!("median {:.0}k words", median / 1000.0),
+    })
+}
+
+/// Pace axis (spec.md "Reading personality, Pace axis"): savorer to
+/// speed-reader from the median true WPM over the same books,
+/// calibrated 140 to 360 WPM; suppressed below three books.
+fn pace_trait(samples: &[f64]) -> Option<ProfileTrait> {
+    if samples.len() < 3 {
+        return None;
+    }
+    let median = median(samples.to_vec())?;
+    let pos = ((median - 140.0) / 220.0).clamp(0.0, 1.0);
+    let label = if pos <= 1.0 / 3.0 {
+        "Savorer"
+    } else if pos >= 2.0 / 3.0 {
+        "Speed-reader"
+    } else {
+        "Steady pacer"
+    };
+    Some(ProfileTrait {
+        label,
+        detail: format!("median {:.0} WPM", median),
+    })
+}
+
 fn variety_trait(authors: &[AuthorStat]) -> Option<ProfileTrait> {
     if authors.len() < 3 {
         return None;
@@ -489,6 +561,10 @@ pub struct OverviewBase {
     records: Records,
     forgotten: Vec<ForgottenBook>,
     recap: Recap,
+    lifetime_words: u64,
+    length_distribution: Option<[u32; 5]>,
+    finished_book_words: Vec<u64>,
+    finished_book_wpms: Vec<f64>,
     finished_books: Vec<FinishedBook>,
 }
 
@@ -534,6 +610,47 @@ pub fn overview_base<Tz: TimeZone>(
             .filter(|(_, s)| *s > 0)
             .max_by_key(|(_, s)| *s),
     };
+    // The word axis (spec.md "Lifetime words read", "Book-length
+    // distribution", "Reading personality, Length/Pace axis"): derived
+    // from the provided EPUBs' word counts already carried per entry.
+    let mut lifetime_words = 0u64;
+    let mut all_word_counts: Vec<u64> = Vec::new();
+    let mut finished_book_words: Vec<u64> = Vec::new();
+    let mut finished_book_wpms: Vec<f64> = Vec::new();
+    for e in entries {
+        let Some(words) = e.word_count else {
+            continue;
+        };
+        all_word_counts.push(words);
+        if e.book.pages.is_some() {
+            let words_read = (words as f64 * metrics::coverage(&e.events)).round() as u64;
+            lifetime_words += words_read;
+            if e.is_finished() {
+                finished_book_words.push(words);
+                let uncapped: i64 = e.events.iter().map(|ev| ev.duration).sum();
+                if uncapped >= 300 {
+                    finished_book_wpms.push(words_read as f64 / (uncapped as f64 / 60.0));
+                }
+            }
+        }
+    }
+    let length_distribution = if all_word_counts.len() >= 3 {
+        let mut buckets = [0u32; 5];
+        for words in &all_word_counts {
+            let slot = match *words {
+                0..=49_999 => 0,
+                50_000..=99_999 => 1,
+                100_000..=149_999 => 2,
+                150_000..=249_999 => 3,
+                _ => 4,
+            };
+            buckets[slot] += 1;
+        }
+        Some(buckets)
+    } else {
+        None
+    };
+
     OverviewBase {
         all_events,
         daily,
@@ -546,6 +663,10 @@ pub fn overview_base<Tz: TimeZone>(
         cumulative,
         series: series_breakdown(entries),
         authors: author_breakdown(entries),
+        lifetime_words,
+        length_distribution,
+        finished_book_words,
+        finished_book_wpms,
     }
 }
 
@@ -720,6 +841,10 @@ pub fn overview_windowed<Tz: TimeZone>(
         streaks: base.streaks,
         series: base.series.clone(),
         authors: base.authors.clone(),
+        lifetime_words: base.lifetime_words,
+        length_distribution: base.length_distribution,
+        finished_book_words: base.finished_book_words.clone(),
+        finished_book_wpms: base.finished_book_wpms.clone(),
         records: base.records.clone(),
         forgotten: base.forgotten.clone(),
         recap: base.recap.clone(),
@@ -864,6 +989,10 @@ pub struct ReaderProfile {
     pub weekly_rhythm: ProfileTrait,
     /// Author-diversity trait; `None` below three distinct authors.
     pub variety: Option<ProfileTrait>,
+    /// Word-count traits; `None` below three finished books with a
+    /// provided EPUB (spec.md word-count lane).
+    pub length: Option<ProfileTrait>,
+    pub pace: Option<ProfileTrait>,
 }
 
 /// Below this much reading in the window the profile is suppressed rather
@@ -958,6 +1087,8 @@ pub fn reader_profile(o: &Overview) -> Option<ReaderProfile> {
         session_style,
         weekly_rhythm,
         variety: variety_trait(&o.authors),
+        length: length_trait(&o.finished_book_words),
+        pace: pace_trait(&o.finished_book_wpms),
     })
 }
 
@@ -1107,6 +1238,16 @@ pub struct BookDetail {
     pub momentum: Option<Momentum>,
     /// Current-axis pages visited more than once (re-read detection).
     pub revisited_pages: usize,
+    /// Words in the book, from the user-provided EPUB (spec.md "Words in
+    /// book"); `None` without one, which hides the word rows.
+    pub words: Option<u64>,
+    /// `round(words x coverage)`: the words on the pages actually logged
+    /// (spec.md "Words read"). `None` when the words or the page count
+    /// are unknown.
+    pub words_read: Option<u64>,
+    /// True words per minute (spec.md "True WPM"): words read over
+    /// uncapped minutes, shown from 300 s of reading.
+    pub wpm: Option<f64>,
 }
 
 /// A per-book recent-pace read (spec.md "Reading momentum").
@@ -1200,7 +1341,7 @@ pub fn book_detail<Tz: TimeZone>(
 
     let momentum = reading_momentum(events, tz, day_start, today);
 
-    BookDetail {
+    let mut detail = BookDetail {
         total_secs: book.total_read_time,
         capped_secs: entry.capped_secs,
         days_reading,
@@ -1219,7 +1360,26 @@ pub fn book_detail<Tz: TimeZone>(
         est_confidence,
         momentum,
         revisited_pages: entry.page_totals.iter().filter(|p| p.reads > 1).count(),
+        words: entry.word_count,
+        words_read: None,
+        wpm: None,
+    };
+    // The word axis (spec.md "Words read", "True WPM"): carried from the
+    // page coverage, and hidden with the page-derived stats when the
+    // page count is unknown. WPM runs on the uncapped time and only
+    // shows from 300 s of reading.
+    if let Some(words) = entry.word_count
+        && book.pages.is_some()
+    {
+        let coverage = metrics::coverage(events);
+        let words_read = (words as f64 * coverage).round() as u64;
+        detail.words_read = Some(words_read);
+        let uncapped: i64 = events.iter().map(|e| e.duration).sum();
+        if uncapped >= 300 {
+            detail.wpm = Some(words_read as f64 / (uncapped as f64 / 60.0));
+        }
     }
+    detail
 }
 
 /// This book's last 7 days against the 7 before them (spec.md "Reading
@@ -1356,6 +1516,7 @@ mod tests {
             last_page: Some(50),
             declared_status: None,
             annotations: Vec::new(),
+            word_count: None,
         })
     }
 
@@ -1699,6 +1860,10 @@ mod tests {
 
     fn base_overview() -> Overview {
         Overview {
+            lifetime_words: 0,
+            length_distribution: None,
+            finished_book_words: Vec::new(),
+            finished_book_wpms: Vec::new(),
             total_secs: 7200,
             unique_pages: 0,
             books: 1,
@@ -1802,6 +1967,36 @@ mod tests {
         assert_eq!(authors[1].name, "Terry Pratchett");
         assert_eq!((authors[1].books, authors[1].finished), (1, 0)); // two files, one work
         assert_eq!(authors[1].total_secs, (50 + 40) * 60);
+    }
+
+    #[test]
+    fn length_and_pace_traits_classify_and_suppress() {
+        // Below three finished books: suppressed.
+        assert!(length_trait(&[40_000, 50_000]).is_none());
+        assert!(pace_trait(&[150.0, 200.0]).is_none());
+        // Median words 40k -> short; 90k -> mid; 160k -> long.
+        assert_eq!(
+            length_trait(&[35_000, 40_000, 45_000]).unwrap().label,
+            "Short-book reader"
+        );
+        assert_eq!(
+            length_trait(&[85_000, 90_000, 95_000]).unwrap().label,
+            "Mid-length reader"
+        );
+        assert_eq!(
+            length_trait(&[150_000, 160_000, 170_000]).unwrap().label,
+            "Long-book reader"
+        );
+        // Pace: 150/200/250 WPM -> savorer (median 200 sits in the low third).
+        assert_eq!(pace_trait(&[150.0, 200.0, 250.0]).unwrap().label, "Savorer");
+        assert_eq!(
+            pace_trait(&[240.0, 300.0, 350.0]).unwrap().label,
+            "Speed-reader"
+        );
+        assert_eq!(
+            pace_trait(&[200.0, 240.0, 280.0]).unwrap().label,
+            "Steady pacer"
+        );
     }
 
     #[test]
@@ -2136,6 +2331,7 @@ mod tests {
             book: entry(Vec::new()).book.clone(),
             declared_status: None,
             annotations: Vec::new(),
+            word_count: None,
         });
         let d = book_detail(&e, &Utc, DayStart::MIDNIGHT, date("2026-07-03"));
         assert_eq!(d.days_reading, 0);
