@@ -133,6 +133,14 @@ matching the shape of `Viaduct`/`Conservatory` rather than Atrium's larger
 seven-crate split; this project doesn't need that much separation yet.
 Charts are hand-drawn cairo (decided Phase 3; no charting crate).
 
+Toolchain floor: `rust-version = 1.85` (the edition 2024 minimum; the
+highest feature the code uses, `#[expect]`, is 1.81). There is
+deliberately **no** rust-toolchain.toml (recorded decision, 2026-09-15):
+each environment pins its own Rust where it matters (CI on stable in the
+pinned Fedora 44 container, the Flatpak on the runtime's
+`rust-stable//25.08` extension, local dev on the rustup default), and a
+repo pin would bind only local dev while needing a forever-bump.
+
 ## Naming
 
 "Colophon": a printer's mark historically placed at the end of a book

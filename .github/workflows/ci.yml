@@ -44,6 +44,13 @@ jobs:
       # Swatinem/rust-cache v2.8.0
       - uses: Swatinem/rust-cache@8cbdedb5103daa674dcf46d3590fe06a76645684
 
+      # EmbarkStudios/cargo-deny-action v2 (the cargo-deny authors' own
+      # action): RustSec advisories against every locked crate, including
+      # the bundled sqlite and vendored lua. Advisories only; see deny.toml.
+      - uses: EmbarkStudios/cargo-deny-action@b66acf5e9fe20f8aba065be86778a8a4c846f902
+        with:
+          command: check advisories
+
       - name: cargo fmt --check
         run: cargo fmt --all --check
 
