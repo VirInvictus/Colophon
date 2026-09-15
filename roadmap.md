@@ -911,7 +911,7 @@ Slop-reader: no AI-slop in substance anywhere (patchnotes among the best release
 - [x] **Cross-book annotation browser (v2.5.0, GO'd).** An overview
       surface listing highlights, notes, and bookmarks across every
       provided sidecar, not only per book.
-- [ ] **Word-count axis (v2.6.0; GO'd 2026-09-12; lane order: fixes
+- [x] **Word-count axis (v2.6.0; GO'd 2026-09-12; lane order: fixes
       first, then this).** Spec amendment first; the scoped zip/epub
       dependency regenerates generated-sources.json (provenance header
       goes on the generator then, not before); explicit-path

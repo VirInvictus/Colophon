@@ -14,7 +14,7 @@ it exists: every KOReader stats tool Brandon has found is a web dashboard or
 a self-hosted Docker instance, and he doesn't want that. See `README.md` and
 `spec.md`.
 
-## Where this stands right now (prose written 2026-07-16 at v2.1.0; current release v2.5.0)
+## Where this stands right now (prose written 2026-07-16 at v2.1.0; current release v2.6.0)
 
 **Shipped 2.1.** Phases 0 through 4.6 plus Phase 7 (device auto-pull,
 v1.1.0) and Phase 6 (the de-adwaita migration, v2.0.0) are complete. Two
@@ -39,11 +39,12 @@ Sonnet's, everything since is Fable's. Phase 6e's scriptable polish tail
 shipped with the migration (2026-07-10); what remains of Phase 6 is only
 Brandon's hands-on confirmation pass (roadmap 6e). Phase 5 is the
 post-1.0 candidate list, and each item needs its own go/no-go; the big
-one, a word-count axis, was GO'd 2026-09-12 (spec amendment first, a
-scoped zip/epub dependency for the counter, reads stay explicit-path so
-the never-discovers rule holds), so it no longer breaks the stats-DB-only
-contract; it is queued in the blitz feature train after the GO'd year
-pager, per-year recap, and cross-book annotation browser (roadmap).
+one, a word-count axis, was GO'd 2026-09-12 and shipped as v2.6.0
+(spec amended first; the granted zip dependency; EPUBs provisioned on
+the sidecar pattern: explicit path, partial-MD5 verified, cached,
+origin remembered for auto-pull). The blitz also shipped the GO'd year
+pager, per-year recap, and cross-book annotation browser (v2.5.0);
+declined and recorded: export PNG/CSV, dragon-themer/custom palettes. 
 
 Phase 6f opened later for packaging: the Flatpak moved to the GNOME 50
 runtime and the build was verified for real (2026-07-23), and the cargo

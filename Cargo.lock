@@ -136,7 +136,7 @@ dependencies = [
 
 [[package]]
 name = "colophon"
-version = "2.5.0"
+version = "2.6.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -147,7 +147,7 @@ dependencies = [
 
 [[package]]
 name = "colophon-core"
-version = "2.5.0"
+version = "2.6.0"
 dependencies = [
  "anyhow",
  "chrono",

@@ -1,5 +1,30 @@
 # Patchnotes
 
+## v2.6.0 (2026-09-15)
+
+The word-count axis: Colophon's numbers gain a unit that no reading
+device reports.
+
+- **Give Colophon a book's EPUB and it can see words.** On the book
+  page, "Add EPUB..." takes the book's file; Colophon verifies it is
+  really that book (KOReader's own content checksum) and keeps its own
+  copy, refreshing it from the remembered origin when the device
+  appears, exactly like sidecars. The book page then shows words in
+  the book, words read (the share of pages you actually logged,
+  carried onto the word axis), and a true words-per-minute pace over
+  uncapped reading time from five minutes of reading. A file that does
+  not match the book is refused; a book without a provided EPUB shows
+  no word stats, like every other provided-file feature.
+- **The overview counts what it all adds up to.** Lifetime words read
+  when any EPUB is provided, and a book-length distribution (the
+  provided books bucketed by size) once there are three.
+- **The reading personality grows two word-count traits.** Length
+  (short- to long-book reader, from the median size of your finished
+  provided books) and Pace (savorer to speed-reader, from their true
+  WPM), each appearing from three finished books.
+
+Suite 134 green across the workspace; clippy `-D warnings`, fmt clean.
+
 ## v2.5.0 (2026-09-15)
 
 History gets room to breathe: the year calendar pages, the recap can be
