@@ -236,6 +236,47 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
   over the same whole-history day totals (spec.md "Day" applies), so
   no other widget moves; a year before the first reading day renders
   as an empty grid.
+- **User-provided book files (EPUB, decided 2026-09-12)**: a book's EPUB
+  is provided on its book page exactly like a sidecar: an explicit path
+  the user picks, never discovered or scanned. It is verified against
+  the book by KOReader's own partial-MD5 (the checksum KOReader stamps
+  in docsettings: MD5 over 1024-byte samples taken at file offsets
+  `1024 * 4^i` for `i = -1..10` (256, 1024, 4096, ... up to 1 GiB),
+  short final sample allowed, concatenated in order), lowercased hex,
+  matching `book.md5`. A mismatching file is refused with a message,
+  never used. A matching file is copied into the app-owned cache
+  (`<data>/library/<md5>.epub`), its origin path remembered, and
+  auto-pull re-copies it like sidecars. A book without a provided EPUB
+  hides every word-count stat (the data-provision principle). Because
+  the device checksum can predate a re-saved file, a refusal is also
+  the honest outcome for a re-downloaded edition of the same title.
+- **Words in book**: the provided EPUB's text, counted over every
+  HTML/XHTML document in the container after removing `<style>` and
+  `<script>` blocks and stripping markup (entities decoded). A word is
+  a maximal run of alphanumeric characters (Unicode); hyphens and
+  apostrophes inside a run keep it one word. This is a viewer-grade
+  estimate (pagination- and typesetting-independent by nature), counted
+  once at attach time and cached with the copy.
+- **Words read (per book)**: `round(words x coverage)`: the share of
+  the book's pages actually logged, carried onto the word axis. Never
+  exceeds words in book; hidden alongside the page-derived stats when
+  the page count is unknown.
+- **True WPM (per book)**: words read over uncapped reading time,
+  minutes. Shown only when the book has at least 300 s of reading
+  (below that, pace is noise). Pagination-independent, which is the
+  axis' whole reason to exist.
+- **Lifetime words read**: the sum of words read over the books whose
+  EPUBs are provided. Library-wide; hidden until at least one EPUB is
+  provided.
+- **Book-length distribution**: the provided books' word counts bucketed
+  (<50k, 50-100k, 100-150k, 150-250k, 250k+), count per bucket. Hidden
+  below three provided books.
+- **Reading personality, Length axis** (word-count-gated): short to long
+  from the median words in book over finished books with provided
+  EPUBs, calibrated 30k to 150k; needs at least three such books.
+- **Reading personality, Pace axis** (word-count-gated): savorer to
+  speed-demon from the median true WPM over the same books, calibrated
+  140 to 360 WPM; needs the same minimum.
 - **Annotation browser (cross-book)**: the per-book annotation browser
   lifted to the overview: every annotation from every provided sidecar,
   grouped by book (books in library order, the sidebar's own order),
