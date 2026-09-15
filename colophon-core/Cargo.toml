@@ -11,3 +11,4 @@ rusqlite.workspace = true
 anyhow.workspace = true
 chrono.workspace = true
 mlua.workspace = true
+zip.workspace = true

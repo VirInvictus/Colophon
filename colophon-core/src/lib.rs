@@ -16,11 +16,14 @@
 //! - [`sidecar`] — reads KOReader's per-book `.sdr` sidecar (a Lua table)
 //!   for the user-declared finished status the stats DB doesn't carry.
 //! - [`model`] — the plain types both share.
+//! - [`wordcount`] — EPUB word counts and the partial-MD5 file identity
+//!   for the user-provided library files (the word-count axis).
 
 pub mod db;
 pub mod metrics;
 pub mod model;
 pub mod sidecar;
+pub mod wordcount;
 
 pub use db::{EXPECTED_SCHEMA_VERSION, StatsDb, snapshot};
 pub use model::{

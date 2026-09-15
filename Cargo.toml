@@ -18,3 +18,6 @@ chrono = "0.4"
 # chunk). Vendored so it builds from source, like rusqlite's bundled sqlite.
 mlua = { version = "0.10", features = ["lua54", "vendored"] }
 gtk = { version = "0.9", package = "gtk4", features = ["v4_16"] }
+# EPUB word counts (the GO'd word-count axis): the only member that
+# touches it is colophon-core::wordcount, for reading the container.
+zip = { version = "2", default-features = false, features = ["deflate"] }
