@@ -866,3 +866,27 @@ and are in `patchnotes.md`.
       `gh release create v2.4.0 --notes-from-tag` (tag messages carry
       full notes; repeat for v2.3.x/v2.2.0); topics swap (drop
       gtk4-no-libadwaita-since-v200/mit/rust-2024; add gtk/reading).
+
+### Final audit 2026-09-14 (THE FINAL AUDIT: NEW findings, one line each; full detail in audit-final/Colophon/FINAL-REPORT.md)
+
+Eight lenses + slop-reader at v2.4.0 (f21dd78). Tally after dedup: 2 HIGH / 8 MEDIUM / ~30 LOW + 11 feature proposals. Cleanest repo of the audit so far on the code side: read-only DB contract verified exemplary, threading and chart math clean, nothing to remove, version-sync unanimous. NEW findings LOGGED, never executed:
+
+- [ ] [HIGH] Zero GitHub Releases despite four annotated tags; create all four with `--notes-from-tag`, then add a release.yml on `push: tags: ['v*']` so the state cannot recur.
+- [ ] [HIGH] Repo description truncated mid-word at the 350 cap; apply the drafted replacement.
+- [ ] [MEDIUM] Panic guard: raw `start_time` reaches `timestamp_opt(...).expect` on the GTK main thread (colophon-core/src/metrics/days.rs:20, :104, metrics/speed.rs:92); a corrupt/foreign .db (import accepts any *.db) panics the app. Bound timestamps once in `load_snapshot`.
+- [ ] [MEDIUM] Comment-hygiene commit: nine-site D1 drift family still describing the `page_stat` view as the data source (model.rs:77, :89; lib.rs:9; loader.rs:26, :39, :48; library.rs:24; stats.rs:6) plus the stale sidecars future tense (stats.rs:990).
+- [ ] [MEDIUM] CLAUDE.md sync commit: word-count GO framing (:40-42), vendoring contradiction (:44-46 vs :85-87), stale 6e remainder (:37-39), dead ~/.claude pointer (:3).
+- [ ] [MEDIUM] Pin CI: `actions/checkout@v5`, `Swatinem/rust-cache@v2`, `dtolnay/rust-toolchain@stable` to full SHAs; version-pin `fedora:latest` (ci.yml:19,31,34,38).
+- [ ] [MEDIUM] Known-defects block: add the v2.2.0 leave-recorded parenthetical and restore the missing blank line (roadmap.md:731-735).
+- [ ] [MEDIUM] Staged-import gap: validate with full `load_snapshot` before the rename, or add `numbers` to the required-table check (loader.rs:117-141); a promoted-then-failed import clobbers the good snapshot.
+- [ ] [MEDIUM] Spec/doc truth fixes: junk threshold "configurable" is a fixed 300 s constant (spec.md:170); heatmap tooltip lacks the promised books count (spec.md:295); Tier A records/weekday catalogue items never shipped (spec.md:268); README default theme is Follow-system, not Dragon (README.md:81); stale sample-pending claims in spec.md:343 and RESEARCH.md:609/:758; Tier B numbering collides with Tier A (spec.md:295).
+- [ ] [LOW] Main-thread `p.exists()` on possibly-hung FUSE mounts at startup and on every mounts_changed (window.rs:242); completion rows ignore the configured day start (book_page.rs:258); Shortcuts window documents a nonexistent F8 accelerator (shortcuts.rs:13).
+- [ ] [LOW] Removal dispositions: `scan_sidecars` off the public API; `all_events` removed (fold live_sample onto flattened per-book events); `rescaled_events` KEPT, marked baseline-only (it is the D1/D2 oracle + perf comparison arm); dedupe the D1 SQL subquery shared by page_totals/rescaled_events.
+- [ ] [LOW] Housekeeping: MSRV `rust-version` key; rust-toolchain.toml or a recorded no-pin decision; generator provenance header; `generated-sources.json linguist-generated` in .gitattributes; CI badge; SECURITY.md; dependabot (actions-only, deliberately not cargo); optional justfile and cargo-deny gate (Brandon's call).
+- [ ] [LOW] Em-dash pass: RESEARCH.md 29, roadmap.md 14, spec.md 6, CLAUDE.md 3 live in prose; future defect IDs use "D1:" not "D1 —"; historical patchnotes and the pushed v2.2.0 tag stay untouched per the 2026-09-12 decision.
+
+CONFIRMED-prior (all verified still present, none superseded; the 09-12 block above remains the authority): CLAUDE.md decision-gating staleness, v2.2.0 parenthetical, DBusActivatable=true with no service file, unused public `scan_sidecars`, missing Known-defects blank line, GitHub description/Releases/topics. Audit-side correction: the audit sheet's "113 test attrs" is stale; the tree has 120 attrs / 119 runnable, matching the repo's own docs.
+
+Feature candidates (RE-RANKED or NEW, grounded in audit-final/Colophon/FINAL-REPORT.md lens 4): word-count lane (GO'd, rank 1) vs rename+Flathub train (decided, rank 5) vs the S-sized wins: rollup click-through navigation (rank 2), library search Ctrl+F (rank 3); then heatmap year pager, per-year recap, cross-book annotation browser, estimate-accuracy card; export and dragon-themer integration noted but NOT recommended.
+
+Slop-reader: no AI-slop in substance anywhere (patchnotes among the best release prose in the workspace); the systemic finding is ~52 live em-dashes concentrated in RESEARCH.md and roadmap.md (see the LOW em-dash box above).
