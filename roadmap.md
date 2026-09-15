@@ -853,15 +853,15 @@ and are in `patchnotes.md`.
 
 ## New findings 2026-09-12 (six-lens full audit; detail: audit/FULL-AUDIT-2026-09-12.md, Wave 24)
 
-- [ ] **The v2.2.0 leave-recorded call lives only in a commit message:**
+- [x] **The v2.2.0 leave-recorded call lives only in a commit message:**
       add one parenthetical to the Known-defects block ("the pushed
       v2.2.0 tag keeps its recorded message as history; no force-push,
       decided 2026-09-12") so the decision survives outside git log.
-- [ ] **CLAUDE.md staleness (sync in the word-count lane's first
+- [x] **CLAUDE.md staleness (sync in the word-count lane's first
       commit):** CLAUDE.md:40-42 still says the word-count axis needs a
       decision (it was GO'd 2026-09-12, roadmap Phase 5); CLAUDE.md:88-89
       still says Flathub is blocked on the app-id split (decided).
-- [ ] **Rename-lane riders:** DBusActivatable=true with no D-Bus service
+- [x] **Rename-lane riders:** DBusActivatable=true with no D-Bus service
       file installed (drop the key or install the .service); scan_sidecars
       is public API unused by the app (#[cfg(test)] or delete); restore
       the blank line before ## Known defects.
@@ -871,7 +871,7 @@ and are in `patchnotes.md`.
       pattern; deliverables: WPM, lifetime words, length distribution,
       Length+Pace axes); the app-id rename (~12 sites + the GSettings
       path reset note); the hands-on pass closes Phase 6e.
-- [ ] **GitHub presentation (workspace batch):** description truncated
+- [x] **GitHub presentation (workspace batch):** description truncated
       mid-word at the 350 cap (replacement drafted); zero Releases -
       `gh release create v2.4.0 --notes-from-tag` (tag messages carry
       full notes; repeat for v2.3.x/v2.2.0); topics swap (drop
@@ -879,24 +879,55 @@ and are in `patchnotes.md`.
 
 ### Final audit 2026-09-14 (THE FINAL AUDIT: NEW findings, one line each; full detail in audit-final/Colophon/FINAL-REPORT.md)
 
-Eight lenses + slop-reader at v2.4.0 (f21dd78). Tally after dedup: 2 HIGH / 8 MEDIUM / ~30 LOW + 11 feature proposals. Cleanest repo of the audit so far on the code side: read-only DB contract verified exemplary, threading and chart math clean, nothing to remove, version-sync unanimous. NEW findings LOGGED, never executed:
+Eight lenses + slop-reader at v2.4.0 (f21dd78). Tally after dedup: 2 HIGH / 8 MEDIUM / ~30 LOW + 11 feature proposals. Cleanest repo of the audit so far on the code side: read-only DB contract verified exemplary, threading and chart math clean, nothing to remove, version-sync unanimous.
 
-- [ ] [HIGH] Zero GitHub Releases despite four annotated tags; create all four with `--notes-from-tag`, then add a release.yml on `push: tags: ['v*']` so the state cannot recur.
-- [ ] [HIGH] Repo description truncated mid-word at the 350 cap; apply the drafted replacement.
-- [ ] [MEDIUM] Panic guard: raw `start_time` reaches `timestamp_opt(...).expect` on the GTK main thread (colophon-core/src/metrics/days.rs:20, :104, metrics/speed.rs:92); a corrupt/foreign .db (import accepts any *.db) panics the app. Bound timestamps once in `load_snapshot`.
-- [ ] [MEDIUM] Comment-hygiene commit: nine-site D1 drift family still describing the `page_stat` view as the data source (model.rs:77, :89; lib.rs:9; loader.rs:26, :39, :48; library.rs:24; stats.rs:6) plus the stale sidecars future tense (stats.rs:990).
-- [ ] [MEDIUM] CLAUDE.md sync commit: word-count GO framing (:40-42), vendoring contradiction (:44-46 vs :85-87), stale 6e remainder (:37-39), dead ~/.claude pointer (:3).
-- [ ] [MEDIUM] Pin CI: `actions/checkout@v5`, `Swatinem/rust-cache@v2`, `dtolnay/rust-toolchain@stable` to full SHAs; version-pin `fedora:latest` (ci.yml:19,31,34,38).
-- [ ] [MEDIUM] Known-defects block: add the v2.2.0 leave-recorded parenthetical and restore the missing blank line (roadmap.md:731-735).
-- [ ] [MEDIUM] Staged-import gap: validate with full `load_snapshot` before the rename, or add `numbers` to the required-table check (loader.rs:117-141); a promoted-then-failed import clobbers the good snapshot.
-- [ ] [MEDIUM] Spec/doc truth fixes: junk threshold "configurable" is a fixed 300 s constant (spec.md:170); heatmap tooltip lacks the promised books count (spec.md:295); Tier A records/weekday catalogue items never shipped (spec.md:268); README default theme is Follow-system, not Dragon (README.md:81); stale sample-pending claims in spec.md:343 and RESEARCH.md:609/:758; Tier B numbering collides with Tier A (spec.md:295).
-- [ ] [LOW] Main-thread `p.exists()` on possibly-hung FUSE mounts at startup and on every mounts_changed (window.rs:242); completion rows ignore the configured day start (book_page.rs:258); Shortcuts window documents a nonexistent F8 accelerator (shortcuts.rs:13).
-- [ ] [LOW] Removal dispositions: `scan_sidecars` off the public API; `all_events` removed (fold live_sample onto flattened per-book events); `rescaled_events` KEPT, marked baseline-only (it is the D1/D2 oracle + perf comparison arm); dedupe the D1 SQL subquery shared by page_totals/rescaled_events.
-- [ ] [LOW] Housekeeping: MSRV `rust-version` key; rust-toolchain.toml or a recorded no-pin decision; generator provenance header; `generated-sources.json linguist-generated` in .gitattributes; CI badge; SECURITY.md; dependabot (actions-only, deliberately not cargo); optional justfile and cargo-deny gate (Brandon's call).
-- [ ] [LOW] Em-dash pass: RESEARCH.md 29, roadmap.md 14, spec.md 6, CLAUDE.md 3 live in prose; future defect IDs use "D1:" not "D1 —"; historical patchnotes and the pushed v2.2.0 tag stay untouched per the 2026-09-12 decision.
+*(EXECUTED 2026-09-15 in the final blitz: every box below shipped in v2.4.1 unless the note says otherwise.)*
+
+- [x] [HIGH] Zero GitHub Releases despite four annotated tags; create all four with `--notes-from-tag`, then add a release.yml on `push: tags: ['v*']` so the state cannot recur.
+- [x] [HIGH] Repo description truncated mid-word at the 350 cap; apply the drafted replacement.
+- [x] [MEDIUM] Panic guard: raw `start_time` reaches `timestamp_opt(...).expect` on the GTK main thread (colophon-core/src/metrics/days.rs:20, :104, metrics/speed.rs:92); a corrupt/foreign .db (import accepts any *.db) panics the app. Bound timestamps once in `load_snapshot`.
+- [x] [MEDIUM] Comment-hygiene commit: nine-site D1 drift family still describing the `page_stat` view as the data source (model.rs:77, :89; lib.rs:9; loader.rs:26, :39, :48; library.rs:24; stats.rs:6) plus the stale sidecars future tense (stats.rs:990).
+- [x] [MEDIUM] CLAUDE.md sync commit: word-count GO framing (:40-42), vendoring contradiction (:44-46 vs :85-87), stale 6e remainder (:37-39), dead ~/.claude pointer (:3).
+- [x] [MEDIUM] Pin CI: `actions/checkout@v5`, `Swatinem/rust-cache@v2`, `dtolnay/rust-toolchain@stable` to full SHAs; version-pin `fedora:latest` (ci.yml:19,31,34,38).
+- [x] [MEDIUM] Known-defects block: add the v2.2.0 leave-recorded parenthetical and restore the missing blank line (roadmap.md:731-735).
+- [x] [MEDIUM] Staged-import gap: validate with full `load_snapshot` before the rename, or add `numbers` to the required-table check (loader.rs:117-141); a promoted-then-failed import clobbers the good snapshot.
+- [x] [MEDIUM] Spec/doc truth fixes: junk threshold "configurable" is a fixed 300 s constant (spec.md:170); heatmap tooltip lacks the promised books count (spec.md:295); Tier A records/weekday catalogue items never shipped (spec.md:268); README default theme is Follow-system, not Dragon (README.md:81); stale sample-pending claims in spec.md:343 and RESEARCH.md:609/:758; Tier B numbering collides with Tier A (spec.md:295).
+- [x] [LOW] Main-thread `p.exists()` on possibly-hung FUSE mounts at startup and on every mounts_changed (window.rs:242); completion rows ignore the configured day start (book_page.rs:258); Shortcuts window documents a nonexistent F8 accelerator (shortcuts.rs:13).
+- [x] [LOW] Removal dispositions: `scan_sidecars` off the public API; `all_events` removed (fold live_sample onto flattened per-book events); `rescaled_events` KEPT, marked baseline-only (it is the D1/D2 oracle + perf comparison arm); dedupe the D1 SQL subquery shared by page_totals/rescaled_events.
+- [x] [LOW] Housekeeping: MSRV `rust-version` key; rust-toolchain.toml or a recorded no-pin decision; generator provenance header; `generated-sources.json linguist-generated` in .gitattributes; CI badge; SECURITY.md; dependabot (actions-only, deliberately not cargo); optional justfile and cargo-deny gate (Brandon's call).
+- [x] [LOW] Em-dash pass: RESEARCH.md 29, roadmap.md 14, spec.md 6, CLAUDE.md 3 live in prose; future defect IDs use "D1:" not "D1 —"; historical patchnotes and the pushed v2.2.0 tag stay untouched per the 2026-09-12 decision.
 
 CONFIRMED-prior (all verified still present, none superseded; the 09-12 block above remains the authority): CLAUDE.md decision-gating staleness, v2.2.0 parenthetical, DBusActivatable=true with no service file, unused public `scan_sidecars`, missing Known-defects blank line, GitHub description/Releases/topics. Audit-side correction: the audit sheet's "113 test attrs" is stale; the tree has 120 attrs / 119 runnable, matching the repo's own docs.
 
 Feature candidates (RE-RANKED or NEW, grounded in audit-final/Colophon/FINAL-REPORT.md lens 4): word-count lane (GO'd, rank 1) vs rename+Flathub train (decided, rank 5) vs the S-sized wins: rollup click-through navigation (rank 2), library search Ctrl+F (rank 3); then heatmap year pager, per-year recap, cross-book annotation browser, estimate-accuracy card; export and dragon-themer integration noted but NOT recommended.
 
 Slop-reader: no AI-slop in substance anywhere (patchnotes among the best release prose in the workspace); the systemic finding is ~52 live em-dashes concentrated in RESEARCH.md and roadmap.md (see the LOW em-dash box above).
+
+### Final blitz gates (answered 2026-09-15)
+
+- [ ] **Year heatmap pager + per-year recap (v2.5.0, GO'd).** Arrows page
+      the year calendar back through past years instead of the silent
+      52-week rolling window; the recap card gains a per-year variant.
+- [ ] **Cross-book annotation browser (v2.5.0, GO'd).** An overview
+      surface listing highlights, notes, and bookmarks across every
+      provided sidecar, not only per book.
+- [ ] **Word-count axis (v2.6.0; GO'd 2026-09-12; lane order: fixes
+      first, then this).** Spec amendment first; the scoped zip/epub
+      dependency regenerates generated-sources.json (provenance header
+      goes on the generator then, not before); explicit-path
+      provisioning on the sidecar/remembered-origin pattern;
+      deliverables: true WPM, lifetime words, book-length
+      distribution, Length + Pace personality axes.
+- Declined, recorded so no future audit re-raises them: export
+  PNG/CSV (grim covers the one known consumer); dragon-themer
+  integration and custom palettes (protects the pilot's theme.rs);
+  reading goals remain declined from research time.
+- Recorded, not scheduled: estimate-accuracy card is the next Tier A
+  candidate (after word-count); keyboard sidebar resize stays optional
+  (6e box above); the app-id rename train and the S-sized wins
+  (rollup click-through navigation, library search) keep their recorded
+  places for their own sessions; Flathub submission follows the
+  word-count lane, in a screenshot session with Brandon (the metainfo
+  screenshot slots prep rides the lane); the Phase 6e hands-on pass
+  stays Brandon's. GitHub social preview: composed from logo.svg, one
+  manual upload left (Settings -> Social preview).

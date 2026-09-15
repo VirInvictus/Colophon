@@ -1,5 +1,48 @@
 # Patchnotes
 
+## v2.4.1 (2026-09-15)
+
+A hardening release from the final audit. No new features, and none of
+your numbers move.
+
+- **A corrupt or foreign database can no longer crash the app.** The
+  import dialog accepts any `*.db`, and a file carrying timestamps no
+  calendar can name used to panic the day and hour charts when they
+  rendered. Events outside an honest epoch window (1970 through 9999)
+  are now dropped once at load, the same graceful treatment relative
+  dates already had.
+- **A bad import can no longer touch your good snapshot.** Staged
+  imports used to be validated by reading the book table only, so a
+  database that opened but could not be fully loaded was promoted and
+  failed afterwards, clobbering the snapshot it was supposed to be
+  checked against. Validation now fully loads the staged copy first,
+  and the promote-refuses path has an end-to-end test.
+- **The year heatmap tooltip names books.** The spec promised
+  "time + pages + books"; the count was already computed and now shows.
+- **The import path no longer stats the source on the UI thread.** The
+  source path can live on a network mount; the startup and
+  mount-change probes moved off the main thread so a hung mount cannot
+  freeze the window.
+- **Read-through dates follow the reading day.** A book finished just
+  after midnight under a non-midnight day start showed one day late;
+  completion rows now use the logical day.
+- **The shortcuts window no longer documents a sidebar-resize
+  accelerator that does not exist.** Nothing ever bound F8, and GTK
+  gives paned dividers no keyboard path; the false row is dropped.
+
+Under the hood: the comment layer caught up with the post-D1 data
+path, CLAUDE.md synced with the 2026-09-12 decisions, and the spec,
+README, and RESEARCH records had their truth fixes (the junk threshold
+is fixed, not configurable; Tier B renumbered 10-17; the default theme
+is Follow-system, not Dragon). An advisory gate (cargo-deny) joined
+CI, a SECURITY policy and a justfile landed, the MSRV is declared
+(1.85), CI actions are SHA-pinned with a versioned Fedora container,
+releases are now cut automatically from tags, and the approved
+removals shipped (the unused directory-scan API and all_events;
+rescaled_events stays as the test oracle).
+
+Suite 124 green across the workspace; clippy `-D warnings`, fmt clean.
+
 ## v2.4.0 (2026-09-06)
 
 Your margins, readable.
