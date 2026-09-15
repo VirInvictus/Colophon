@@ -118,18 +118,6 @@ impl StatsDb {
         Ok(out)
     }
 
-    /// Every raw page-turn event in the database, ordered by time.
-    pub fn all_events(&self) -> Result<Vec<PageEvent>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id_book, page, start_time, duration, total_pages
-             FROM page_stat_data ORDER BY start_time",
-        )?;
-        let rows = stmt
-            .query_map([], event_from_row)?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
-        Ok(rows)
-    }
-
     /// Per canonical-axis page aggregates replacing the `page_stat` view's
     /// `GROUP BY page` reduction: one row per page instead of the fanned-out
     /// view (which expands each stored row across the `numbers` join, up to
@@ -191,6 +179,10 @@ impl StatsDb {
     /// (see `page_totals` for why the per-row axis would conflate merged
     /// rows). A book with an unknown page count yields no rescaled events.
     /// Ordered by time.
+    ///
+    /// Baseline-only: the app never calls this. It is the D1/D2 oracle
+    /// (the tests that pin the canonical-axis rescale against the old
+    /// view semantics) and the perf baseline's old-load comparison arm.
     pub fn rescaled_events(&self, book: &Book) -> Result<Vec<RescaledEvent>> {
         let Some(canon) = book.pages else {
             return Ok(Vec::new());

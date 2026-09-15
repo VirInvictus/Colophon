@@ -9,7 +9,6 @@
 //! `os`/`io`/`require`), text chunks only (never precompiled bytecode), and
 //! invalid UTF-8 is repaired lossily rather than dropping the whole file.
 
-use std::collections::HashMap;
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -156,43 +155,6 @@ pub fn parse_sidecar_file(path: &Path) -> Result<SidecarMeta> {
     parse_sidecar_bytes(&bytes)
 }
 
-/// Recursively scans `root` for `metadata.*.lua` sidecars, keyed by their
-/// `partial_md5_checksum` (lowercased) for a direct join to `book.md5`.
-/// Sidecars that fail to parse or carry no md5 are skipped, never fatal;
-/// `*.lua.old` backups are ignored. The whole scan is read-only.
-pub fn scan_sidecars(root: &Path) -> HashMap<String, SidecarMeta> {
-    let mut out = HashMap::new();
-    let mut stack = vec![root.to_path_buf()];
-    while let Some(dir) = stack.pop() {
-        let Ok(entries) = std::fs::read_dir(&dir) else {
-            continue;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                stack.push(path);
-                continue;
-            }
-            if !is_sidecar_file(&path) {
-                continue;
-            }
-            if let Ok(meta) = parse_sidecar_file(&path)
-                && let Some(md5) = &meta.partial_md5
-            {
-                out.insert(md5.to_lowercase(), meta);
-            }
-        }
-    }
-    out
-}
-
-/// A `metadata.<ext>.lua` sidecar, but not a `.lua.old` backup.
-fn is_sidecar_file(path: &Path) -> bool {
-    path.file_name()
-        .and_then(|n| n.to_str())
-        .is_some_and(|name| name.starts_with("metadata.") && name.ends_with(".lua"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -303,18 +265,16 @@ mod tests {
 
     #[test]
     fn parses_real_finished_sidecar_when_present() {
-        let root = samples_dir();
-        if !root.exists() {
-            eprintln!("skipping: real sidecar samples absent");
+        // The known real sidecar copied from the device (gitignored);
+        // parses as a finished book carrying its md5 join key.
+        let path = samples_dir().join("Royal Assassin - Robin Hobb (1705).sdr/metadata.epub.lua");
+        if !path.exists() {
+            eprintln!("skipping: real sidecar sample absent");
             return;
         }
-        let map = scan_sidecars(&root);
-        // The Royal Assassin sidecar is a finished book with a real md5.
-        assert!(
-            map.values()
-                .any(|m| m.status == Some(ReadStatus::Complete) && m.percent_finished == Some(1.0)),
-            "expected a complete sidecar in the samples"
-        );
-        assert!(map.keys().all(|k| !k.is_empty()));
+        let meta = parse_sidecar_file(&path).unwrap();
+        assert_eq!(meta.status, Some(ReadStatus::Complete));
+        assert_eq!(meta.percent_finished, Some(1.0));
+        assert!(meta.partial_md5.is_some_and(|md5| !md5.is_empty()));
     }
 }

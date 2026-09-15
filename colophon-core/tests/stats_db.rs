@@ -240,7 +240,9 @@ fn page_totals_and_last_page_agree_with_the_materialized_view() {
 }
 
 #[test]
-fn all_events_returns_every_row_in_time_order() {
+fn events_are_ordered_across_merged_rows() {
+    // One md5, two book rows: the app reads a merged book through
+    // `events`, which must interleave both rows' events in time order.
     let dir = common::TempDir::new();
     let path = common::create_db(dir.path());
     let a = common::insert_book(&path, &FixtureBook::default());
@@ -248,18 +250,22 @@ fn all_events_returns_every_row_in_time_order() {
         &path,
         &FixtureBook {
             title: "Other",
-            md5: Some("bbbb0000bbbb0000bbbb0000bbbb0000"),
+            last_open: 500,
             ..Default::default()
         },
     );
     common::insert_event(&path, b, 1, 300, 30, 100);
     common::insert_event(&path, a, 1, 100, 30, 100);
+    common::insert_event(&path, a, 2, 350, 30, 100);
 
     let db = StatsDb::open(&path).unwrap();
-    let events = db.all_events().unwrap();
-    assert_eq!(events.len(), 2);
-    assert_eq!(events[0].start_time, 100);
-    assert_eq!(events[1].start_time, 300);
+    let books = db.books().unwrap();
+    assert_eq!(books.len(), 1, "same md5 merges to one book");
+    assert_eq!(books[0].all_ids.len(), 2);
+    let events = db.events(&books[0]).unwrap();
+    assert_eq!(events.len(), 3);
+    let times: Vec<i64> = events.iter().map(|e| e.start_time).collect();
+    assert_eq!(times, vec![100, 300, 350]);
 }
 
 #[test]

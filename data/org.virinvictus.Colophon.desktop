@@ -8,4 +8,3 @@ Type=Application
 Categories=GNOME;GTK;Utility;
 Keywords=KOReader;Reading;Statistics;Books;Ebook;Stats;
 StartupNotify=true
-DBusActivatable=true

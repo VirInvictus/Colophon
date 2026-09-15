@@ -69,7 +69,12 @@ fn live_sample_reconciles() {
         assert!(rescaled_sum <= book.total_read_time);
     }
 
-    let all = db.all_events().unwrap();
+    // Whole-history metrics flatten the per-book events (the app's own
+    // shape): every event appears exactly once across the books.
+    let all: Vec<_> = books
+        .iter()
+        .flat_map(|book| db.events(book).unwrap())
+        .collect();
     assert_eq!(all.len(), total_events);
 
     // Whole-history derived metrics must at least compute sanely.

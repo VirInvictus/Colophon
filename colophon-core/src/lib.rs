@@ -27,4 +27,4 @@ pub use model::{
     Book, Completion, DayTotal, PageEvent, PageTotal, RescaledEvent, Session, SpeedPoint, Streak,
     Streaks,
 };
-pub use sidecar::{Annotation, AnnotationKind, ReadStatus, SidecarMeta, scan_sidecars};
+pub use sidecar::{Annotation, AnnotationKind, ReadStatus, SidecarMeta};
