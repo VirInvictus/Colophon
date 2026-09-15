@@ -220,6 +220,31 @@ device and with each other. Rationale and citations: `RESEARCH.md` §4-§6.
   finished (distinct finished works), total time, longest streak, session
   count, and the most-active calendar month. Because it is always all-time,
   it stays meaningful (and unchanged) when a shorter window is selected.
+- **Recap, per-year variant**: the same five numbers computed inside one
+  calendar year (a finished work counts to the year of its finish date;
+  time, sessions, the longest streak, and the most-active month are the
+  year's own). The recap card keeps the whole-history recap as its
+  default and gains a year selector (All time, then each year the
+  library has data for); the choice belongs to the card alone and never
+  moves the global time window. A year with no reading shows an empty
+  state rather than zeros.
+- **Year heatmap, year selection**: the GitHub-style calendar shows one
+  calendar year (January through December) instead of a rolling
+  52-week window, with arrows stepping back and forward through the
+  years the library has data for; forward stops at the current year.
+  The default is the current year. The selection is a display choice
+  over the same whole-history day totals (spec.md "Day" applies), so
+  no other widget moves; a year before the first reading day renders
+  as an empty grid.
+- **Annotation browser (cross-book)**: the per-book annotation browser
+  lifted to the overview: every annotation from every provided sidecar,
+  grouped by book (books in library order, the sidebar's own order),
+  entries within a book in book order by rescaled position (the same
+  rule the per-book browser uses). Each entry names its kind and
+  position, shows the excerpt and note as the per-book browser does,
+  and names its book; selecting a book's group opens that book's page.
+  Hidden entirely when no provided sidecar carries annotations (the
+  data-provision principle).
 - **Completion rate**: finished works over started works, both counted
   distinct by title (files of one work count once), whole-history. A started
   work is any with logged reading.
@@ -298,7 +323,8 @@ Nothing below exists in KOReader or any of the four tools.
 *Renumbered 2026-09-15 (10-17; was 7-14): Tier A grew to nine items and
 the two tiers' numbers collided.*
 
-10. **Year heatmap calendar.** GitHub-style day grid, quantized intensity
+10. **Year heatmap calendar.** GitHub-style day grid for a selected year
+    (arrows step years; default current), quantized intensity
     levels (not continuous alpha), tooltips with time + pages + books.
 11. **Streaks.** Current/longest day streak with date ranges.
 12. **Library totals.** Total time, unique pages, books touched, active
@@ -322,8 +348,9 @@ the two tiers' numbers collided.*
     already loaded.
 17. **Recap and trend.** A whole-history recap card (books finished,
     completion rate, total time, longest streak, sessions, most-active
-    month) and, on the windowed total time, a period-over-period change
-    against the previous equal-length window.
+    month) with the per-year variant on the same card, and, on the
+    windowed total time, a period-over-period change against the
+    previous equal-length window.
 
 ### Tier C — deferred until the data or a dependency justifies it
 
