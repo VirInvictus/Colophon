@@ -729,10 +729,13 @@ is not on the table. This is a *version* bump inside the GNOME runtime.
       from the vendored sources. App-id migrates to
       io.github.virinvictus.Colophon per the 2026-09-12 workspace decision
       (Brandon); the rename and the Flathub prep ride the next Colophon lane.
+
 ## Known defects — carried 2026-08-09, closed in v2.2.0 (D1-D3)
 
 *(All three closed in v2.2.0; the text below is the 2026-08-09 record,
-kept for what moved and why.)*
+kept for what moved and why. The pushed v2.2.0 tag itself keeps its
+recorded message, quirks included (single-`#` heading, the stray
+"pyright strict" tail), as history: no force-push, decided 2026-09-12.)*
 
 Three latent correctness bugs found in the 2026-08-09 full-repo sweep and
 deliberately **not** fixed in that pass. All three are latent rather than
