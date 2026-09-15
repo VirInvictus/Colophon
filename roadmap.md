@@ -871,6 +871,8 @@ and are in `patchnotes.md`.
       pattern; deliverables: WPM, lifetime words, length distribution,
       Length+Pace axes); the app-id rename (~12 sites + the GSettings
       path reset note); the hands-on pass closes Phase 6e.
+      *(2026-09-15: word-count shipped as v2.6.0 in the final blitz;
+      the rename train and the hands-on pass remain.)*
 - [x] **GitHub presentation (workspace batch):** description truncated
       mid-word at the 350 cap (replacement drafted); zero Releases -
       `gh release create v2.4.0 --notes-from-tag` (tag messages carry
