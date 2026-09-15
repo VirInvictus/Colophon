@@ -1,9 +1,10 @@
 # CLAUDE.md — Colophon
 
-Per-project guidance. Overrides `~/.claude/CLAUDE.md` where the two
-conflict; read that file first for the general house style (portfolio doc
-set, git habits, prose style, etc.) — this file only covers what's specific
-to Colophon.
+Per-project guidance. Overrides `~/.zcode/AGENTS.md` (the house file;
+`~/.claude/CLAUDE.md` was retired 2026-09-03 with the Claude Code client)
+where the two conflict; read the house file first for the general house
+style (portfolio doc set, git habits, prose style, etc.) — this file only
+covers what's specific to Colophon.
 
 ## What this project is
 
@@ -34,16 +35,18 @@ carries page/excerpt/note and the book page lists them per spec
 "Annotation browser". The
 spec is fully built and the app is the portfolio's de-adwaita pilot, the
 template for Atrium/Conservatory/Viaduct/Framework. Scaffolding was
-Sonnet's, everything since is Fable's. The Phase 6e polish tail (tiling
-geometry audit, draw-time label thinning, keyboard pass, shortcuts window)
-is the only Phase 6 remainder. Phase 5 is the post-1.0 candidate list, and
-each item needs its own go/no-go; the big open one is a word-count axis,
-which is off the stats-DB-only contract because it means reading the
-library EPUB files. Don't start any of it without a decision.
+Sonnet's, everything since is Fable's. Phase 6e's scriptable polish tail
+shipped with the migration (2026-07-10); what remains of Phase 6 is only
+Brandon's hands-on confirmation pass (roadmap 6e). Phase 5 is the
+post-1.0 candidate list, and each item needs its own go/no-go; the big
+one, a word-count axis, was GO'd 2026-09-12 (spec amendment first, a
+scoped zip/epub dependency for the counter, reads stay explicit-path so
+the never-discovers rule holds), so it no longer breaks the stats-DB-only
+contract; it awaits only the lane-order call.
 
 Phase 6f opened later for packaging: the Flatpak moved to the GNOME 50
-runtime and the build was verified for real (2026-07-23), leaving one open
-item, vendoring the cargo sources so the build works offline for Flathub.
+runtime and the build was verified for real (2026-07-23), and the cargo
+sources are vendored (v2.3.1), so 6f has nothing left open.
 
 **Read `roadmap.md`'s "Known defects" section for the metric layer's
 history before touching it.** The 2026-08-09 sweep fixed five live bugs and
@@ -59,8 +62,9 @@ Architecture worth knowing before you touch code:
 
 - **`colophon-core`** is the read-only ingestion + pure derived-metric layer:
   the typed query layer over the confirmed KOReader schema (md5-merged books,
-  raw events, the rescaled `page_stat` view consumed as a per-page `GROUP BY`
-  reduction rather than fanned-out rows), WAL-safe `snapshot()` (the source
+  raw events, and the D1 canonical-axis page aggregates computed in SQL from
+  the raw rows rather than the `page_stat` view, which is never queried),
+  WAL-safe `snapshot()` (the source
   db is never opened in place), the metric functions (sessions, daily totals,
   streaks, interval-union coverage, capped/uncapped totals, speed series,
   completion detection), and `sidecar` (sandboxed `mlua`, `StdLib::NONE`,
@@ -85,8 +89,9 @@ Architecture worth knowing before you touch code:
   Crate sources are vendored (`generated-sources.json`, regen:
   `uv run scripts/flatpak-cargo-generator.py Cargo.lock -o
   generated-sources.json`), so the build needs no network; regen is part of
-  any dependency change. Flathub remains blocked only on the workspace-wide
-  app-id split decision.
+  any dependency change. The app-id migrates to
+  io.github.virinvictus.Colophon (decided 2026-09-12); the rename and the
+  Flathub submission prep ride the lane-order call.
 
 Standing rules that still bind post-1.0: every new widget's metric lands in
 `spec.md` first; ask before adding any dependency; Colophon reads only
