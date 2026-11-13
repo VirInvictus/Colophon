@@ -19,6 +19,14 @@ jobs:
     # Version-pinned on purpose: fedora:latest floats every Fedora release
     # under a GTK-version-sensitive build. Bump the pin deliberately.
     container: fedora:44
+    # The rolling 44 image's rustup refuses to run when $HOME differs from
+    # the euid-obtained home; Actions sets HOME=/github/home in containers
+    # while the container user is root. Pin HOME=/root to satisfy the guard
+    # without weakening the image pin. (2026-11-13: the drift red-lit the
+    # dependabot runs; the zip-crate advisories cargo-deny flags are a
+    # separate fix, tracked in issue #7.)
+    env:
+      HOME: /root
     steps:
       - name: Install system dependencies
         run: |
