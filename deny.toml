@@ -6,3 +6,13 @@
 [advisories]
 version = 2
 yanked = "deny"
+ignore = [
+    # chrono 0.4 is flagged unmaintained (RUSTSEC-2026-0543) and the
+    # advisory offers no upgrade path: every version is affected, so no
+    # lockfile bump can clear it. The metric layer's timezone/DST math is
+    # deliberately chrono (spec.md, roadmap Phase 4), and a migration to
+    # another time crate is a project of its own, not a CI fix. Revisit
+    # if a successor crate lands or the advisory escalates beyond
+    # "unmaintained".
+    "RUSTSEC-2026-0543",
+]
