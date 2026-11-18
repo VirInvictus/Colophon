@@ -162,6 +162,7 @@ Commit and push verified work (the standing push grant in the global file;
 force-pushes still need approval), wait for CI to go green, then tag:
 annotated `vX.Y.Z` at the release commit, message = that release's
 patchnotes entry verbatim (`--cleanup=verbatim`; the full tag procedure
-lives in `~/.zcode/AGENTS.md`). Version carriers: `VERSION` and the
-workspace `Cargo.toml`, plus the AppStream metainfo and README badge riding
+lives in `~/.zcode/AGENTS.md`). Version carriers: `VERSION`, the
+workspace `Cargo.toml`, and the Meson wrapper's `project(... version:)`,
+plus the AppStream metainfo and README Status line riding
 the same release commit.

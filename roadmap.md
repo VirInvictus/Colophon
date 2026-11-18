@@ -374,7 +374,7 @@ deps, on-contract):
 
 Still open:
 
-- [ ] **Word-count axis (the big one; needs a scope decision).** Tome's
+- [x] **Word-count axis (the big one; needs a scope decision).** Tome's
       largest capability delta (`RESEARCH.md` §5.5): true words-per-minute
       (pagination-independent, unlike Colophon's pages/hour), lifetime
       words-read, and a book-length distribution, and it unlocks two more
@@ -385,7 +385,7 @@ Still open:
       path (Tome falls back to exactly that). Both are deliberate go/no-go
       calls, not slip-ins: it changes what Colophon reads. High value if the
       answer is yes.
-  *(DECIDED 2026-09-12 (Brandon): GO, with a new scoped zip/epub dependency for the counter; reads stay explicit-path, so the never-discovers rule holds and the library-files grant rides this decision.)*
+  *(DECIDED 2026-09-12 (Brandon): GO, with a new scoped zip/epub dependency for the counter; reads stay explicit-path, so the never-discovers rule holds and the library-files grant rides this decision. Shipped v2.6.0, 2026-09-15.)*
 - [ ] Reading goals ({books|minutes|pages} per {day|week|month|year}, with a
       prorated on-pace line), stats-DB-feasible. **Deliberately declined at
       research time** (Colophon is a stats *viewer*, not a tracker); listed
