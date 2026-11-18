@@ -194,7 +194,11 @@ pub fn epub_word_count(path: &Path) -> Result<u64> {
     let mut total = 0u64;
     for i in 0..zip.len() {
         let mut entry = zip.by_index(i)?;
-        if entry.is_dir() || !is_text_document(entry.name()) {
+        // zip 9 resolves entry names against the central directory and can
+        // refuse a mismatched local header; an unreadable name is not a
+        // document name, so the entry does not count.
+        let Ok(name) = entry.name() else { continue };
+        if entry.is_dir() || !is_text_document(&name) {
             continue;
         }
         let mut bytes = Vec::with_capacity(entry.size() as usize);
@@ -214,12 +218,14 @@ fn decode_text(bytes: Vec<u8>) -> String {
     if bytes.starts_with(&[0xFE, 0xFF]) || bytes.starts_with(&[0xFF, 0xFE]) {
         let little = bytes[0] == 0xFF;
         let units: Vec<u16> = bytes[2..]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|c| {
                 if little {
-                    u16::from_le_bytes([c[0], c[1]])
+                    u16::from_le_bytes(*c)
                 } else {
-                    u16::from_be_bytes([c[0], c[1]])
+                    u16::from_be_bytes(*c)
                 }
             })
             .collect();

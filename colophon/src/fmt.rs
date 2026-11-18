@@ -57,7 +57,7 @@ pub fn thousands(n: u64) -> String {
     let head = digits.len().rem_euclid(3);
     let mut out = String::new();
     for (i, ch) in digits.chars().enumerate() {
-        if i > 0 && (i - head) % 3 == 0 {
+        if i > 0 && (i - head).is_multiple_of(3) {
             out.push(',');
         }
         out.push(ch);
