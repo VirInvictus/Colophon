@@ -13,7 +13,7 @@ it exists: every KOReader stats tool Brandon has found is a web dashboard or
 a self-hosted Docker instance, and he doesn't want that. See `README.md` and
 `spec.md`.
 
-## Where this stands right now (prose written 2026-07-16 at v2.1.0; current release v2.6.0)
+## Where this stands right now (prose written 2026-07-16 at v2.1.0; current release v2.6.1)
 
 **Shipped 2.1.** Phases 0 through 4.6 plus Phase 7 (device auto-pull,
 v1.1.0) and Phase 6 (the de-adwaita migration, v2.0.0) are complete. Two
@@ -43,7 +43,12 @@ one, a word-count axis, was GO'd 2026-09-12 and shipped as v2.6.0
 the sidecar pattern: explicit path, partial-MD5 verified, cached,
 origin remembered for auto-pull). The blitz also shipped the GO'd year
 pager, per-year recap, and cross-book annotation browser (v2.5.0);
-declined and recorded: export PNG/CSV, dragon-themer/custom palettes. 
+declined and recorded: export PNG/CSV, dragon-themer/custom palettes.
+**v2.6.1** (2026-11-17) is a dependency-security maintenance release:
+the cargo-deny advisories gate is green again (rusqlite 0.41.1 carries
+the bundled-SQLite CVE fix; zip sits on its fixed 9.x line), the
+chrono-unmaintained advisory is ignored with its rationale recorded in
+`deny.toml`, and the MSRV floor is dependency-driven at 1.89.
 
 Phase 6f opened later for packaging: the Flatpak moved to the GNOME 50
 runtime and the build was verified for real (2026-07-23), and the cargo
@@ -133,8 +138,10 @@ matching the shape of `Viaduct`/`Conservatory` rather than Atrium's
 six-crate split; this project doesn't need that much separation yet.
 Charts are hand-drawn cairo (decided Phase 3; no charting crate).
 
-Toolchain floor: `rust-version = 1.85` (the edition 2024 minimum; the
-highest feature the code uses, `#[expect]`, is 1.81). There is
+Toolchain floor: `rust-version = 1.89`, dependency-driven since v2.6.1
+(rusqlite 0.41, the first line carrying the libsqlite3-sys advisory
+floor, needs 1.89; the highest source feature, `#[expect]`, is 1.81).
+There is
 deliberately **no** rust-toolchain.toml (recorded decision, 2026-09-15):
 each environment pins its own Rust where it matters (CI on stable in the
 pinned Fedora 44 container, the Flatpak on the runtime's

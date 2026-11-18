@@ -16,7 +16,7 @@ the live file on your device.
   <img src="docs/screenshots/per-book.png" alt="Colophon's per-book view: reading stats table with the pace-through-the-book and reading-speed charts">
 </p>
 
-**Status:** v2.6.0. Ingestion, the app shell, the full widget catalogue,
+**Status:** v2.6.1. Ingestion, the app shell, the full widget catalogue,
 per-book sidecar reconciliation, eight themes, device auto-pull, and Meson +
 Flatpak packaging are all shipped. 2.0.0 replaced the GNOME design language
 with Colophon's own: libadwaita is gone, the look is flat, square, and
@@ -28,8 +28,10 @@ bookmarks (from its provided sidecar) in full on the book page. 2.4.1
 hardened the import path, 2.5.0 gave the year heatmap a year pager, the
 recap card a per-year view, and the overview an annotations section, and
 2.6.0 added the word-count axis: provide a book's EPUB and Colophon can
-speak in words (words read, true WPM, book lengths). See `roadmap.md`
-for what remains deferred.
+speak in words (words read, true WPM, book lengths). 2.6.1 is a
+dependency-security maintenance release: the SQLite bundled into the
+binary is patched, and the zip crate sits on its fixed 9.x line; nothing
+about the app itself changed. See `roadmap.md` for what remains deferred.
 
 ## What you get
 

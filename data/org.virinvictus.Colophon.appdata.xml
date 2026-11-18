@@ -32,6 +32,11 @@
   </developer>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2.6.1" date="2026-11-17">
+      <description translate="no">
+        <p>A maintenance release: the SQLite bundled into the binary is patched (CVE-2026-119375, via rusqlite 0.41.1), the zip crate moves to its fixed 9.x line, and the CI advisory gate is green again. Nothing about the app itself changed.</p>
+      </description>
+    </release>
     <release version="2.6.0" date="2026-09-15">
       <description translate="no">
         <p>The word-count axis: give Colophon a book's EPUB (verified against the book, kept in its own cache, refreshed like sidecars) and the book page gains words in the book, words read, and true WPM; the overview adds lifetime words read and a book-length distribution; the reading personality gains Length and Pace traits.</p>

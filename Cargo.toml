@@ -4,7 +4,7 @@ default-members = ["colophon"]
 resolver = "2"
 
 [workspace.package]
-version = "2.6.0"
+version = "2.6.1"
 edition = "2024"
 # Dependency-driven since v2.6.1: rusqlite 0.41 (for the libsqlite3-sys
 # advisory floor) needs 1.89; no source feature above that.

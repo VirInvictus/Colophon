@@ -1,5 +1,42 @@
 # Patchnotes
 
+## v2.6.1 (2026-11-17)
+
+A maintenance release from the CI-repair lane: nothing you see moves,
+and none of your numbers change. The continuous-integration gate had
+been red for every run since 2026-11-01, and the advisory database it
+checks against had grown well past what the original triage recorded;
+this release clears it.
+
+- **The SQLite shipped inside Colophon is patched.** rusqlite moves to
+  0.41.1, which carries libsqlite3-sys 0.39.1, the fix for
+  CVE-2026-119375 in the bundled SQLite. That matters more than it
+  sounds: the import dialog accepts any `*.db` file, so SQLite's file
+  parser is squarely in Colophon's attack surface.
+- **The zip crate moves from 2.4.2 to 9.7.0.** Six RustSec advisories
+  against the 2.x line (SUID/SGID preservation, symlink escapes,
+  permissions applied through symlinks, a symlink-size extraction
+  abort, AES-authentication skipping, local-header name mismatch), each
+  fixed only in 9.x. The EPUB reader now skips entries whose names
+  cannot be resolved against the central directory (zip 9 makes that
+  resolution fallible); every readable document still counts, and no
+  word count moves.
+- **chrono's "unmaintained" flag is on the record.** RUSTSEC-2026-0543
+  marks every chrono 0.4 version unmaintained and offers no upgrade
+  path, so no lockfile bump can clear it. The advisory gate's config
+  now ignores that one advisory with the reasoning written beside it;
+  migrating the metric layer's timezone math to another time crate
+  stays a deliberate future project, not a CI fix.
+- **The toolchain floor rises to Rust 1.89**, rusqlite 0.41's own
+  requirement, and two clippy lints new in stable 1.100 are chased with
+  mechanical rewrites (`as_chunks`, `is_multiple_of`).
+- **CI action bumps ride along**: the Swatinem/rust-cache 2.9.3 and
+  dtolnay/rust-toolchain pins, via the two dependabot PRs the red gate
+  had been blocking.
+
+Suite 134 green across the workspace; clippy `-D warnings`, fmt clean,
+advisories gate clear.
+
 ## v2.6.0 (2026-09-15)
 
 The word-count axis: Colophon's numbers gain a unit that no reading
