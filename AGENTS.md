@@ -13,7 +13,7 @@ it exists: every KOReader stats tool Brandon has found is a web dashboard or
 a self-hosted Docker instance, and he doesn't want that. See `README.md` and
 `spec.md`.
 
-## Where this stands right now (prose written 2026-07-16 at v2.1.0; current release v2.6.1)
+## Where this stands right now (prose written 2026-07-16 at v2.1.0; current release v2.6.2)
 
 **Shipped 2.1.** Phases 0 through 4.6 plus Phase 7 (device auto-pull,
 v1.1.0) and Phase 6 (the de-adwaita migration, v2.0.0) are complete. Two
@@ -49,6 +49,10 @@ the cargo-deny advisories gate is green again (rusqlite 0.41.1 carries
 the bundled-SQLite CVE fix; zip sits on its fixed 9.x line), the
 chrono-unmaintained advisory is ignored with its rationale recorded in
 `deny.toml`, and the MSRV floor is dependency-driven at 1.89.
+**v2.6.2** (2026-11-17) ports release.yml to a deterministic read of the
+annotated tag (issue #8: `--notes-from-tag` can silently fall back to
+the commit message under Actions; the v2.5.0/v2.6.0 release bodies were
+repaired in place from their tag messages, 2026-11-17).
 
 Phase 6f opened later for packaging: the Flatpak moved to the GNOME 50
 runtime and the build was verified for real (2026-07-23), and the cargo

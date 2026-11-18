@@ -32,6 +32,11 @@
   </developer>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2.6.2" date="2026-11-17">
+      <description translate="no">
+        <p>A release-engineering fix: GitHub Releases are minted from a deterministic read of the annotated tag, so release notes can never degrade to a commit message. Nothing in the app changes.</p>
+      </description>
+    </release>
     <release version="2.6.1" date="2026-11-17">
       <description translate="no">
         <p>A maintenance release: the SQLite bundled into the binary is patched (CVE-2026-119375, via rusqlite 0.41.1), the zip crate moves to its fixed 9.x line, and the CI advisory gate is green again. Nothing about the app itself changed.</p>

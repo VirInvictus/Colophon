@@ -1,5 +1,25 @@
 # Patchnotes
 
+## v2.6.2 (2026-11-17)
+
+A release-engineering fix, cutting its own proof: nothing in the app
+changes, and no number moves.
+
+- **Releases are minted from a deterministic read of the annotated
+  tag.** release.yml created GitHub Releases with `gh --notes-from-tag`,
+  which is unreliable inside Actions: actions/checkout rewrites the
+  pushed tag ref to the commit it points at, the annotated tag object
+  is gone locally, and gh can silently fall back to the commit message.
+  That is exactly what damaged the v2.5.0 and v2.6.0 release bodies
+  (repaired in place 2026-11-17 from their tag messages; v2.6.1 got the
+  correct body by luck, which is the flakiness that made the bug
+  dangerous). The workflow now force-restores the annotated tag object
+  after checkout, refuses a lightweight tag with a loud error, and
+  writes the verbatim patchnotes entry as the release body with the
+  entry's heading line as the title. This release is the end-to-end
+  proof: the body below comes from the new path and is byte-identical
+  to the tag's annotation.
+
 ## v2.6.1 (2026-11-17)
 
 A maintenance release from the CI-repair lane: nothing you see moves,
