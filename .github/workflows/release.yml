@@ -1,8 +1,14 @@
 name: Release
 
-# A pushed v* tag is a release: the GitHub Release is created from the
-# tag's own annotation, so the release notes are the patchnotes entry the
-# tag was cut with and the zero-Releases state cannot recur.
+# A pushed v* tag is a release: the GitHub Release body is the tag's own
+# annotation (the verbatim patchnotes entry the tag was cut with), read
+# deterministically from the local tag object, so the release notes can
+# never degrade to a commit message and the zero-Releases state cannot
+# recur. (Issue #8: `gh release create --notes-from-tag` is unreliable
+# inside Actions because actions/checkout rewrites refs/tags/vX to the
+# commit it points at, so gh can silently fall back to the commit
+# message; v2.5.0/v2.6.0 ate their notes that way and were repaired in
+# place 2026-11-17.)
 
 on:
   push:
@@ -16,16 +22,38 @@ jobs:
     name: Create the GitHub Release from the tag
     runs-on: ubuntu-latest
     steps:
-      # actions/checkout v5.0.0. Needed because `--notes-from-tag` reads
-      # the annotated tag object from the local git, not the API.
+      # actions/checkout v5.0.0, full fetch (kept from the proven fleet
+      # shape): a repo with history, then the tag ref force-restored on
+      # top of it below.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
 
-      - name: gh release create --notes-from-tag
+      # checkout rewrites refs/tags/vX to the resolved commit SHA, so the
+      # annotated tag object must be force-restored before anything reads
+      # it. Ordered AFTER checkout because checkout is what clobbers it.
+      - name: Fetch the annotated tag object
+        run: git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+        env:
+          TAG: ${{ github.ref_name }}
+
+      - name: Publish the Release from the tag annotation
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          # gh rejects `--notes-from-tag` together with a --repo flag; the
-          # GH_REPO env var is the supported way to name the repository.
-        run: gh release create "$GITHUB_REF_NAME" --notes-from-tag
+          # gh rejects --notes-from-tag with a --repo flag; GH_REPO is the
+          # supported way to name the repository, and the tag now comes
+          # from the explicit local read below, not from gh's fallback.
+          TAG: ${{ github.ref_name }}
+        run: |
+          OT="$(git for-each-ref "refs/tags/$TAG" --format='%(objecttype)')"
+          if [ "$OT" != "tag" ]; then
+            echo "::error::tag $TAG is $OT, not an annotated tag; the verbatim patchnotes entry is unavailable"
+            exit 1
+          fi
+          # %(contents) is the tag message plus for-each-ref's own record
+          # newline; drop that one byte so the body is byte-identical to
+          # the annotated message (`git cat-file tag "$TAG"`).
+          git for-each-ref "refs/tags/$TAG" --format='%(contents)' | head -c -1 > /tmp/release-notes.md
+          TITLE="$(head -1 /tmp/release-notes.md)"
+          gh release create "$TAG" --notes-file /tmp/release-notes.md --title "$TITLE"
